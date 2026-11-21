@@ -1,0 +1,21 @@
+__pycache__/
+.venv/
+*.bak
+*.log
+*.tmp
+# dati dell'ultimo giro: stanno sul branch "data", non su main
+/raw_v2.jsonl
+/trips_raw_v2.jsonl
+/trips_data.json
+/scan_meta.json
+/bot/snapshot.json
+/raw.jsonl
+/trips_raw.jsonl
+/prev/
+# output generati
+/_site/
+/agosto-2027.html
+/agosto-2027-v2.html
+/popular-preview.html
+/origins.json
+/fail_reason.txt

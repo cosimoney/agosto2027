@@ -1,0 +1,34 @@
+/* Tab "Popular trips": usa solo i token e le classi di template.html (.card .badge .pp .cp .detail .chip .kpi .mx .cell .fl .lbox).
+   Qui c'e' solo quello che manca al template. Tutto sotto #pop-root, nessun colore nuovo. */
+#pop-root{min-width:0}
+#pop-root .pt-route{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;color:var(--ink-soft);overflow-wrap:anywhere}
+#pop-root .pt-route b{color:var(--ink);font-weight:600}
+#pop-root .pt-tot{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;border-top:1px dashed var(--line);padding-top:6px;margin-top:2px}
+#pop-root .pt-tot .pp{font-size:16px}
+#pop-root .pt-est{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--warn)}
+#pop-root .pt-real{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ok)}
+#pop-root .pt-hi{margin:8px 0 0;padding:0 0 0 18px;max-width:72ch}
+#pop-root .pt-hi li{margin:2px 0}
+#pop-root .pt-stages{list-style:none;margin:0;padding:0;counter-reset:st}
+#pop-root .pt-stages li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:2px 10px;padding:7px 0;border-bottom:1px solid var(--line)}
+#pop-root .pt-stages li:last-child{border-bottom:0}
+#pop-root .pt-n{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;font-weight:600;color:var(--ink-soft);white-space:nowrap}
+#pop-root .pt-stages b{font-weight:600}
+#pop-root .pt-stages span.s{color:var(--ink-soft);font-size:12.5px;grid-column:2;overflow-wrap:anywhere}
+#pop-root table.pt-cost{border-collapse:collapse;width:100%;font-size:13px}
+#pop-root table.pt-cost td{padding:6px 0;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}
+#pop-root table.pt-cost td:last-child{text-align:right;white-space:nowrap;font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-weight:600;padding-left:10px}
+#pop-root table.pt-cost tr.t td{border-bottom:0;border-top:2px solid var(--ink);font-weight:600}
+#pop-root table.pt-cost small{display:block;color:var(--ink-soft);font-weight:400}
+#pop-root .pt-leg{display:block}
+#pop-root .pt-leg + .pt-leg{margin-top:6px;padding-top:6px;border-top:1px dashed var(--line)}
+#pop-root .fl-r a{display:block}
+#pop-root select.chip{max-width:100%}
+#pop-root .cell small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:600px){
+  #pop-root .grid{grid-template-columns:minmax(0,1fr)}
+  #pop-root table.mx{border-spacing:2px}
+  #pop-root table.mx th.r{width:62px;font-size:10px}
+  #pop-root .cell{font-size:12px;padding:6px 1px}
+  #pop-root .fl-r{text-align:left;white-space:normal;flex:1 1 100%}
+}

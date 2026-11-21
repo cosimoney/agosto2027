@@ -1,0 +1,451 @@
+<!doctype html><html lang="it">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agosto 2027 da Milano</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#f2f4f6;--paper:#ffffff;--ink:#182430;--ink-soft:#5b6975;--line:#dde3e8;
+  --board:#152230;--board-ink:#e9eef3;--amber:#e3a52e;
+  --ok:#0e7c5b;--ok-bg:#e2f2ec;--warn:#9a6a12;--warn-bg:#f7ecd4;
+  --info:#2b5f9e;--info-bg:#e3edf8;
+  --chip-on:#182430;--chip-on-ink:#f2f4f6;--detail-bg:#f7f9fa;--heat:#0e7c5b;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#10161d;--paper:#1a232c;--ink:#e7ecf1;--ink-soft:#93a1ad;--line:#2c3945;
+    --board:#0c141c;--board-ink:#e7ecf1;--amber:#e8b04a;
+    --ok:#5ecfa6;--ok-bg:#12352a;--warn:#e0b25e;--warn-bg:#3a2f16;
+    --info:#8fbcf0;--info-bg:#1b2c40;
+    --chip-on:#e7ecf1;--chip-on-ink:#10161d;--detail-bg:#151d25;--heat:#2f9c7a;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#10161d;--paper:#1a232c;--ink:#e7ecf1;--ink-soft:#93a1ad;--line:#2c3945;
+  --board:#0c141c;--board-ink:#e7ecf1;--amber:#e8b04a;
+  --ok:#5ecfa6;--ok-bg:#12352a;--warn:#e0b25e;--warn-bg:#3a2f16;
+  --info:#8fbcf0;--info-bg:#1b2c40;
+  --chip-on:#e7ecf1;--chip-on-ink:#10161d;--detail-bg:#151d25;--heat:#2f9c7a;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{overflow-x:hidden}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:"Archivo",system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.55;overflow-x:hidden}
+.mono,.eyebrow,.lbl,.rules{font-family:"IBM Plex Mono",ui-monospace,monospace}
+.board{background:var(--board);color:var(--board-ink);padding:34px 24px 0}
+.board-inner{max-width:1120px;margin:0 auto}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0 0 10px}
+h1{font-family:"Bricolage Grotesque","Archivo",system-ui,sans-serif;font-weight:700;font-size:clamp(26px,4vw,40px);margin:0 0 12px;text-wrap:balance;line-height:1.12}
+.rules{font-size:12.5px;color:color-mix(in srgb, var(--board-ink) 70%, transparent);display:flex;flex-wrap:wrap;gap:6px 22px;margin:0;padding:0;list-style:none}
+.rules b{color:var(--amber);font-weight:500}
+.tabs{display:flex;gap:4px;margin-top:24px;flex-wrap:wrap}
+.tab{font:inherit;font-weight:600;font-size:14px;border:0;cursor:pointer;padding:10px 16px;border-radius:10px 10px 0 0;background:color-mix(in srgb, var(--board-ink) 10%, transparent);color:var(--board-ink)}
+.tab[aria-selected="true"]{background:var(--ground);color:var(--ink)}
+.tab small{font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:400;opacity:.7;margin-left:6px}
+.tab:focus-visible,.chip:focus-visible,.card:focus-visible,.cell:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+main{max-width:1120px;margin:0 auto;padding:22px 24px 60px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:0 0 18px}
+.kpi{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 16px;min-width:0}
+.kpi .k-l{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+.kpi .k-v{font-family:"Bricolage Grotesque","Archivo",system-ui,sans-serif;font-weight:700;font-size:24px;line-height:1.2}
+.kpi .k-s{font-size:12.5px;color:var(--ink-soft);overflow-wrap:anywhere}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:0 0 16px}
+.grp{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.lbl{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);margin-right:2px}
+.chip{font-family:"Archivo",system-ui,sans-serif;font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:5px 13px;cursor:pointer;max-width:100%}
+.chip[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink);border-color:var(--chip-on)}
+input.chip{cursor:text;min-width:0;width:190px}
+.count{margin:0 0 10px;color:var(--ink-soft);font-size:13.5px}
+.count b{color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px;cursor:pointer;text-align:left;font:inherit;color:var(--ink);display:flex;flex-direction:column;gap:5px;min-width:0}
+.card:hover{border-color:color-mix(in srgb, var(--amber) 60%, var(--line))}
+.card[aria-expanded="true"]{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber)}
+.c-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.c-name{font-family:"Bricolage Grotesque","Archivo",system-ui,sans-serif;font-weight:700;font-size:16.5px;line-height:1.2}
+.c-iata{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;color:var(--ink-soft)}
+.c-sub{color:var(--ink-soft);font-size:12.5px}
+.c-price{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:2px}
+.pp{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-weight:600;font-size:21px}
+.pp small{font-size:12px;font-weight:500;color:var(--ink-soft)}
+.cp{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;color:var(--ink-soft)}
+.badges{display:flex;flex-wrap:wrap;gap:5px}
+.badge{display:inline-block;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;border-radius:5px;padding:2px 7px;border:1px solid transparent;white-space:nowrap}
+.badge.ok{background:var(--ok-bg);color:var(--ok)}
+.badge.warn{background:var(--warn-bg);color:var(--warn)}
+.badge.info{background:var(--info-bg);color:var(--info)}
+.badge.plain{border-color:var(--line);color:var(--ink-soft)}
+.badge.wrap{white-space:normal}
+.c-clima{font-size:12.5px;color:var(--ink-soft)}
+.c-giro{font-size:12.5px}
+.c-giro s{text-decoration:none;color:var(--ink-soft)}
+.score{font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:600;font-size:12px;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:1px 6px;white-space:nowrap}
+.detail{grid-column:1/-1;background:var(--detail-bg);border:1px solid var(--amber);border-radius:10px;padding:18px;min-width:0}
+.d-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.d-title{font-family:"Bricolage Grotesque","Archivo",system-ui,sans-serif;font-weight:700;font-size:20px;margin:0}
+.d-why{margin:6px 0 0;max-width:72ch}
+.d-h{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);margin:18px 0 8px}
+.d-cols{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:8px 28px}
+@media (max-width:820px){.d-cols{grid-template-columns:minmax(0,1fr)}}
+table.mx{border-collapse:separate;border-spacing:3px;width:100%;table-layout:fixed}
+table.mx th{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;font-weight:500;color:var(--ink-soft);text-align:center;padding:2px}
+table.mx th.r{text-align:left;white-space:nowrap;width:76px}
+.cell{display:block;width:100%;border:1px solid transparent;border-radius:6px;padding:6px 2px;font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;text-align:center;line-height:1.2}
+.cell small{display:block;font-size:10px;font-weight:400;color:var(--ink-soft)}
+.cell.na{background:transparent;border:1px dashed var(--line);color:var(--ink-soft);font-weight:400;cursor:default}
+.cell[aria-pressed="true"]{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.fl{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0 0 6px;display:flex;justify-content:space-between;gap:8px 16px;flex-wrap:wrap}
+.fl-l{min-width:0;flex:1 1 240px}
+.fl-t{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:13.5px;font-weight:600}
+.fl-m{font-size:12.5px;color:var(--ink-soft);overflow-wrap:anywhere}
+.fl-r{text-align:right;white-space:nowrap}
+.fl-r .pp{font-size:17px}
+.apt{display:inline-block;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;font-weight:600;border-radius:5px;padding:1px 6px;border:1px solid var(--line);color:var(--ink-soft);margin-right:6px}
+.apt.lin{border-color:color-mix(in srgb, var(--ok) 55%, transparent);color:var(--ok)}
+.trips{margin:14px 0 0}
+.trips-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:0 0 8px}
+.trips-top .d-h{margin:0}
+.trips-top .chip{font-size:12px;padding:3px 10px}
+.trips-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:6px 10px;align-items:start}
+.it{background:var(--paper);border:1px solid var(--line);border-radius:8px;min-width:0}
+.it[open]{border-color:color-mix(in srgb, var(--amber) 60%, var(--line))}
+.it summary{cursor:pointer;list-style:none;padding:10px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 10px;border-radius:8px}
+.it summary::-webkit-details-marker{display:none}
+.it summary::after{content:"+";grid-column:2;grid-row:1;font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:600;font-size:15px;line-height:1.3;color:var(--ink-soft)}
+.it[open] summary::after{content:"−"}
+.it summary:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.it-n{grid-column:1;grid-row:1;font-family:"Bricolage Grotesque","Archivo",system-ui,sans-serif;font-weight:700;font-size:15px;line-height:1.25;overflow-wrap:anywhere}
+.it summary .badges,.it-t{grid-column:1/-1}
+.it-t{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;line-height:1.5;color:var(--ink);overflow-wrap:anywhere}
+.it-t b{font-weight:600}
+.it-t i{font-style:normal;color:var(--ink-soft)}
+.it-b{padding:0 12px 12px;font-size:13px;overflow-wrap:anywhere}
+.it-b p{margin:0 0 6px}
+.it-b ul{margin:0 0 8px;padding-left:18px}
+.it-b li{margin:0 0 2px}
+.it-b .k{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);display:block}
+.it-aug{background:var(--warn-bg);color:var(--warn);border-radius:6px;padding:6px 9px}
+.it-aug .k{color:inherit}
+.it-src{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px}
+a{color:var(--info)}
+.note{font-size:12.5px;color:var(--ink-soft);max-width:72ch;margin:8px 0 0}
+.empty{padding:28px 18px;text-align:center;color:var(--ink-soft);background:var(--paper);border:1px solid var(--line);border-radius:10px}
+.lists{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:22px}
+.lbox{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+.lbox h2{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 8px;font-weight:500}
+.lbox ul{margin:0;padding:0;list-style:none;font-size:13px}
+.lbox li{padding:5px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.lbox li:last-child{border-bottom:0}
+.lbox li span{color:var(--ink-soft)}
+.footnotes{margin:22px 0 0;color:var(--ink-soft);font-size:13px;max-width:76ch}
+.footnotes p{margin:0 0 8px}
+@media (max-width:600px){
+  .board{padding:26px 16px 0}
+  main{padding:18px 16px 50px}
+  .detail{padding:14px 12px}
+  .tab{padding:9px 12px;font-size:13px}
+}
+</style>
+
+<header class="board">
+  <div class="board-inner">
+    <p class="eyebrow">Milano (LIN &middot; MXP) &middot; Roma FCO &middot; Pisa PSA &middot; fuori Europa &middot; 2 adulti</p>
+    <h1>Agosto 2027 da Milano</h1>
+    <ul class="rules">
+      <li>andata <b>ven 6 &rarr; sab 14 ago</b></li>
+      <li>durata <b>10 / 11 / 12 giorni</b></li>
+      <li>max <b>1 scalo</b> per tratta</li>
+      <li>2 scali solo se <b>&minus;25% e &minus;150&euro; pp</b></li>
+      <li>prezzi <b>A/R per persona</b></li>
+    </ul>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="new" aria-selected="true">Nuove mete<small id="tn-new"></small></button>
+      <button class="tab" role="tab" data-tab="vis" aria-selected="false">Gi&agrave; visitati &mdash; nuovi giri<small id="tn-vis"></small></button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="kpis" id="kpis"></div>
+  <div class="controls">
+    <span class="grp"><input type="search" class="chip" id="q" placeholder="Cerca meta o paese&hellip;" aria-label="Cerca meta o paese"></span>
+    <span class="grp"><span class="lbl">Da</span><span class="grp" id="f-origin"></span></span>
+    <span class="grp"><span class="lbl">Area</span><span class="grp" id="f-area"></span></span>
+    <span class="grp"><span class="lbl">Paese</span><select class="chip" id="f-country" aria-label="Paese"></select></span>
+    <span class="grp"><span class="lbl">Budget pp</span><select class="chip" id="f-budget" aria-label="Budget massimo per persona"></select></span>
+    <span class="grp"><span class="lbl">Max scali</span><span class="grp" id="f-stops"></span></span>
+    <span class="grp"><span class="lbl">Durata</span><span class="grp" id="f-dur"></span></span>
+    <span class="grp"><span class="lbl">Andata</span><select class="chip" id="f-dep" aria-label="Data di andata"></select></span>
+    <span class="grp"><span class="lbl">Clima</span><span class="grp" id="f-clima"></span></span>
+    <span class="grp"><span class="lbl">Ordina</span><select class="chip" id="f-sort" aria-label="Ordinamento">
+      <option value="score">Punteggio</option><option value="price">Prezzo pp</option><option value="clima">Clima</option></select></span>
+  </div>
+  <p class="count" id="count"></p>
+  <div class="grid" id="grid"></div>
+  <p class="empty" id="empty" hidden>Nessuna destinazione con questi filtri.</p>
+  <div class="lists" id="lists"></div>
+  <div class="footnotes" id="foot"></div>
+</main>
+
+<script>
+const RAW = /*__DATA__*/;
+const DEST = Object.fromEntries(RAW.dests.map(d => [d.code, d]));
+const MESI = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
+const GIORNI = ["dom","lun","mar","mer","gio","ven","sab"];
+const CL = RAW.clima;
+const CL_RANK = {ottimo:0, buono:1, accettabile:2, sconsigliato:3};
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const eur = n => Math.round(n).toLocaleString("it-IT") + " €";
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const dt = iso => { const [y,m,d] = iso.split("-").map(Number); return new Date(y, m-1, d); };
+const fmtD = iso => { const x = dt(iso); return `${GIORNI[x.getDay()]} ${x.getDate()} ${MESI[x.getMonth()]}`; };
+const addD = (iso, n) => { const x = dt(iso); x.setDate(x.getDate()+n); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`; };
+const hm = m => `${Math.floor(m/60)}h ${String(m%60).padStart(2,"0")}m`;
+const clamp = x => Math.max(0, Math.min(1, x));
+// flight tuple: [price, airlines, outDurMin, outStops, depTime, arrTime, dayOffset, layovers, from, to]
+
+const state = { tab:"new", q:"", origin:"all", area:"all", country:"all", budget:0, stops:1, dur:"all", dep:"all", clima:"all", sort:"score", open:null, cell:null, tstyle:"all", topen:new Set() };
+
+function scoreOf(f, d){
+  const price = clamp((2200 - f[0]) / 1700);
+  const comfort = 0.5 * [1, 0.7, 0.3][Math.min(f[3], 2)] + 0.5 * clamp((32*60 - f[2]) / (25*60));
+  return Math.round(100 * (0.5 * price + 0.25 * comfort + 0.25 * (CL[d.g] || 0)));
+}
+// options of a combo under the stops filter: [{f, two, save, pct}]
+function options(c){
+  const out = c.a.filter(f => f[3] <= state.stops).map(f => ({f, two:false}));
+  if(state.stops >= 2 && c.b && c.a.length){
+    const p1 = c.a[0][0];
+    out.push({f:c.b, two:true, save:p1 - c.b[0], pct:Math.round(100 * (p1 - c.b[0]) / p1)});
+  }
+  return out.sort((x, y) => x.f[0] - y.f[0]);
+}
+function match(c, skip){
+  const d = DEST[c.d];
+  if(!d || d.tab !== state.tab || d.g === "sconsigliato") return false;
+  if(skip !== "origin" && state.origin !== "all" && c.o !== state.origin) return false;
+  if(skip !== "area" && state.area !== "all" && d.area !== state.area) return false;
+  if(skip !== "country" && state.country !== "all" && d.country !== state.country) return false;
+  if(skip !== "dur" && state.dur !== "all" && c.n !== +state.dur) return false;
+  if(skip !== "dep" && state.dep !== "all" && c.dep !== state.dep) return false;
+  if(skip !== "clima" && state.clima === "ottimo" && d.g !== "ottimo") return false;
+  if(skip !== "clima" && state.clima === "buono" && CL_RANK[d.g] > 1) return false;
+  if(state.q && !norm(d.city + " " + d.country + " " + d.code).includes(state.q)) return false;
+  const o = options(c);
+  if(!o.length) return false;
+  if(skip !== "budget" && state.budget && o[0].f[0] > state.budget) return false;
+  return true;
+}
+function agg(){
+  const map = new Map();
+  for(const c of RAW.combos){
+    if(!match(c, null)) continue;
+    const d = DEST[c.d], o = options(c)[0], s = scoreOf(o.f, d);
+    let a = map.get(c.d);
+    if(!a){ a = {d, min:Infinity, max:0, n:0, best:null, bestS:-1, cheap:null, origins:new Set()}; map.set(c.d, a); }
+    a.n++; a.origins.add(c.o);
+    if(o.f[0] < a.min){ a.min = o.f[0]; a.cheap = {c, o}; }
+    a.max = Math.max(a.max, o.f[0]);
+    if(s > a.bestS){ a.bestS = s; a.best = {c, o}; }
+  }
+  const list = [...map.values()];
+  const by = {
+    score: (x, y) => y.bestS - x.bestS || x.min - y.min,
+    price: (x, y) => x.min - y.min || y.bestS - x.bestS,
+    clima: (x, y) => CL_RANK[x.d.g] - CL_RANK[y.d.g] || y.bestS - x.bestS,
+  };
+  return list.sort(by[state.sort]);
+}
+function chips(el, items, cur, key){
+  $(el).innerHTML = items.map(([v, l]) => `<button class="chip" data-k="${key}" data-v="${esc(v)}" aria-pressed="${String(v) === String(cur)}">${esc(l)}</button>`).join("");
+}
+function rebuildFilters(){
+  const tabCombos = skip => RAW.combos.filter(c => match(c, skip));
+  const areas = [...new Set(tabCombos("area").map(c => DEST[c.d].area))].sort((a, b) => a.localeCompare(b, "it"));
+  if(state.area !== "all" && !areas.includes(state.area)) state.area = "all";
+  const countries = [...new Set(tabCombos("country").map(c => DEST[c.d].country))].sort((a, b) => a.localeCompare(b, "it"));
+  if(state.country !== "all" && !countries.includes(state.country)) state.country = "all";
+  const deps = [...new Set(tabCombos("dep").map(c => c.dep))].sort();
+  if(state.dep !== "all" && !deps.includes(state.dep)) state.dep = "all";
+  chips("f-origin", [["all","Tutti"],["LIN","Linate"],["MXP","Malpensa"],["FCO","Roma"],["PSA","Pisa"]], state.origin, "origin");
+  chips("f-area", [["all","Tutte"], ...areas.map(a => [a, a])], state.area, "area");
+  chips("f-stops", [[0,"Diretto"],[1,"1"],[2,"2 (se conviene)"]], state.stops, "stops");
+  chips("f-dur", [["all","Tutte"],[10,"10"],[11,"11"],[12,"12"]], state.dur, "dur");
+  chips("f-clima", [["all","Tutti"],["buono","Buono+"],["ottimo","Ottimo"]], state.clima, "clima");
+  $("f-country").innerHTML = `<option value="all">Tutti</option>` + countries.map(c => `<option${c === state.country ? " selected" : ""}>${esc(c)}</option>`).join("");
+  $("f-dep").innerHTML = `<option value="all">Tutte</option>` + deps.map(x => `<option value="${x}"${x === state.dep ? " selected" : ""}>${fmtD(x)}</option>`).join("");
+  $("f-budget").innerHTML = [0,800,1000,1200,1500,1800,2200].map(b => `<option value="${b}"${b === state.budget ? " selected" : ""}>${b ? "≤ " + eur(b) : "Nessun limite"}</option>`).join("");
+}
+function climaBadge(d){
+  const cls = d.g === "ottimo" ? "ok" : d.g === "buono" ? "info" : "warn";
+  return `<span class="badge ${cls}">clima ${esc(d.g)}</span>`;
+}
+function twoBadge(o){
+  return o.two ? `<span class="badge warn wrap">2 scali — risparmi ${eur(o.save)} pp (${o.pct}%)</span>` : "";
+}
+function stopsTxt(f){
+  return f[3] === 0 ? "diretto" : `${f[3]} ${f[3] === 1 ? "scalo" : "scali"} · ${esc(f[7])}`;
+}
+function cardHTML(a){
+  const d = a.d, b = a.best, lin = a.origins.has("LIN");
+  return `<button class="card" data-code="${d.code}" aria-expanded="${state.open === d.code}">
+    <span class="c-top"><span class="c-name">${esc(d.city)}</span><span class="score" title="Punteggio 0-100: prezzo pp 50%, comodità 25%, clima 25%">${a.bestS}/100</span></span>
+    <span class="c-sub">${esc(d.country)} · ${esc(d.area)} · <span class="c-iata">${d.code}</span></span>
+    <span class="c-price"><span class="pp">${eur(a.min)} <small>pp A/R</small></span><span class="cp">${a.max > a.min ? "fino a " + eur(a.max) + " · " : ""}coppia da ${eur(a.min * 2)}</span></span>
+    <span class="badges">${lin ? `<span class="badge ok">da Linate</span>` : `<span class="badge plain">solo ${[...a.origins].join(" · ")}</span>`}${climaBadge(d)}${d.flag ? `<span class="badge plain">${esc(d.flag)}</span>` : ""}${twoBadge(a.cheap.o)}</span>
+    <span class="c-clima">${esc(d.temp)} · ${esc(d.rain)}</span>
+    ${d.giro ? `<span class="c-giro"><s>${esc(d.seen)}</s> → <b>${esc(d.giro)}</b></span>` : ""}
+    <span class="c-sub">Migliore: ${fmtD(b.c.dep)} · ${b.c.n} giorni · ${b.c.o} · ${stopsTxt(b.o.f)} · ${hm(b.o.f[2])} · ${eur(b.o.f[0])} pp</span>
+  </button>`;
+}
+function tripsHTML(d){
+  const all = (RAW.trips || {})[d.code] || [];
+  if(!all.length) return "";
+  const styles = [...new Set(all.flatMap(t => t.s))];
+  if(state.tstyle !== "all" && !styles.includes(state.tstyle)) state.tstyle = "all";
+  const list = all.filter(t => state.tstyle === "all" || t.s.includes(state.tstyle));
+  const pace = {intenso:"ok", medio:"info", rilassato:"plain"};
+  const chipsH = styles.length > 1 && all.length > 1 ? `<span class="grp">` + [["all", "Tutti"], ...styles.map(x => [x, x])].map(([v, l]) =>
+    `<button class="chip" data-k="tstyle" data-v="${esc(v)}" aria-pressed="${v === state.tstyle}">${esc(l)}</button>`).join("") + `</span>` : "";
+  const items = list.map(t => {
+    const nights = t.t.reduce((s, x) => s + x[1], 0);
+    const g = `https://www.google.com/search?q=${encodeURIComponent(`itinerario ${t.n} ${d.country} agosto ${nights} notti`)}`;
+    return `<details class="it" data-trip="${esc(t.n)}"${state.topen.has(t.n) ? " open" : ""}>
+      <summary><span class="it-n">${esc(t.n)}</span>
+        <span class="badges">${t.s.map(x => `<span class="badge plain">${esc(x)}</span>`).join("")}<span class="badge ${pace[t.r] || "plain"}">ritmo ${esc(t.r)}</span><span class="badge plain wrap" title="Stima a terra per persona, mid-range, volo internazionale escluso">~ ${esc(t.c)}</span></span>
+        <span class="it-t">${t.t.map(x => `<b>${esc(x[0])}</b> ${x[1]}n`).join(` <i>→</i> `)} <i>· ${nights} notti</i></span></summary>
+      <div class="it-b">
+        <p><span class="k">Come ci si muove</span>${esc(t.m)}</p>
+        <p><span class="k">Costo a terra · stima</span>${esc(t.c)}, mid-range per l'intero giro, volo internazionale escluso</p>
+        <span class="k">Da non perdere</span><ul>${t.h.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+        <p class="it-aug"><span class="k">Ad agosto</span>${esc(t.a)}</p>
+        ${t.oj ? `<p><span class="k">Open-jaw</span>${esc(t.oj)} I prezzi in pagina restano A/R sullo stesso aeroporto.</p>` : ""}
+        ${(t.src || []).length ? `<p class="it-src"><span class="k">Fonti</span>${t.src.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(String(u).replace(/^https?:\/\/(www\.)?/, "").split("/")[0])} ↗</a>`).join(" · ")}</p>` : ""}
+        <a class="cp" href="${g}" target="_blank" rel="noopener">Cerca su Google ↗</a>
+      </div></details>`;
+  }).join("");
+  return `<div class="trips"><div class="trips-top"><p class="d-h">Itinerari popolari · ${all.length} ${all.length === 1 ? "idea" : "idee"} per 10-12 giorni</p>${chipsH}</div>
+    <div class="trips-grid">${items}</div>
+    <p class="note">Tocca un itinerario per tappe, spostamenti e note di agosto. Notti a terra per tappa (n); costi indicativi per persona; dove ci sono le «Fonti», tappe e prezzi sono stati confrontati online a novembre 2026.${d.giro ? " Giri pensati fuori dalle zone già viste." : ""}</p></div>`;
+}
+function detailHTML(a){
+  const d = a.d;
+  const cs = RAW.combos.filter(c => c.d === d.code && match(c, null));
+  const deps = [...new Set(RAW.combos.filter(c => DEST[c.d].tab === state.tab).map(c => c.dep))].sort();
+  const cellBest = {};
+  for(const c of cs){
+    const o = options(c)[0], k = c.dep + "|" + c.n;
+    if(!cellBest[k] || o.f[0] < cellBest[k].o.f[0]) cellBest[k] = {c, o};
+  }
+  const keys = Object.keys(cellBest);
+  if(!state.cell || !cellBest[state.cell]) state.cell = a.best.c.dep + "|" + a.best.c.n;
+  const ps = keys.map(k => cellBest[k].o.f[0]), lo = Math.min(...ps), hi = Math.max(...ps);
+  let mx = `<table class="mx"><thead><tr><th class="r">Andata</th><th>10 giorni</th><th>11 giorni</th><th>12 giorni</th></tr></thead><tbody>`;
+  for(const dep of deps){
+    mx += `<tr><th class="r">${fmtD(dep)}</th>`;
+    for(const n of [10, 11, 12]){
+      const k = dep + "|" + n, x = cellBest[k];
+      if(!x){ mx += `<td><span class="cell na">–</span></td>`; continue; }
+      const t = hi > lo ? (hi - x.o.f[0]) / (hi - lo) : 1;
+      mx += `<td><button class="cell" data-cell="${k}" aria-pressed="${k === state.cell}" style="background:color-mix(in srgb, var(--heat) ${Math.round(5 + 30 * t)}%, var(--paper))" title="Rientro ${fmtD(addD(dep, n))}">${eur(x.o.f[0])}<small>${x.c.o}${x.o.two ? " · 2 scali" : ""}</small></button></td>`;
+    }
+    mx += `</tr>`;
+  }
+  mx += `</tbody></table><p class="note">Prezzo A/R per persona più basso della combinazione (aeroporto sotto il prezzo). Verde più intenso = più economico. Clicca una cella per i voli.</p>`;
+  const [dep, n] = state.cell.split("|"), ret = addD(dep, +n);
+  let fl = "";
+  for(const c of cs.filter(c => c.dep === dep && c.n === +n).sort((x, y) => (x.o === "LIN" ? 0 : 1) - (y.o === "LIN" ? 0 : 1))){
+    for(const o of options(c)){
+      const f = o.f, link = `https://www.google.com/travel/flights?q=${encodeURIComponent(`Flights from ${c.o} to ${d.code} on ${dep} through ${ret}`)}&curr=EUR&hl=it`;
+      fl += `<div class="fl"><div class="fl-l">
+        <div class="fl-t"><span class="apt ${c.o === "LIN" ? "lin" : ""}">${f[8]}</span>${f[4]} → ${f[5]}${f[6] ? `<sup>+${f[6]}</sup>` : ""} ${esc(f[9])}</div>
+        <div class="fl-m">${esc(f[1])} · ${stopsTxt(f)} · ${hm(f[2])} all'andata · punteggio ${scoreOf(f, d)}/100</div>
+        ${o.two ? `<div class="badges" style="margin-top:4px">${twoBadge(o)}</div>` : ""}
+      </div><div class="fl-r"><div class="pp">${eur(f[0])} <small>pp</small></div><div class="cp">coppia ${eur(f[0] * 2)}</div><a class="cp" href="${link}" target="_blank" rel="noopener">Google Flights ↗</a></div></div>`;
+    }
+  }
+  return `<div class="detail" id="detail">
+    <div class="d-head"><div><h2 class="d-title">${esc(d.city)} <span class="c-iata">${d.code} · ${esc(d.country)}</span></h2>
+      <div class="badges" style="margin-top:6px">${climaBadge(d)}<span class="badge plain">${esc(d.temp)}</span><span class="badge plain wrap">${esc(d.rain)}</span>${d.flag ? `<span class="badge plain">${esc(d.flag)}</span>` : ""}</div></div>
+      <div style="text-align:right"><div class="pp">${eur(a.min)} <small>pp A/R</small></div><div class="cp">coppia da ${eur(a.min * 2)}${a.max > a.min ? " · range pp fino a " + eur(a.max) : ""}</div></div></div>
+    <p class="d-why"><b>Perché ad agosto.</b> ${esc(d.why)}</p>
+    ${d.giro ? `<p class="d-why"><b>Già visto:</b> ${esc(d.seen)} → <b>giro nuovo:</b> ${esc(d.giro)}</p>` : ""}
+    ${tripsHTML(d)}
+    <div class="d-cols"><div><p class="d-h">Data di andata × durata · € pp</p>${mx}</div>
+    <div><p class="d-h">Voli migliori · ${fmtD(dep)} → ${fmtD(ret)} (${n} giorni)</p>${fl}
+    <p class="note">Orari, scali e durata si riferiscono all'andata; il prezzo è il totale A/R per persona con il ritorno più economico che rispetta lo stesso limite di scali (il ritorno si sceglie su Google Flights).</p></div></div>
+  </div>`;
+}
+function renderKpis(list){
+  const tot = RAW.dests.filter(d => d.tab === state.tab && d.g !== "sconsigliato").length;
+  const cheap = [...list].sort((x, y) => x.min - y.min)[0], top = [...list].sort((x, y) => y.bestS - x.bestS)[0];
+  const lin = list.filter(a => a.origins.has("LIN")).length;
+  const k = (l, v, s) => `<div class="kpi"><div class="k-l">${l}</div><div class="k-v">${v}</div><div class="k-s">${s}</div></div>`;
+  $("kpis").innerHTML =
+    k("Mete con voli validi", `${list.length}<span class="k-s"> / ${tot}</span>`, `con i filtri attivi · ${list.reduce((s, a) => s + a.n, 0)} combinazioni`) +
+    k("Prezzo pp più basso", cheap ? eur(cheap.min) : "–", cheap ? `${esc(cheap.d.city)} · coppia ${eur(cheap.min * 2)}` : "nessun volo") +
+    k("Miglior punteggio", top ? `${top.bestS}/100` : "–", top ? `${esc(top.d.city)} · ${eur(top.best.o.f[0])} pp · clima ${top.d.g}` : "") +
+    k("Raggiungibili da Linate", lin, `mete con partenza da LIN su ${list.length}`);
+}
+function renderLists(){
+  const tabD = RAW.dests.filter(d => d.tab === state.tab);
+  const valid = new Set(RAW.combos.filter(c => c.a.length).map(c => c.d));
+  const cov = c => RAW.cov[c] || [0, 0, null];
+  const stops = tabD.filter(d => d.g !== "sconsigliato" && !valid.has(d.code) && cov(d.code)[1] > 0);
+  const nodata = tabD.filter(d => d.g !== "sconsigliato" && cov(d.code)[1] === 0);
+  const clima = tabD.filter(d => d.g === "sconsigliato");
+  const box = (t, items, sub) => `<div class="lbox"><h2>${t}</h2>${sub ? `<p class="note" style="margin:0 0 6px">${sub}</p>` : ""}<ul>${items.length ? items.join("") : "<li><span>nessuna</span></li>"}</ul></div>`;
+  $("lists").innerHTML =
+    box("Scartate per troppi scali", stops.map(d => `<li><b>${esc(d.city)}</b> ${d.code} <span>· solo con 2 scali${cov(d.code)[2] ? ", da " + eur(cov(d.code)[2]) + " pp" : ""}</span></li>`), "Nessuna opzione con al massimo 1 scalo per tratta nelle date richieste.") +
+    box("Voli non ancora su Google Flights", nodata.map(d => `<li><b>${esc(d.city)}</b> ${d.code} <span>· ${esc(d.country)}</span></li>`), `Al ${RAW.meta.date} Google non restituiva tariffe per agosto 2027 su queste rotte da LIN/MXP/FCO/PSA: da ricontrollare più avanti.`) +
+    box("Scartate per clima", clima.map(d => `<li><b>${esc(d.city)}</b> <span>· ${esc(d.temp)}, ${esc(d.rain)}. ${esc(d.why)}${valid.has(d.code) ? "" : ""}</span></li>`).concat(RAW.excluded.map(e => `<li><span>${esc(e)}</span></li>`)), "Troppo caldo o in piena stagione di piogge, monsoni, uragani; in coda le esclusioni a monte.");
+}
+function render(){
+  rebuildFilters();
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.tab === state.tab));
+  const list = agg();
+  if(state.open && !list.some(a => a.d.code === state.open)){ state.open = null; state.cell = null; }
+  renderKpis(list);
+  $("count").innerHTML = `<b>${list.length}</b> destinazioni · prezzo A/R <b>per persona</b>, range sulle date selezionate · clicca una meta per matrice date e voli`;
+  $("grid").innerHTML = list.map(a => cardHTML(a) + (state.open === a.d.code ? detailHTML(a) : "")).join("");
+  $("empty").hidden = list.length > 0;
+  renderLists();
+}
+function tabCounts(){
+  const cur = state.tab;
+  for(const t of ["new", "vis"]){ state.tab = t; $("tn-" + t).textContent = new Set(RAW.combos.filter(c => match(c, null)).map(c => c.d)).size; }
+  state.tab = cur;
+}
+document.addEventListener("click", e => {
+  const tab = e.target.closest(".tab");
+  if(tab){ state.tab = tab.dataset.tab; state.open = null; state.cell = null; state.tstyle = "all"; state.topen = new Set(); state.area = "all"; state.country = "all"; render(); return; }
+  const chip = e.target.closest(".chip[data-k]");
+  if(chip){ const k = chip.dataset.k, v = chip.dataset.v; state[k] = k === "stops" ? +v : v; render(); tabCounts(); return; }
+  const cell = e.target.closest(".cell[data-cell]");
+  if(cell){ state.cell = cell.dataset.cell; render(); return; }
+  const card = e.target.closest(".card");
+  if(card){
+    const code = card.dataset.code;
+    state.open = state.open === code ? null : code; state.cell = null; state.tstyle = "all"; state.topen = new Set(); render();
+    if(state.open){ const el = document.querySelector(`.card[data-code="${code}"]`); if(el) el.scrollIntoView({block:"nearest", behavior:"smooth"}); }
+  }
+});
+document.addEventListener("toggle", e => {
+  const t = e.target;
+  if(!t || !t.matches || !t.matches("details.it")) return;
+  if(t.open) state.topen.add(t.dataset.trip); else state.topen.delete(t.dataset.trip);
+}, true);
+$("q").addEventListener("input", e => { state.q = norm(e.target.value.trim()); render(); tabCounts(); });
+$("f-country").addEventListener("change", e => { state.country = e.target.value; render(); });
+$("f-dep").addEventListener("change", e => { state.dep = e.target.value; render(); tabCounts(); });
+$("f-budget").addEventListener("change", e => { state.budget = +e.target.value; render(); tabCounts(); });
+$("f-sort").addEventListener("change", e => { state.sort = e.target.value; render(); });
+$("foot").innerHTML = `
+  <p><b>Prezzi.</b> Google Flights al ${RAW.meta.date}, A/R per persona in economy (tariffa base, 1 adulto); il prezzo coppia è il doppio. A nove mesi dalla partenza molte compagnie non hanno ancora caricato agosto 2027: i prezzi sono indicativi e l'offerta crescerà.</p>
+  <p><b>Scali.</b> Di base al massimo 1 scalo per tratta. Un'opzione con 2 scali compare solo impostando «Max scali: 2» e solo se costa almeno il ${Math.round(RAW.meta.minPct * 100)}% e almeno ${RAW.meta.minEur} € a persona in meno del miglior volo con al massimo 1 scalo per la stessa destinazione, aeroporto e date. Mai 3 o più scali.</p>
+  <p><b>Punteggio (0-100).</b> 50% prezzo pp (100 a 500 €, 0 a 2.200 €), 25% comodità (scali e durata dell'andata: diretto 1 · 1 scalo 0,7 · 2 scali 0,3; da 7 a 32 ore), 25% clima di agosto (ottimo 1 · buono 0,8 · accettabile 0,5).</p>
+  <p><b>Scansione.</b> ${RAW.dests.length} destinazioni × LIN, MXP, FCO e PSA × 9 date di andata (6-14 agosto) × 10/11/12 giorni: ${RAW.meta.q.toLocaleString("it-IT")} ricerche, ${RAW.meta.ok.toLocaleString("it-IT")} con voli.</p>`;
+render(); tabCounts();
+</script>
+</html>
