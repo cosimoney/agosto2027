@@ -1,0 +1,93 @@
+{
+ "digest_last": "2026-11-21",
+ "fav": {},
+ "global": {
+  "d_ALA@FCO-CIA": {
+   "min": 603
+  },
+  "d_CMB@FCO-CIA": {
+   "min": 821
+  },
+  "d_CMB@MXP": {
+   "min": 839
+  },
+  "d_EVN@FCO-CIA": {
+   "min": 260
+  },
+  "d_EVN@LIN": {
+   "min": 358
+  },
+  "d_EVN@MXP": {
+   "min": 390
+  },
+  "d_KUL@FCO-CIA": {
+   "min": 792
+  },
+  "d_KUL@MXP": {
+   "min": 887
+  },
+  "d_TBS@FCO-CIA": {
+   "min": 367
+  },
+  "d_TBS@MXP": {
+   "min": 416
+  },
+  "t_canada-rockies@FCO-CIA": {
+   "min": 890
+  },
+  "t_canada-rockies@MXP": {
+   "min": 870
+  },
+  "t_georgia-armenia@FCO-CIA": {
+   "min": 285
+  },
+  "t_georgia-armenia@LIN": {
+   "min": 383
+  },
+  "t_georgia-armenia@MXP": {
+   "min": 215
+  },
+  "t_georgia-svaneti@FCO-CIA": {
+   "min": 354
+  },
+  "t_georgia-svaneti@LIN": {
+   "min": 415
+  },
+  "t_georgia-svaneti@MXP": {
+   "min": 190
+  },
+  "t_kirghizistan-almaty@FCO-CIA": {
+   "min": 603
+  },
+  "t_malesia-borneo@FCO-CIA": {
+   "min": 852
+  },
+  "t_malesia-borneo@MXP": {
+   "min": 947
+  },
+  "t_sri-lanka@FCO-CIA": {
+   "min": 821
+  },
+  "t_sri-lanka@MXP": {
+   "min": 839
+  },
+  "t_sudafrica-kruger-garden@MXP": {
+   "min": 945
+  },
+  "t_usa-pacific-northwest@FCO-CIA": {
+   "min": 940
+  },
+  "t_usa-pacific-northwest@MXP": {
+   "min": 930
+  },
+  "t_usa-rockies-yellowstone@FCO-CIA": {
+   "min": 932
+  },
+  "t_usa-rockies-yellowstone@LIN": {
+   "min": 895
+  },
+  "t_usa-rockies-yellowstone@MXP": {
+   "min": 888
+  }
+ }
+}
