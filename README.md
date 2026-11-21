@@ -10,7 +10,7 @@ Tutto su GitHub Actions, senza server.
 
 | Workflow | Quando | Cosa fa |
 |---|---|---|
-| `scan.yml` | ogni notte, 02:23 UTC | scansione completa da zero, verifica dei vuoti, build, pubblicazione su Pages, avvisi Telegram |
+| `scan.yml` | ogni mattina, 05:23 UTC | scansione completa da zero, verifica dei vuoti, build, pubblicazione su Pages, avvisi Telegram |
 | `deploy.yml` | push su grafica o cataloghi, o a mano | ricostruisce il sito dai dati dell'ultimo giro, senza riscansionare |
 | `bot-commands.yml` | ogni ~13 minuti | legge i comandi del bot Telegram e salva preferiti e soglie |
 | `bot-register.yml` | a mano | registra il menu dei comandi del bot |

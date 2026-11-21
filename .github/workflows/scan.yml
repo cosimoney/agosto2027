@@ -5,7 +5,7 @@ name: Scansione voli
 
 on:
   schedule:
-    - cron: "23 2 * * *"
+    - cron: "23 5 * * *"
   workflow_dispatch:
     inputs:
       send_alerts:
