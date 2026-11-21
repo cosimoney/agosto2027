@@ -1,0 +1,61 @@
+# Legge i comandi Telegram (polling, nessun server). Parte ogni ~13 minuti e resta in ascolto 10 minuti in
+# long-polling: dentro quella finestra il bot risponde in 1-2 secondi, fuori si aspetta il giro successivo.
+# Solo libreria standard di Python: nessun pip install.
+# Secret: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_IDS (una o piu' chat separate da virgola). Variabile: DASHBOARD_URL.
+name: Bot Telegram - comandi
+
+on:
+  schedule:
+    - cron: "6,19,32,45,58 * * * *"
+  workflow_dispatch:
+    inputs:
+      loop_seconds:
+        description: "Secondi di ascolto"
+        default: "600"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bot-commands
+  cancel-in-progress: false
+
+jobs:
+  commands:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Snapshot dell'ultimo giro (branch data)
+        run: bash .github/fetch_data.sh .
+
+      - name: Leggi e rispondi ai comandi
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_IDS: ${{ secrets.TELEGRAM_CHAT_IDS }}
+          DASHBOARD_URL: ${{ vars.DASHBOARD_URL }}
+          LOOP_SECONDS: ${{ inputs.loop_seconds || '600' }}
+        run: python bot/commands.py --loop-seconds "$((LOOP_SECONDS + 0))"
+
+      - name: Commit dello stato se cambiato
+        if: always()
+        run: |
+          for f in bot/state/prefs.json bot/state/offset.json; do if [ -f "$f" ]; then git add "$f"; fi; done
+          if git diff --cached --quiet; then
+            echo "Nessuna modifica"
+            exit 0
+          fi
+          git config user.name "voli-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "Bot: preferiti e soglie $(date -u +%FT%H:%MZ)"
+          for i in 1 2 3 4 5; do
+            git pull --rebase --autostash origin main && git push origin HEAD:main && exit 0
+            sleep $((RANDOM % 8 + 3))
+          done
+          echo "Push non riuscito dopo 5 tentativi"
+          exit 1

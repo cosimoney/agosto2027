@@ -1,0 +1,126 @@
+# Giro giornaliero: scansione completa da zero -> verifica dei vuoti -> build -> GitHub Pages -> avvisi Telegram.
+# Se la scansione va in ABORT (Google blocca il runner) o un passo fallisce: niente pubblicazione, niente avvisi,
+# e un messaggio Telegram solo all'admin.
+name: Scansione voli
+
+on:
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+    inputs:
+      send_alerts:
+        description: "Manda gli avvisi Telegram a fine giro"
+        type: boolean
+        default: true
+      dry_run:
+        description: "Prova: non pubblica, non salva i dati, non manda avvisi"
+        type: boolean
+        default: false
+      budget_min:
+        description: "Tetto in minuti per la scansione (oltre, le rotte mancanti restano quelle del giro prima)"
+        default: "240"
+      force_publish:
+        description: "Salta il controllo anti-blocco (calo vero dei risultati, confermato a mano)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    env:
+      DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+      ALERTS: ${{ github.event_name != 'workflow_dispatch' || inputs.send_alerts }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install --quiet -r requirements.txt
+
+      - name: Dati del giro precedente
+        run: bash .github/fetch_data.sh prev
+
+      - name: Scansione e verifica
+        env:
+          SCAN_BUDGET_MIN: ${{ inputs.budget_min || '240' }}
+          FORCE_PUBLISH: ${{ inputs.force_publish && '1' || '0' }}
+          WORKERS: "4"
+        run: python pipeline.py scan
+
+      - name: Build del sito
+        run: python pipeline.py build
+
+      - name: Bot - snapshot delle offerte
+        run: python bot/snapshot.py --raw raw_v2.jsonl --trips trips_data.json
+
+      - name: Salva i dati dell'ultimo giro (branch data)
+        if: env.DRY != 'true'
+        run: bash .github/push_data.sh "Dati del giro $(date -u +%F)"
+
+      - uses: actions/upload-pages-artifact@v3
+        if: env.DRY != 'true'
+        with:
+          path: _site
+
+      - name: Pubblica su GitHub Pages
+        if: env.DRY != 'true'
+        id: pages
+        uses: actions/deploy-pages@v4
+
+      - name: Bot - avvisi Telegram
+        if: env.DRY != 'true' && env.ALERTS == 'true'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_IDS: ${{ secrets.TELEGRAM_CHAT_IDS }}
+          DASHBOARD_URL: ${{ vars.DASHBOARD_URL }}
+        run: python bot/alerts.py
+
+      - name: Bot - commit dello stato degli avvisi
+        if: env.DRY != 'true' && env.ALERTS == 'true'
+        run: |
+          for f in bot/state/last_snapshot.json bot/state/notified.json bot/state/history.json; do if [ -f "$f" ]; then git add "$f"; fi; done
+          if git diff --cached --quiet; then
+            echo "Nessuna modifica"
+            exit 0
+          fi
+          git config user.name "voli-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "Bot: stato avvisi $(date -u +%F)"
+          for i in 1 2 3 4 5; do
+            git pull --rebase --autostash origin main && git push origin HEAD:main && exit 0
+            sleep $((RANDOM % 8 + 3))
+          done
+          echo "Push non riuscito dopo 5 tentativi"
+          exit 1
+
+      - name: Avvisa l'admin se il giro e' fallito
+        if: failure() || cancelled()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ADMIN_CHAT: ${{ secrets.TELEGRAM_ADMIN_CHAT }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_ADMIN_CHAT" ]; then echo "secret mancanti: nessun messaggio"; exit 0; fi
+          REASON="$(head -c 600 fail_reason.txt 2>/dev/null || true)"
+          [ -n "$REASON" ] || REASON="un passo del workflow non e' andato a buon fine (vedi il log)."
+          curl -sS -o /dev/null -w "telegram http %{http_code}\n" --max-time 30 \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_ADMIN_CHAT}" \
+            --data-urlencode "disable_web_page_preview=true" \
+            --data-urlencode "text=⚠️ Scansione voli agosto 2027 fallita: ${REASON} Sito e avvisi restano quelli del giro precedente. ${RUN_URL}"

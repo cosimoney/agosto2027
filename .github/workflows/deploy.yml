@@ -1,0 +1,58 @@
+# Ripubblica il sito dai dati dell'ultimo giro (branch data), senza riscansionare:
+# parte quando cambia la grafica o un catalogo, oppure a mano.
+name: Pubblica sito
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "template_v2.html"
+      - "v2.css"
+      - "v2.js"
+      - "img/**"
+      - "build*.py"
+      - "dests.py"
+      - "origins.py"
+      - "itineraries.py"
+      - "popular_trips.py"
+      - "pipeline.py"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# stesso gruppo della scansione: se un giro e' in corso si aspetta che finisca, cosi' non si ripubblicano dati vecchi sopra i nuovi
+concurrency:
+  group: scan
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Dati dell'ultimo giro
+        run: bash .github/fetch_data.sh .
+
+      - name: Build del sito
+        run: python pipeline.py build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Pubblica su GitHub Pages
+        id: pages
+        uses: actions/deploy-pages@v4
