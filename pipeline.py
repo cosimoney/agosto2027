@@ -30,7 +30,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 os.chdir(ROOT); sys.path.insert(0, ROOT)
 RAW, TRIPS_RAW, META, PREV = "raw_v2.jsonl", "trips_raw_v2.jsonl", "scan_meta.json", "prev"
 BUDGET = float(os.environ.get("SCAN_BUDGET_MIN") or 240) * 60
-VERIFY_BUDGET = float(os.environ.get("VERIFY_BUDGET_MIN") or 40) * 60
+VERIFY_BUDGET = float(os.environ.get("VERIFY_BUDGET_MIN") or 60) * 60   # meta' ai trip (C + verify_trips.py), meta' a verify.py
 MIN_OK_RATIO = float(os.environ.get("MIN_OK_RATIO") or 0.6)
 MIN_OK_ABS = int(os.environ.get("MIN_OK_ABS") or 100)
 MAX_BLOCKED = int(os.environ.get("MAX_BLOCKED") or 150)
@@ -153,8 +153,21 @@ def scan():
     done = load(TRIPS_RAW)
     tfresh.update(k for k in tb if k in done)
     tstale += carry(TRIPS_RAW, prev_trips, [k[:-1] + "1" for k in tstale if done.get(k, {}).get("st") == "ok"], set())
-    deadline[0] = time.time() + VERIFY_BUDGET / 2
+    deadline[0] = time.time() + VERIFY_BUDGET / 4
     T.run(sorted(tfresh), "trips C(ricontrollo vuoti)", workers=2, v=1, slow=True)
+    # verify_trips.py: secondo ricontrollo (v=2) dei vuoti sulle rotte che hanno gia' voli, poi fase B per le sbloccate
+    deadline[0] = float("inf")
+    if VERIFY_BUDGET >= 240 and os.path.exists("verify_trips.py"):
+        try:
+            subprocess.run([sys.executable, "verify_trips.py", "2"], timeout=VERIFY_BUDGET / 4, check=False,
+                           env=dict(os.environ, WORKERS="2"))
+        except subprocess.TimeoutExpired:
+            log("verify_trips interrotta al tetto di tempo (le righe gia' scritte restano)")
+        done = load(TRIPS_RAW)
+        tb2 = [k[:-1] + "1" for k in ta if done.get(k, {}).get("st") == "ok" and k[:-1] + "1" not in done]
+        T.run(tb2, "trips B(ms1) dopo verifica")
+        done = load(TRIPS_RAW)
+        tfresh.update(k for k in tb2 if k in done)
     trip_stats = dict(T.stats)
 
     # verifica dei vuoti (verify.py): prima le coppie senza nessun volo, poi fase B per quelle sbloccate, poi il resto.
@@ -165,7 +178,7 @@ def scan():
     try:
         vt0 = time.time()
         for mode in ("none", "ok"):
-            left = VERIFY_BUDGET - (time.time() - vt0)
+            left = VERIFY_BUDGET / 2 - (time.time() - vt0)
             if left < 60:
                 log("verifica %s saltata: tempo finito" % mode); break
             try:

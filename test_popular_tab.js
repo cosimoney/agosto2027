@@ -27,7 +27,7 @@ for(const sort of ["tot", "voli", "score"]){
     if(sort === "score") assert(list[i-1].bestS >= list[i].bestS);
   }
 }
-for(const stops of [1, 2]) for(const origin of ["all", "LIN", "MXP"]){
+for(const stops of [1, 2]) for(const origin of ["all", "LIN", "MXP", "FCO", "PSA"]){
   root.fire("click", tgt(".chip[data-pk]", {pk:"stops", v:String(stops)}));
   root.fire("click", tgt(".chip[data-pk]", {pk:"origin", v:origin}));
   for(const a of m.agg(false)){

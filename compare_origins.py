@@ -10,7 +10,7 @@ def blob(path):
     if not os.path.exists(path): return None
     s = open(path, encoding="utf-8").read()
     i = s.index("const RAW = ") + 12
-    return json.JSONDecoder().raw_decode(s.replace("<\/", "</")[i:])[0]
+    return json.JSONDecoder().raw_decode(s.replace("<" + chr(92) + "/", "</")[i:])[0]
 def ret(dep, n): return (date.fromisoformat(dep) + timedelta(days=n)).isoformat()[5:]
 def summarize(rows):
     """rows: (id, gruppo, origine, dep, n, prezzo, scali<=1?) -> {id: {gruppo: best<=1, gruppo+'2': best 2 scali}}"""

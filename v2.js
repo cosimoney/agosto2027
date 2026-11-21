@@ -38,7 +38,15 @@ const OSEL = [["all","Tutti"],["LIN","Linate"],["MXP","Malpensa"],["ROM","Roma"]
 const OORDER = ["LIN","MXP","FCO","CIA","PSA"];
 const oName = o => ONAME[o] || o;
 const oKey = o => (o === "FCO" || o === "CIA") ? "ROM" : o;
-const oMatch = (o, sel) => sel === "all" || oKey(o) === sel;
+const oMatch = (o, sel) => sel === "all" || oKey(o) === sel || (sel === "MIL" && (o === "LIN" || o === "MXP"));
+const CITIES = [["MIL", "Milano"], ["ROM", "Roma"], ["PSA", "Pisa"]];
+// migliori prezzi affiancati per citta' di partenza; view(gruppo) -> aggregato o null, line(aggregato) -> [prezzo, riga piccola]
+function byCity(view, cur, line){
+  const items = CITIES.map(([g, name]) => [g, name, view(g)]).filter(x => x[2]);
+  if(items.length < 2) return "";
+  const lo = Math.min(...items.map(x => line(x[2])[0]));
+  return `<div class="byc" role="group" aria-label="Miglior prezzo per città di partenza">${items.map(([g, name, a]) => { const [pr, sm] = line(a); return `<button class="byc-i${pr === lo ? " lo" : ""}" data-k="origin" data-v="${cur === g ? "all" : g}" aria-pressed="${cur === g}"><span class="l">da ${name}${pr === lo ? " · il più basso" : ""}</span><b class="num">${eur(pr)} <small>pp</small></b><span class="s">${sm}</span></button>`; }).join("")}</div>`;
+}
 const oRank = o => { const i = OORDER.indexOf(o); return i < 0 ? 9 : i; };
 const HAS_O = new Set(COMBOS.map(c => oKey(c.o)).concat(POP.trips.flatMap(t => t.cells.map(c => oKey(c.o)))));
 
@@ -288,7 +296,7 @@ function topHTML(detail){
    a caso e si ruota tra 4; il box "In copertina" segue la foto (prezzo pp e link alla pagina della meta). */
 const HERO = [["zanzibar","ZNZ"],["sossusvlei","WDH"],["bali","DPS"],["le-morne","MRU"],["masai-mara","MBA"],["machu-picchu","LIM"],["nusa-penida","DPS"],["galapagos","GPS"],["moorea","PPT"],["seychelles","SEZ"]];
 function heroPicks(){
-  let list = HERO.filter(([k, c]) => PHO[k] && PHO[k].w >= 1500 && DEST[c]).map(([k, c]) => { const a = viewD(c, "all", 1); return {k, code:c, city:DEST[c].city, min:a ? a.min : null}; });
+  let list = HERO.filter(([k, c]) => PHO[k] && PHO[k].w >= 1000 && DEST[c]).map(([k, c]) => { const a = viewD(c, "all", 1); return {k, code:c, city:DEST[c].city, min:a ? a.min : null}; });
   const priced = list.filter(h => h.min != null);
   if(priced.length >= 3) list = priced;
   if(!list.length){
@@ -400,7 +408,7 @@ function homeParts(){
     grid = list.map((a, i) => cardT(a, i, i === 0 && list.length > 3)).join("");
     lists = listsT(); notes = notesT();
   }
-  const LBL = {origin:v => "da " + (OSEL.find(x => x[0] === v) || [0, v])[1], area:v => v, country:v => v, budget:v => "fino a " + eur(+v) + " pp", stops:v => +v === 0 ? "solo diretti" : "fino a 2 scali",
+  const LBL = {origin:v => "da " + (OSEL.concat(CITIES).find(x => x[0] === v) || [0, v])[1], area:v => v, country:v => v, budget:v => "fino a " + eur(+v) + " pp", stops:v => +v === 0 ? "solo diretti" : "fino a 2 scali",
     dur:v => v + " giorni", dep:v => "andata " + fmtD(v), clima:v => v === "ottimo" ? "clima ottimo" : "clima buono o meglio", kind:v => v === "oj" ? "open-jaw" : "A/R", style:v => v, q:v => "«" + v + "»"};
   const act = Object.keys(base).filter(key => key !== "sort" && String(st[key]) !== String(base[key]));
   const active = act.length ? act.map(key => `<button class="achip" data-act="rm" data-k="${key}" aria-label="Togli il filtro ${esc(LBL[key](st[key]))}">${esc(LBL[key](st[key]))} ×</button>`).join("") + `<button class="achip all" data-act="reset">Azzera</button>` : "";
@@ -521,7 +529,8 @@ function voliD(code){
   const d = DEST[code], a = viewD(code, S.f.origin, S.f.stops);
   const origins = new Set((BYD[code] || []).map(c => oKey(c.o)));
   const ctl = vctl(S.f, origins, [[0, "Diretto"], [1, "1"], [2, "2 (se conviene)"]]);
-  const head = `<p class="eyebrow">Voli · A/R per persona</p><h2 class="h2" style="margin:6px 0 0">Quando <i>partire</i></h2>`;
+  const head = `<p class="eyebrow">Voli · A/R per persona</p><h2 class="h2" style="margin:6px 0 0">Quando <i>partire</i></h2>` +
+    byCity(g => viewD(code, g, S.f.stops), S.f.origin, x => [x.min, `${esc(oName(x.cheap.c.o))} · ${fmtD(x.cheap.c.dep)} · ${x.cheap.c.n} giorni · ${stopsTxt(x.cheap.o.f)}`]);
   if(!a){
     const cov = COV[code] || [0, 0, null], any = (BYD[code] || []).length;
     const msg = any ? "Nessun volo con questi filtri: prova un altro aeroporto o più scali." : cov[1] > 0 ? `Per ora solo voli con 2 scali per tratta${cov[2] ? ", da " + eur(cov[2]) + " pp" : ""}.` : `Al ${esc(META.date || "")} Google Flights non ha ancora tariffe per agosto 2027 su questa rotta.`;
@@ -611,7 +620,8 @@ function voliT(id){
   const t = PT[id], a = viewT(t, S.p.origin, S.p.stops);
   const origins = new Set(t.cells.map(c => oKey(c.o)));
   const ctl = vctl(S.p, origins, [[1, "1"], [2, "2 (se conviene)"]]);
-  const head = `<p class="eyebrow">Costi e voli · per persona</p><h2 class="h2" style="margin:6px 0 0">Quanto <i>costa</i></h2>`;
+  const head = `<p class="eyebrow">Costi e voli · per persona</p><h2 class="h2" style="margin:6px 0 0">Quanto <i>costa</i></h2>` +
+    byCity(g => viewT(t, g, S.p.stops), S.p.origin, x => [x.cheap.o.voli, `voli · ${esc(oName(x.cheap.c.o))} · ${fmtD(x.cheap.c.dep)} · ${x.cheap.c.n} giorni · totale stimato ~${eur(x.min)}`]);
   const land = `<tr><td>A terra, mid-range <span class="est">stima</span><small>${t.nights} notti in doppia, pasti, mezzi, ingressi e attività</small></td><td>${eur(t.land[0])} – ${eur(t.land[1])}</td></tr>`;
   if(!a){
     const msg = t.cells.length && t.best ? "Nessun volo con questi filtri: prova un altro aeroporto o più scali." : esc(t.why || "Nessun volo valido per ora.");
