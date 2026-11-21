@@ -2,8 +2,10 @@
 # Copia in un solo passo i sorgenti del progetto nella cartella del repo (Git Bash).
 #
 #   bash sync_from_source.sh            copia e mostra cosa e' cambiato
-#   bash sync_from_source.sh --push     copia, commit + push su main (pull --rebase), carica i dati sul branch
-#                                       "data" e lancia il workflow che ripubblica il sito
+#   bash sync_from_source.sh --push     copia, commit + push su main (pull --rebase) e lancia il workflow che
+#                                       ripubblica il sito con i dati dell'ultimo giro
+#   bash sync_from_source.sh --push --data   in piu' carica sul branch "data" i dati locali (raw_v2.jsonl ecc.):
+#                                       sovrascrive quelli dell'ultimo giro, serve solo al primo caricamento
 #
 # SRC=/altro/percorso per una sorgente diversa. CHECK_PATTERNS="regex" aggiunge un controllo sui dati sensibili
 # (es. i chat_id: non vanno scritti in questo file, il repo e' pubblico).
@@ -12,7 +14,8 @@
 set -euo pipefail
 SRC="${SRC:-$HOME/Viaggio-Agosto-2027}"
 DST="$(cd "$(dirname "$0")" && pwd)"
-PUSH=0; [ "${1:-}" = "--push" ] && PUSH=1
+PUSH=0; DATA=0
+for a in "$@"; do case "$a" in --push) PUSH=1 ;; --data) DATA=1 ;; esac; done
 cd "$DST"
 [ -d "$SRC" ] || { echo "sorgente assente: $SRC"; exit 1; }
 
@@ -70,11 +73,14 @@ for i in 1 2 3 4; do
   sleep 4
 done
 
-# 6) dati "ultimo giro" sul branch data (un solo commit, sovrascritto: nessuna storia che cresce)
+# 6) dati locali sul branch data (un solo commit, sovrascritto: nessuna storia che cresce)
+# Solo con --data: i dati locali SOSTITUISCONO quelli dell'ultimo giro fatto su Actions (di norma piu' recenti).
+if [ "$DATA" = 1 ]; then
 python pipeline.py build
 python bot/snapshot.py --raw raw_v2.jsonl --trips trips_data.json
 python pipeline.py meta
 bash .github/push_data.sh "Dati caricati a mano $(date +%F\ %H:%M)"
+fi
 
 # 7) ripubblica il sito (parte anche da solo se il push ha toccato i file del sito; il gruppo di concurrency li mette in fila)
 gh workflow run deploy.yml --repo cosimoney/agosto2027 && echo "Deploy lanciato: gh run watch --repo cosimoney/agosto2027"

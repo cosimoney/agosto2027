@@ -350,7 +350,7 @@ function homeHTML(){
       <div class="fpanel" id="fpanel" hidden></div>
     </div></div>
     <div class="wrap"><p class="count" id="count" aria-live="polite"></p><div class="grid" id="grid"></div></div>
-    <section class="sec wrap"><div class="lists" id="lists"></div></section>
+    <section class="sec wrap"><details class="xlists"><summary><span class="eyebrow">Mete escluse</span><span class="xl-t">Scartate per scali o clima, voli non ancora in vendita</span><span class="xl-i" aria-hidden="true">+</span></summary><div class="lists" id="lists"></div></details></section>
     <section class="sec wrap" style="padding-top:0"><p class="eyebrow" style="margin-bottom:14px">Come leggere i numeri</p><div class="notes" id="notes"></div></section>
   </main>` + footHTML();
 }

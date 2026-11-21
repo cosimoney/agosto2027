@@ -401,3 +401,13 @@ body{overflow-x:clip}
 .byc-i.lo .l{color:var(--ink)}
 .byc-i[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .byc-i[aria-pressed="true"] .l,.byc-i[aria-pressed="true"] .s{color:inherit;opacity:.8}
+
+.xlists>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px 16px;padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.xlists>summary::-webkit-details-marker{display:none}
+.xlists>summary .eyebrow{grid-column:1;margin:0}
+.xlists>summary .xl-t{grid-column:1;font-family:var(--f-display);font-weight:800;text-transform:uppercase;font-size:clamp(20px,3vw,26px);line-height:1.05;color:var(--ink)}
+.xlists>summary .xl-i{grid-column:2;grid-row:1/3;font-size:28px;line-height:1;color:var(--ink-2);transition:transform .2s}
+.xlists[open]>summary .xl-i{transform:rotate(45deg)}
+.xlists>summary:focus-visible{outline:2px solid currentColor;outline-offset:4px}
+.xlists>.lists{padding-top:22px}
+@media (prefers-reduced-motion:reduce){.xlists>summary .xl-i{transition:none}}
