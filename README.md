@@ -22,6 +22,7 @@ Tutto su GitHub Actions, senza server.
 - Branch `main`: codice, foto (`img/`) e stato del bot (`bot/state/`).
 - Branch `data`: i dati dell'ultimo giro (`raw_v2.jsonl`, `trips_raw_v2.jsonl`, `trips_data.json`, `bot/snapshot.json`, `scan_meta.json`) in un solo commit, sovrascritto a ogni giro. Niente storico: il repo non cresce.
 - Lo storico dei prezzi che serve al bot sta in `bot/state/history.json` (minimo giornaliero per meta, ultimi 90 giorni).
+- Lo storico per il grafico "Il prezzo nel tempo" delle pagine meta e trip sta in `bot/state/price_history.json` (`price_history.py`): minimo per persona per giorno, totale e da Milano / Roma / Pisa. Lo aggiorna `pipeline.py build` a ogni giro riuscito, lo committa il workflow della scansione; un giro in ABORT non scrive nulla. Test: `python test_price_history.py`.
 - Il sito viene pubblicato dall'action di Pages: `index.html` non è nel repo.
 
 ## Protezioni

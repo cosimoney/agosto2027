@@ -2,7 +2,8 @@
    Controlla: home (3 sezioni), una pagina dettaglio per sezione, deep link come primo caricamento,
    niente undefined/NaN nel markup, tutte le immagini referenziate esistono in img/.
    Preferiti: senza Worker o senza token la stella resta il link Telegram; con il token (Worker finto) stella piena/vuota,
-   toggle ottimistico con ritorno indietro se il Worker fallisce, pagina #/preferiti, rotta #/login/<token>. */
+   toggle ottimistico con ritorno indietro se il Worker fallisce, pagina #/preferiti, rotta #/login/<token>.
+   Andamento del prezzo: grafico dello storico su mete e trip, Giorno / Settimana / Mese, serie per città, pochi dati, dato parziale. */
 const fs = require("fs"), path = require("path"), vm = require("vm");
 const ROOT = __dirname;
 const html = fs.readFileSync(path.join(ROOT, "agosto-2027-v2.html"), "utf8");
@@ -26,7 +27,7 @@ function boot(hash, opts){
   if(opts.token) ls["agosto2027.token"] = opts.token;
   const els = {};
   const mk = id => ({id, innerHTML:"", textContent:"", hidden:false, value:"", placeholder:"", open:false, dataset:{}, style:{},
-    classList:{toggle(){}, add(){}, remove(){}}, setAttribute(){}, getAttribute(){ return null; }, removeAttribute(){}, addEventListener(){},
+    classList:{toggle(){}, add(){}, remove(){}, contains(){ return false; }}, setAttribute(){}, getAttribute(){ return null; }, removeAttribute(){}, addEventListener(){},
     querySelectorAll(){ return []; }, querySelector(){ return null; }, appendChild(){}, scrollIntoView(){}, close(){}, showModal(){}, closest(){ return null; }});
   const listeners = {};
   const document = {title:"", hidden:false, getElementById:id => els[id] || (els[id] = mk(id)), querySelectorAll:() => [], querySelector:() => null,
@@ -231,6 +232,81 @@ const favList = () => ({ok:true, me:"Cosimo", threshold:1000, generated:"2026-11
   ok(!off.ls["agosto2027.token"] && /\/sito/.test(off.els.app.innerHTML), "login senza Worker: nessun token salvato");
   const p1 = b.App.parse("#/preferiti"), p2 = b.App.parse("#/login/aa.bb");
   ok(p1.page === "favs" && p2.page === "login" && p2.token === "aa.bb", "parse delle rotte preferiti e login");
+}
+
+// 11. andamento del prezzo (storico dei giri): grafico su mete e trip, aggregazioni, serie, pochi dati, dato parziale
+{
+  const d = boot(""), A = d.App, H = A.HIST;
+  const ids = Object.keys(H.t || {}), dIds = ids.filter(x => x[0] === "d"), tIds = ids.filter(x => x[0] === "t");
+  ok(H.days.length >= 1 && dIds.length >= 5 && tIds.length >= 5, "storico: dati nel blob (" + H.days.length + " giorni, " + dIds.length + " mete, " + tIds.length + " trip)");
+  ok(H.days.every(x => /^\d{4}-\d\d-\d\d$/.test(x)) && H.runs.length === H.days.length && ids.every(id => H.t[id].every(r => r[0] < H.days.length && [1, 2, 3].every(i => r[i] === -1 || H.e[r[i]]))), "storico: indici coerenti");
+  const sample = dIds.slice(0, 4).concat(dIds.includes("d_CMB") ? ["d_CMB"] : []).concat(tIds.slice(0, 4));
+  for(const id of sample){
+    const page = A.pageHTML({page:id[0] === "d" ? "dest" : "trip", id:id.slice(2)});
+    ok(/<section class="voli sec" id="voli">[\s\S]*id="hist-in"/.test(page), id + ": grafico nella sezione voli");
+    for(const per of ["day", "week", "month"]){
+      A.S.h.per = per; A.S.h.off = {};
+      const mk = A.histHTML(id), rows = A.histRows(id), nb = A.histAgg(rows, per).length;
+      ok(/<svg viewBox="0 0 1000 \d+" preserveAspectRatio="none" role="img" aria-label="Andamento[^"]+"><title>/.test(mk), id + " " + per + ": svg con titolo");
+      ok(mk.split('class="hcol"').length - 1 === nb && mk.split('role="tooltip"').length - 1 === nb, id + " " + per + ": una colonna con tooltip per periodo (" + nb + ")");
+      ok(new RegExp(`data-hk="per" data-hv="${per}" aria-pressed="true"`).test(mk) && mk.split('data-hk="per"').length - 1 === 3, id + " " + per + ": selettore Giorno / Settimana / Mese");
+      ok(/class="hstats"/.test(mk) && />Ultimo</.test(mk) && />Minimo storico</.test(mk) && />Dall'inizio</.test(mk) && />Dall'ultimo giro</.test(mk), id + " " + per + ": etichette ultimo / minimo / variazioni");
+      ok(/<details class="htab"><summary>Tabella dei valori<\/summary>/.test(mk) && mk.split("<tr><th scope=\"row\">").length - 1 === nb, id + " " + per + ": tabella dei valori");
+      ok(/coppia [\d.]+ €/.test(mk) && /(diretto|\d scal[oi])/.test(mk) && /(Linate|Malpensa|Roma|Pisa)/.test(mk), id + " " + per + ": tooltip con coppia, aeroporto e scali");
+      ok(rows.length >= 7 || new RegExp(`Storico in costruzione: ${rows.length} giorn[oi] di dati`).test(mk), id + " " + per + ": frase 'storico in costruzione'");
+      ok(!/NaN|undefined|Infinity/.test((mk.match(/ d="[^"]*"/g) || []).join("")) && !/(left|top|width|height):(NaN|-?Infinity|undefined)/.test(mk), id + " " + per + ": coordinate valide");
+      audit("storico " + id + " " + per, mk + "x".repeat(500));
+    }
+  }
+  A.S.h.per = "day";
+  // dati finti: 60 giorni, buchi, giorni parziali, una città che compare dopo, più giri in un giorno
+  const day = i => new Date(Date.UTC(2026, 10, 21 + i)).toISOString().slice(0, 10);
+  H.days = Array.from({length:60}, (_, i) => day(i));
+  H.runs = H.days.map((_, i) => [i === 0 ? "locale" : "actions", i === 9 ? 1 : 0, i === 3 ? 2 : 1]);
+  H.e = []; H.t = {d_TST:[], t_tst:[], d_ONE:[[0, 0, -1, -1, 0]], d_MIL:[[0, 0, -1, -1, 0], [1, 3, -1, -1, 0]]};
+  for(let i = 0; i < 60; i++){
+    H.e.push([900 - i * 3 + (i === 9 ? 120 : 0), "MXP", "2027-08-14", 10, 1], [880 + (i % 7) * 4, "FCO", "2027-08-09", 11, 0], [700, "PSA", "2027-08-12", 12, 2]);
+    if(i === 20 || i === 21) continue;
+    H.t.d_TST.push([i, 3 * i, 3 * i + 1, i >= 40 ? 3 * i + 2 : -1, i === 9 ? 1 : 0].concat(i === 3 ? [{MIL:950, ROM:null}] : []));
+  }
+  const e0 = H.e.length; H.e.push([640, "LIN", "2027-08-07", 11, 1, 2100, 0], [600, "FCO", "2027-08-08", 12, 2, 2110, 50]);
+  H.t.t_tst = [[0, e0, e0 + 1, -1, 0], [1, e0, e0 + 1, -1, 0], [5, e0, -1, -1, 0]];
+  let mk = A.histHTML("d_TST");
+  ok(mk.split('class="hcol"').length - 1 === 58 && !/Storico in costruzione/.test(mk), "finti/giorno: 58 punti, niente frase dei pochi dati");
+  ok(/class="hl s-MIL dash"/.test(mk) && /class="hdot s-MIL part"/.test(mk) && /<span class="est">dato parziale<\/span>/.test(mk) && /Punto vuoto e tratto tratteggiato = dato parziale/.test(mk), "finti: dato parziale segnato (tratteggio, punto vuoto, nota)");
+  ok(["A", "MIL", "ROM", "PSA"].every(k => new RegExp(`data-hk="ser" data-hv="${k}" aria-pressed="true"`).test(mk)) && /Migliore assoluto/.test(mk), "finti: legenda con migliore assoluto, Milano, Roma, Pisa");
+  ok(/ultimo giro del giorno: 950 €/.test(mk) && /ultimo giro del giorno: nessun volo trovato/.test(mk) && /2 giri, minimo del giorno/.test(mk) && /scansione dal computer/.test(mk), "finti: più giri nello stesso giorno e fonte nella tabella");
+  ok(/Minimo storico<\/span><b class="num">700 € <small>pp<\/small><\/b>/.test(mk) && /Ultimo<\/span><b class="num">700 €/.test(mk) && /class="hd dn"[^>]*>.*−180 €.*−20%/.test(mk), "finti: minimo storico, ultimo e variazione dall'inizio (−180 €, −20%) → " + (mk.match(/class="hstats"[\s\S]{0,900}/) || [""])[0].replace(/<[^>]+>/g, " ").slice(0, 300));
+  ok(/2 scali/.test(mk) && /diretto/.test(mk) && /Pisa · il più basso/.test(mk), "finti: scali e città più bassa nel tooltip");
+  audit("storico finti giorno", mk);
+  A.S.h.per = "week"; mk = A.histHTML("d_TST");
+  ok(mk.split('class="hcol"').length - 1 === 10 && /Settimana del 16 nov · minimo di 2 giorni/.test(mk) && /visto il \d+ (nov|dic|gen)/.test(mk), "finti/settimana: 10 settimane, minimo del periodo con il giorno in cui è stato visto");
+  ok(!/dash/.test(mk), "finti/settimana: una settimana con giorni completi non è parziale");
+  audit("storico finti settimana", mk);
+  A.S.h.per = "month"; mk = A.histHTML("d_TST");
+  ok(mk.split('class="hcol"').length - 1 === 3 && /nov 2026 · minimo di 10 giorni/.test(mk) && /gen 2027/.test(mk), "finti/mese: 3 mesi");
+  audit("storico finti mese", mk);
+  // toggle dal clic (delegato sul documento): periodo e serie
+  A.S.route = {page:"dest", id:"TST"}; A.S.page = "dest";
+  const click = ds => d.listeners.click.forEach(f => f({target:{id:"", closest:s => s === "[data-act]" ? {dataset:ds, setAttribute(){}} : null}, preventDefault(){}}));
+  click({act:"hist", hk:"per", hv:"day"});
+  ok(A.S.h.per === "day" && d.els["hist-in"].innerHTML.split('class="hcol"').length - 1 === 58, "clic su Giorno: grafico ridisegnato");
+  click({act:"hist", hk:"ser", hv:"A"}); click({act:"hist", hk:"ser", hv:"PSA"});
+  mk = d.els["hist-in"].innerHTML;
+  ok(/data-hv="A" aria-pressed="false"/.test(mk) && /data-hv="PSA" aria-pressed="false"/.test(mk) && !/class="hl s-A"/.test(mk) && !/class="hl s-PSA"/.test(mk) && /class="hl s-ROM"/.test(mk), "clic sulla legenda: serie nascoste");
+  ok(/Riepilogo dell'andamento, Milano/.test(mk) && /Ultimo<\/span><b class="num">723 €/.test(mk), "serie nascoste: le etichette seguono la prima serie visibile (Milano)");
+  click({act:"hist", hk:"ser", hv:"MIL"}); click({act:"hist", hk:"ser", hv:"ROM"});
+  ok(Object.values(A.S.h.off).every(v => !v) && /class="hl s-A"/.test(d.els["hist-in"].innerHTML), "tutte le serie spente: tornano tutte");
+  // pochi dati e casi limite
+  mk = A.histHTML("d_ONE");
+  ok(/Storico in costruzione: 1 giorno di dati/.test(mk) && mk.split("serve un secondo giro").length - 1 === 2 && /class="hfig few"/.test(mk) && /class="hlast num c"/.test(mk) && !/class="hl /.test(mk) && !/class="hlegs"/.test(mk), "un solo punto: versione ridotta, niente linea né legenda");
+  audit("storico un punto", mk + "x".repeat(500));
+  mk = A.histHTML("d_MIL");
+  ok(/Storico in costruzione: 2 giorni di dati/.test(mk) && /class="hl s-A"/.test(mk) && !/class="hlegs"/.test(mk) && /class="hd dn"/.test(mk), "due punti da una sola città: solo la linea del migliore, variazione calcolata");
+  mk = A.histHTML("t_tst");
+  ok(/Andamento · voli per persona/.test(mk) && /640 € <small>voli pp<\/small>/.test(mk) && /totale stimato ~2\.100 €/.test(mk) && /Milano · il più basso/.test(mk), "trip: prezzo voli e totale stimato; migliore = voli + extra più basso");
+  audit("storico trip finto", mk + "x".repeat(500));
+  ok(A.histHTML("d_ZZZ") === "" && !/hist-in/.test(A.pageHTML({page:"dest", id:R.dests.find(c => !H.t["d_" + c])})), "meta senza storico: nessun grafico, pagina integra");
 }
 
 console.log(`${checks} controlli, ${fails} falliti · pagine: ${R.dests.length} mete, ${R.trips.length} trip · origini nei dati: ${R.origins.join(", ")} · img in home: ${RAWn.d}/${RAWn.v}/${RAWn.p}`);

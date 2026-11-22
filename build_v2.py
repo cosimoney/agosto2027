@@ -4,6 +4,8 @@
 Dati: esegue in memoria build.py (RAW) e build_trips.py (RAW.trips_popular) senza far loro scrivere nulla
 (agosto-2027.html e trips_data.json restano come sono).
 Foto: solo quelle davvero presenti in img/. Uso: python build_v2.py [--raw v1|v2|auto]
+Storico prezzi: bot/state/price_history.json (price_history.py) entra nel blob come RAW.hist, in forma compatta e solo
+per le mete e i trip della pagina; se il file manca il grafico dell'andamento non compare.
 """
 import io, json, os, re, sys, types, contextlib
 
@@ -74,11 +76,22 @@ def worker_url():
     u = u.strip().rstrip("/")
     return u if re.fullmatch(r"https://[A-Za-z0-9.-]+(/[A-Za-z0-9._~/-]*)?", u) else ""
 
+def history(blob):
+    """RAW.hist: storico del prezzo piu' basso per target (vedi price_history.compact)."""
+    try:
+        import price_history
+        ids = {"d_" + d["code"] for d in blob["dests"]} | {"t_" + t["id"] for t in blob["trips_popular"]["trips"]}
+        return price_history.compact(price_history.load(), ids)
+    except Exception as e:
+        print("storico prezzi non caricato:", repr(e))
+        return {"days": [], "runs": [], "e": [], "t": {}}
+
 def dump(o):
     return json.dumps(o, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
 
 def main():
     blob, src1 = pick()
+    blob["hist"] = history(blob)
     man = manifest()
     js = open("v2.js", encoding="utf-8").read()
     assert "/*__DATA__*/" in js and "/*__PHOTOS__*/" in js and "/*__API__*/" in js
@@ -91,6 +104,7 @@ def main():
     codes = {c["d"] for c in blob["combos"] if c["a"]}
     pop = [t["id"] for t in blob["trips_popular"]["trips"] if t["best"]]
     print("dati:", src1)
+    print("storico prezzi:", len(blob["hist"]["days"]), "giorni,", len(blob["hist"]["t"]), "target,", len(dump(blob["hist"])), "caratteri")
     print("preferiti:", "Worker " + api if api else "solo link Telegram (worker_url non impostato)")
     print("html bytes", len(out.encode("utf-8")), "| foto", len(man["photos"]), "| mete con voli", len(codes), "senza cover:", sorted(codes - set(man["cover"])),
           "| trip con voli", len(pop), "senza cover dedicata:", sorted(set(pop) - set(man["pop"])), "| origini:", sorted({c["o"] for c in blob["combos"]}))

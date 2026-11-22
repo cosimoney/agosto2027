@@ -84,7 +84,7 @@ const noPhoto = txt => `<span class="nophoto" aria-hidden="true">${esc(txt)}</sp
 /* ------------------------------------------------------------------ stato */
 const F0 = {q:"", origin:"all", area:"all", country:"all", budget:0, stops:1, dur:"all", dep:"all", clima:"all", sort:"score"};
 const P0 = {q:"", origin:"all", kind:"all", area:"all", style:"all", budget:0, stops:1, sort:"tot"};
-const S = {tab:"new", f:Object.assign({}, F0), p:Object.assign({}, P0), panel:false, cell:null, homeY:0, depth:0, route:null, page:null, lb:[], lbi:0, heroT:null};
+const S = {tab:"new", f:Object.assign({}, F0), p:Object.assign({}, P0), panel:false, cell:null, homeY:0, depth:0, route:null, page:null, lb:[], lbi:0, heroT:null, h:{per:"day", off:{}}};
 const TABS = {new:{hash:"#/", label:"Nuove mete", sub:"Paesi dove non siete mai stati, scelti per il clima di agosto."},
               vis:{hash:"#/visitati", label:"Già visitati", sub:"Paesi che conoscete già, con un giro diverso da quello fatto."},
               pop:{hash:"#/trips", label:"Popular trips", sub:"Itinerari completi, anche open-jaw: tappe, voli e costo a terra."}};
@@ -662,7 +662,7 @@ function destHTML(code){
     </section>
     ${galHTML(galleryD(code))}
     ${itinHTML(d)}
-    <section class="voli sec" id="voli"><div class="wrap" id="voli-in">${voliD(code)}</div></section>
+    <section class="voli sec" id="voli"><div class="wrap" id="voli-in">${voliD(code)}</div>${histSec("d_" + code)}</section>
     ${more.length ? `<section class="sec wrap"><p class="eyebrow">Stessa area</p><h2 class="h2" style="margin:6px 0 22px">Altre mete <i>in ${esc(d.area)}</i></h2><div class="more">${more.map((x, i) => cardD(x, i, false)).join("")}</div></section>` : ""}
   </main>` + footHTML();
 }
@@ -761,7 +761,7 @@ function tripHTML(id){
         ${(t.src || []).length ? `<p class="eyebrow" style="margin:24px 0 10px">Fonti</p><p>${t.src.map(u => `<a href="${esc(safeUrl(u))}" target="_blank" rel="noopener">${esc(host(u))} ↗</a>`).join(" · ")}</p>` : ""}
         ${DEST[t.arr] ? `<p style="margin-top:24px"><a href="#/d/${esc(t.arr)}">Scheda di ${esc(DEST[t.arr].city)} →</a></p>` : ""}</div>
     </div></section>
-    <section class="voli sec" id="voli"><div class="wrap" id="voli-in">${voliT(id)}</div></section>
+    <section class="voli sec" id="voli"><div class="wrap" id="voli-in">${voliT(id)}</div>${histSec("t_" + id)}</section>
   </main>` + footHTML();
 }
 function creditsHTML(){
@@ -848,6 +848,115 @@ function favsHTML(){
 }
 
 /* ------------------------------------------------------------------ router */
+/* ------------------------------------------------------------------ andamento del prezzo (storico dei giri, RAW.hist) */
+const HIST = RAW.hist || {days:[], runs:[], e:[], t:{}};
+const HSER = [["A", "Migliore assoluto"], ["MIL", "Milano"], ["ROM", "Roma"], ["PSA", "Pisa"]];
+const HG = ["MIL", "ROM", "PSA"];
+const hRank = e => e[0] + (e[6] || 0);
+const fmtDY = iso => { const x = dt(iso); return `${x.getDate()} ${MESI[x.getMonth()]}`; };
+const hStops = n => n === 0 ? "diretto" : `${n} ${n === 1 ? "scalo" : "scali"}`;
+const hEntry = e => `${esc(oName(e[1]))} · ${fmtD(e[2])} → ${fmtD(addD(e[2], e[3]))} · ${e[3]} giorni · ${hStops(e[4])}${e[5] ? ` · totale stimato ~${eur(e[5])}` : ""}`;
+function histRows(id){
+  return ((HIST.t || {})[id] || []).map(r => {
+    const d = HIST.days[r[0]], run = HIST.runs[r[0]] || ["", 0, 1], g = {};
+    HG.forEach((k, i) => { const e = HIST.e[r[i + 1]]; if(e) g[k] = e; });
+    const ks = HG.filter(k => g[k]);
+    if(!d || !ks.length) return null;
+    const bg = ks.reduce((a, k) => hRank(g[k]) < hRank(g[a]) ? k : a, ks[0]);
+    g.A = g[bg];
+    return {d, g, bg, part:!!r[4], src:run[0] || "", n:run[2] || 1, last:r[5] || null};
+  }).filter(Boolean);
+}
+function histAgg(rows, per){
+  const m = new Map();
+  for(const r of rows){
+    const k = per === "month" ? r.d.slice(0, 7) + "-01" : per === "week" ? addD(r.d, -((dt(r.d).getDay() + 6) % 7)) : r.d;
+    let b = m.get(k);
+    if(!b){ b = {k, g:{}, on:{}, bg:null, part:true, days:0, last:null, n:1, src:""}; m.set(k, b); }
+    b.days++; b.part = b.part && r.part;
+    for(const s of ["A"].concat(HG)){ const e = r.g[s]; if(e && (!b.g[s] || hRank(e) < hRank(b.g[s]))){ b.g[s] = e; b.on[s] = r.d; if(s === "A") b.bg = r.bg; } }
+    if(per === "day"){ b.last = r.last; b.n = r.n; b.src = r.src; }
+  }
+  return [...m.values()];
+}
+function hStep(x){ const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p; }
+function hDelta(a, b){
+  const d = b - a, p = Math.round(100 * Math.abs(d) / a);
+  if(!d) return `<span class="hd eq">invariato</span>`;
+  return `<span class="hd ${d < 0 ? "dn" : "up"}"><span aria-hidden="true">${d < 0 ? "▼" : "▲"}</span> ${d < 0 ? "−" : "+"}${eur(Math.abs(d))}${p ? ` <small>${d < 0 ? "−" : "+"}${p}%</small>` : ""}</span>`;
+}
+function histHTML(id){
+  const rows = histRows(id);
+  if(!rows.length) return "";
+  const H = S.h, trip = id[0] === "t", unit = trip ? "voli pp" : "pp";
+  const have = HSER.filter(([k]) => k === "A" || rows.some(r => r.g[k]));
+  const ser = have.length > 2 ? have : have.slice(0, 1);          // una sola città con dati: basta la linea del migliore
+  if(!ser.some(([k]) => !H.off[k])) H.off = {};
+  const vis = ser.filter(([k]) => !H.off[k]), F = vis[0][0], fName = vis[0][1];
+  const pts = rows.filter(r => r.g[F]), pp = r => r.g[F][0];
+  const first = pts[0], last = pts[pts.length - 1], prev = pts[pts.length - 2];
+  const lo = pts.reduce((a, r) => pp(r) <= pp(a) ? r : a, pts[0]);
+  const tile = (l, v, s) => `<div class="hst"><span class="l">${l}</span><b class="num">${v}</b><span class="s">${s}</span></div>`;
+  const stats = `<div class="hstats" role="group" aria-label="Riepilogo dell'andamento, ${esc(fName)}">` +
+    tile("Ultimo", `${eur(pp(last))} <small>${unit}</small>`, `${fmtD(last.d)} · coppia ${eur(pp(last) * 2)}${last.part ? " · dato parziale" : ""}`) +
+    tile("Minimo storico", `${eur(pp(lo))} <small>${unit}</small>`, lo.d === last.d ? "è il prezzo dell'ultimo giro" : `visto ${fmtD(lo.d)}`) +
+    tile("Dall'inizio", prev ? hDelta(pp(first), pp(last)) : `<span class="hd eq">n.d.</span>`, prev ? `dal ${fmtD(first.d)} (${eur(pp(first))})` : "serve un secondo giro") +
+    tile("Dall'ultimo giro", prev ? hDelta(pp(prev), pp(last)) : `<span class="hd eq">n.d.</span>`, prev ? `rispetto a ${fmtD(prev.d)} (${eur(pp(prev))})` : "serve un secondo giro") + `</div>`;
+
+  const bs = histAgg(rows, H.per), n = bs.length, vals = [];
+  bs.forEach(b => vis.forEach(([k]) => { if(b.g[k]) vals.push(b.g[k][0]); }));
+  const mn = Math.min(...vals), mx = Math.max(...vals), step = hStep(Math.max(mx - mn, mx * 0.04, 10) / 3);
+  let y0 = Math.floor(mn / step) * step, y1 = Math.ceil(mx / step) * step;
+  if(y0 === y1){ y0 = Math.max(0, y0 - step); y1 += step; }
+  const PH = n <= 2 ? 160 : 230, T = 30, B = 12;
+  const Y = v => +(T + (1 - (v - y0) / (y1 - y0)) * (PH - T - B)).toFixed(1);
+  const t0 = dt(bs[0].k).getTime(), t1 = dt(bs[n - 1].k).getTime();
+  const X = b => n === 1 ? 50 : +(100 * (dt(b.k).getTime() - t0) / (t1 - t0)).toFixed(2);
+  let grid = "", ylab = "";
+  for(let v = y0; v <= y1 + 1e-6; v += step){ grid += `<line class="hgrid" x1="0" x2="1000" y1="${Y(v)}" y2="${Y(v)}"/>`; ylab += `<span class="hy num" style="top:${Y(v)}px">${eur(v)}</span>`; }
+  const paths = vis.map(([k]) => {
+    const p = bs.filter(b => b.g[k]); let so = "", da = "";
+    for(let i = 1; i < p.length; i++){
+      const s = `M${+(X(p[i - 1]) * 10).toFixed(1)} ${Y(p[i - 1].g[k][0])}L${+(X(p[i]) * 10).toFixed(1)} ${Y(p[i].g[k][0])}`;
+      if(p[i - 1].part || p[i].part) da += s; else so += s;
+    }
+    return (so ? `<path class="hl s-${k}" d="${so}"/>` : "") + (da ? `<path class="hl s-${k} dash" d="${da}"/>` : "");
+  }).join("");
+  const dots = vis.map(([k]) => bs.map((b, i) => b.g[k] && (n <= 45 || b.part || i === n - 1) ? `<i class="hdot s-${k}${b.part ? " part" : ""}" style="left:${X(b)}%;top:${Y(b.g[k][0])}px"></i>` : "").join("")).join("");
+  const lb = bs[n - 1].g[F] ? bs[n - 1] : null;
+  const lastLbl = lb ? `<span class="hlast num${n === 1 ? " c" : ""}" style="left:${X(lb)}%;top:${Y(lb.g[F][0])}px">${eur(lb.g[F][0])}</span>` : "";
+  const bTitle = b => H.per === "month" ? `${MESI[dt(b.k).getMonth()]} ${b.k.slice(0, 4)}` : H.per === "week" ? `Settimana del ${fmtDY(b.k)}` : `${fmtD(b.k)} ${b.k.slice(0, 4)}`;
+  const showA = vis.some(([k]) => k === "A");
+  const cols = bs.map((b, i) => {
+    const x = X(b), l = i ? (X(bs[i - 1]) + x) / 2 : 0, r = i < n - 1 ? (x + X(bs[i + 1])) / 2 : 100;
+    const shown = vis.filter(([k]) => b.g[k] && !(k === "A" && vis.some(([g]) => g === b.bg)));
+    const rowsTip = shown.map(([k, name]) => {
+      const e = b.g[k], lk = k === "A" ? b.bg : k, lv = b.last && lk in b.last ? b.last[lk] : undefined;
+      return `<span class="ht-r"><i class="hk s-${k}"></i><span class="ht-n">${esc(name)}${showA && k === b.bg ? " · il più basso" : ""}</span><b class="num">${eur(e[0])} <small>${unit}</small></b>
+        <span class="ht-s">coppia ${eur(e[0] * 2)} · ${hEntry(e)}${H.per !== "day" && b.days > 1 ? ` · visto il ${fmtDY(b.on[k])}` : ""}${lv !== undefined ? ` · ultimo giro del giorno: ${lv == null ? "nessun volo trovato" : eur(lv)}` : ""}</span></span>`;
+    }).join("");
+    const label = `${bTitle(b)}: ` + (shown.map(([k, name]) => `${name} ${eur(b.g[k][0])} ${unit}`).join(", ") || "nessun dato per le serie scelte") + (b.part ? " (dato parziale)" : "");
+    return `<button type="button" class="hcol" style="left:${+l.toFixed(2)}%;width:${+(r - l).toFixed(2)}%" aria-label="${esc(label)}"><i style="left:${+(100 * (x - l) / (r - l)).toFixed(1)}%"></i></button><span class="htip" role="tooltip" style="left:clamp(0px,calc(${x}% - 125px),calc(100% - 250px))"><b class="ht-d">${bTitle(b)}${H.per !== "day" && b.days > 1 ? ` · minimo di ${b.days} giorni` : ""}</b>${b.part ? ` <span class="est">dato parziale</span>` : ""}${rowsTip || `<span class="ht-s">Nessun dato per le serie scelte.</span>`}</span>`;
+  }).join("");
+  const nx = Math.min(n, 5), xi = uniq(Array.from({length:nx}, (_, i) => nx === 1 ? 0 : Math.round(i * (n - 1) / (nx - 1))));
+  const xlab = xi.map(i => `<span class="hx${n > 1 && i === 0 ? " f" : n > 1 && i === n - 1 ? " e" : ""}" style="left:${X(bs[i])}%">${H.per === "month" ? `${MESI[dt(bs[i].k).getMonth()]} ${bs[i].k.slice(2, 4)}` : fmtDY(bs[i].k)}</span>`).join("");
+  const desc = `Andamento del prezzo più basso per persona (${fName}): ${rows.length} ${rows.length === 1 ? "giorno" : "giorni"} di dati dal ${fmtD(first.d)} al ${fmtD(last.d)}, ultimo ${eur(pp(last))}, minimo ${eur(pp(lo))}.`;
+  const seg = `<span class="seg" role="group" aria-label="Aggregazione">${[["day", "Giorno"], ["week", "Settimana"], ["month", "Mese"]].map(([v, l]) => `<button type="button" data-act="hist" data-hk="per" data-hv="${v}" aria-pressed="${H.per === v}">${l}</button>`).join("")}</span>`;
+  const legend = ser.length > 1 ? `<span class="hlegs" role="group" aria-label="Serie mostrate">${ser.map(([k, name]) => `<button type="button" class="hleg" data-act="hist" data-hk="ser" data-hv="${k}" aria-pressed="${!H.off[k]}"><i class="hk s-${k}"></i>${esc(name)}</button>`).join("")}</span>` : "";
+  const anyPart = rows.some(r => r.part), cell = e => e ? `<b class="num">${eur(e[0])}</b><small>${esc(e[1])} · ${fmtDY(e[2])} → ${fmtDY(addD(e[2], e[3]))} · ${hStops(e[4])}${e[5] ? ` · tot. ~${eur(e[5])}` : ""}</small>` : "n.d.";
+  const table = `<details class="htab"><summary>Tabella dei valori</summary><div class="hscroll"><table><caption class="sr">${esc(desc)}</caption><thead><tr><th scope="col">${H.per === "day" ? "Giorno" : H.per === "week" ? "Settimana del" : "Mese"}</th>${ser.map(([, name]) => `<th scope="col">${esc(name)}</th>`).join("")}<th scope="col">Nota</th></tr></thead><tbody>` +
+    bs.slice().reverse().map(b => `<tr><th scope="row">${H.per === "week" ? fmtDY(b.k) : bTitle(b)}</th>${ser.map(([k]) => `<td>${cell(b.g[k])}</td>`).join("")}<td>${[b.part ? "dato parziale" : "", H.per !== "day" && b.days > 1 ? `minimo di ${b.days} giorni` : "", b.n > 1 ? `${b.n} giri, minimo del giorno` : "", /locale/.test(b.src) ? "scansione dal computer" : ""].filter(Boolean).join(" · ") || "giro completo"}</td></tr>`).join("") + `</tbody></table></div></details>`;
+  return `<div class="hist">
+    <div class="hhead"><div><p class="eyebrow">Andamento · ${trip ? "voli" : "A/R"} per persona</p><h3 class="h3">Il prezzo <i>nel tempo</i></h3></div><div class="hctl">${seg}${legend}</div></div>
+    ${stats}
+    <div class="hfig${n <= 2 ? " few" : ""}"><div class="hplot" style="height:${PH}px"><svg viewBox="0 0 1000 ${PH}" preserveAspectRatio="none" role="img" aria-label="${esc(desc)}"><title>${esc(desc)}</title>${grid}${paths}</svg>${ylab}${dots}${lastLbl}${cols}</div><div class="hxax" aria-hidden="true">${xlab}</div></div>
+    ${rows.length < 7 ? `<p class="note hbuild"><b>Storico in costruzione: ${rows.length} ${rows.length === 1 ? "giorno" : "giorni"} di dati.</b> Si aggiunge un punto a ogni giro di scansione, uno al giorno.</p>` : ""}
+    <p class="note">Prezzo più basso trovato a ogni giro fra tutte le date di agosto, con la regola scali (2 scali solo se conviene)${trip ? "; il totale stimato aggiunge voli interni e spese a terra" : ""}. Con più giri nello stesso giorno vale il minimo. Passa sul grafico o tocca un punto per aeroporto, date e scali.${anyPart ? ` <b>Punto vuoto e tratto tratteggiato = dato parziale</b>: quel giorno la scansione ha trovato molti meno voli del solito, il prezzo vero poteva essere più basso.` : ""}</p>
+    ${table}
+  </div>`;
+}
+const histSec = id => { const h = histHTML(id); return h ? `<div class="wrap hist-w" id="hist-in">${h}</div>` : ""; };
+
 function parse(hash){
   const h = String(hash || "").replace(/^#\/?/, "").split("?")[0], parts = h.split("/").filter(Boolean).map(x => { try { return decodeURIComponent(x); } catch(e){ return x; } });
   if(parts[0] === "d" && parts[1]) return {page:"dest", id:parts[1].toUpperCase()};
@@ -949,6 +1058,11 @@ function init(){
       if(a === "reset"){ if(S.tab === "pop") S.p = Object.assign({}, P0, {sort:S.p.sort}); else S.f = Object.assign({}, F0, {sort:S.f.sort}); updateHome(); return; }
       if(a === "rm"){ const st = S.tab === "pop" ? S.p : S.f; st[act.dataset.k] = (S.tab === "pop" ? P0 : F0)[act.dataset.k]; updateHome(); return; }
       if(a === "scroll"){ const el = $(act.dataset.to); if(el) el.scrollIntoView({behavior:"smooth", block:"start"}); return; }
+      if(a === "hist"){
+        if(act.dataset.hk === "per") S.h.per = act.dataset.hv; else S.h.off[act.dataset.hv] = !S.h.off[act.dataset.hv];
+        const el = $("hist-in"); if(el && S.route) el.innerHTML = histHTML((S.page === "trip" ? "t_" : "d_") + S.route.id);
+        return;
+      }
       if(a === "lb"){ openLb(+act.dataset.i); return; }
       if(a === "lb-x"){ $("lb").close(); return; }
       if(a === "lb-p"){ openLb((S.lbi - 1 + S.lb.length) % S.lb.length); return; }
@@ -973,6 +1087,6 @@ function init(){
   if(favLive()) loadFavs();
   go();
 }
-const App = {S, parse, pageHTML, homeParts, aggD, aggT, viewD, viewT, go, favUrl, BOT_USERNAME, API, FAV, favsHTML, toggleFav, loadFavs, flightT};
+const App = {S, parse, pageHTML, homeParts, aggD, aggT, viewD, viewT, go, favUrl, BOT_USERNAME, API, FAV, favsHTML, toggleFav, loadFavs, flightT, histHTML, histRows, histAgg, HIST};
 if(typeof window !== "undefined") window.App = App;
 if(typeof document !== "undefined") init();

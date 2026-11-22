@@ -3,13 +3,15 @@
 """Giro completo per GitHub Actions: scansione -> verifica dei vuoti -> controllo anti-blocco -> build del sito.
 
   python pipeline.py scan     riscansiona tutto da zero (prezzi nuovi a ogni giro) e scrive scan_meta.json
-  python pipeline.py build    build_trips.py, build.py, build_v2.py -> _site/index.html + _site/img/
+  python pipeline.py build    build_trips.py, build.py, storico prezzi, build_v2.py -> _site/index.html + _site/img/
   python pipeline.py meta     ricalcola scan_meta.json dai file presenti (dopo un caricamento a mano dei dati)
 
 Dati:
   raw_v2.jsonl, trips_raw_v2.jsonl   risultati del giro in corso (una riga per query, riprendibili)
   prev/                              gli stessi file del giro precedente, scaricati dal branch "data"
   scan_meta.json                     riepilogo del giro: conteggi, durata, query non rifatte ("stale")
+  bot/state/price_history.json       storico del prezzo piu' basso per meta e trip (price_history.py): sta su main, lo
+                                     aggiorna il build a ogni giro riuscito e lo committa il workflow della scansione
 
 Tempo: la fase A di ogni scansione ha un tetto (SCAN_BUDGET_MIN, default 240 minuti in tutto). Se il tetto scatta,
 le query non rifatte vengono riprese dal giro precedente, segnate come "stale" e rifatte per prime al giro dopo
@@ -242,10 +244,12 @@ def write_meta():
 def build():
     if not os.path.exists(RAW):
         fail("manca %s: nessun dato da pubblicare" % RAW)
-    for cmd in (["build_trips.py"], ["build.py"], ["build_v2.py", "--raw", "v2"]):
+    for cmd in (["build_trips.py"], ["build.py"], ["price_history.py", "update"], ["build_v2.py", "--raw", "v2"]):
         log("$ python", " ".join(cmd))
         r = subprocess.run([sys.executable] + cmd)
-        if r.returncode:
+        if r.returncode and cmd[0] == "price_history.py":
+            log("ATTENZIONE: storico prezzi non aggiornato (exit %d): il sito esce con lo storico che c'era" % r.returncode)
+        elif r.returncode:
             fail("%s fallito (exit %d)" % (cmd[0], r.returncode))
     html = open("agosto-2027-v2.html", encoding="utf-8").read()
     for marker in ("/*__DATA__*/", "/*__PHOTOS__*/", "/*__CSS__*/", "/*__JS__*/"):
