@@ -30,7 +30,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 os.chdir(ROOT); sys.path.insert(0, ROOT)
 RAW, TRIPS_RAW, META, PREV = "raw_v2.jsonl", "trips_raw_v2.jsonl", "scan_meta.json", "prev"
 BUDGET = float(os.environ.get("SCAN_BUDGET_MIN") or 240) * 60
-VERIFY_BUDGET = float(os.environ.get("VERIFY_BUDGET_MIN") or 60) * 60   # meta' ai trip (C + verify_trips.py), meta' a verify.py
+VERIFY_BUDGET = float(os.environ.get("VERIFY_BUDGET_MIN") or 150) * 60   # meta' ai trip (C + verify_trips.py), meta' a verify.py
 MIN_OK_RATIO = float(os.environ.get("MIN_OK_RATIO") or 0.6)
 MIN_OK_ABS = int(os.environ.get("MIN_OK_ABS") or 100)
 MAX_BLOCKED = int(os.environ.get("MAX_BLOCKED") or 150)
@@ -157,15 +157,19 @@ def scan():
     T.run(sorted(tfresh), "trips C(ricontrollo vuoti)", workers=2, v=1, slow=True)
     # verify_trips.py: secondo ricontrollo (v=2) dei vuoti sulle rotte che hanno gia' voli, poi fase B per le sbloccate
     deadline[0] = float("inf")
-    if VERIFY_BUDGET >= 240 and os.path.exists("verify_trips.py"):
+    tv0 = time.time()
+    for target in (2, 3):
+        left = VERIFY_BUDGET / 4 - (time.time() - tv0)
+        if left < 60 or not os.path.exists("verify_trips.py"):
+            break
         try:
-            subprocess.run([sys.executable, "verify_trips.py", "2"], timeout=VERIFY_BUDGET / 4, check=False,
+            subprocess.run([sys.executable, "verify_trips.py", str(target)], timeout=left, check=False,
                            env=dict(os.environ, WORKERS="2"))
         except subprocess.TimeoutExpired:
             log("verify_trips interrotta al tetto di tempo (le righe gia' scritte restano)")
         done = load(TRIPS_RAW)
         tb2 = [k[:-1] + "1" for k in ta if done.get(k, {}).get("st") == "ok" and k[:-1] + "1" not in done]
-        T.run(tb2, "trips B(ms1) dopo verifica")
+        T.run(tb2, "trips B(ms1) dopo verifica %d" % target)
         done = load(TRIPS_RAW)
         tfresh.update(k for k in tb2 if k in done)
     trip_stats = dict(T.stats)
@@ -177,17 +181,18 @@ def scan():
         shutil.copyfile(os.path.join(PREV, RAW), "raw.jsonl")
     try:
         vt0 = time.time()
-        for mode in ("none", "ok"):
+        # Sul runner molte pagine tornano vuote per carico: ogni passata di verify.py ne recupera una parte, e ogni
+        # query a 2 scali recuperata ha bisogno della sua query a 1 scalo (fase B), i cui vuoti passano al giro dopo.
+        for mode, target in (("none", "1"), ("ok", "1"), ("ok", "2"), ("ok", "3")):
             left = VERIFY_BUDGET / 2 - (time.time() - vt0)
             if left < 60:
-                log("verifica %s saltata: tempo finito" % mode); break
+                log("verifica %s %s saltata: tempo finito" % (mode, target)); break
             try:
-                subprocess.run([sys.executable, "verify.py", "1", mode], timeout=left, check=False,
+                subprocess.run([sys.executable, "verify.py", target, mode], timeout=left, check=False,
                                env=dict(os.environ, WORKERS=str(min(3, int(os.environ.get("WORKERS") or 3)))))
             except subprocess.TimeoutExpired:
-                log("verifica %s interrotta al tetto di tempo (le righe gia' scritte restano)" % mode)
-            if mode == "none":
-                phase_b("B(ms1) dopo verifica")
+                log("verifica %s %s interrotta al tetto di tempo (le righe gia' scritte restano)" % (mode, target))
+            phase_b("B(ms1) dopo verifica %s %s" % (mode, target))
     finally:
         if os.path.exists("raw.jsonl"):
             os.remove("raw.jsonl")
