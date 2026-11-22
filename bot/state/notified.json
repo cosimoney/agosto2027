@@ -1,5 +1,5 @@
 {
- "digest_last": "2026-11-21",
+ "digest_last": "2026-11-22",
  "fav": {},
  "global": {
   "d_ALA@FCO-CIA": {
@@ -30,7 +30,10 @@
    "min": 367
   },
   "d_TBS@MXP": {
-   "min": 416
+   "min": 190
+  },
+  "t_canada-quebec@MXP": {
+   "min": 926
   },
   "t_canada-rockies@FCO-CIA": {
    "min": 890
