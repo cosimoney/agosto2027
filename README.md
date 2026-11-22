@@ -29,7 +29,7 @@ Tutto su GitHub Actions, senza server.
 - Se Google blocca il runner le pagine tornano vuote: quando i risultati con voli scendono sotto il 60% del giro precedente il giro si ferma, il sito resta quello di prima e non parte nessun avviso.
 - Se la scansione supera il tetto di tempo, le rotte non rifatte restano quelle del giro precedente e vengono rifatte per prime la notte dopo.
 - Ogni giro fallito manda un messaggio Telegram all'amministratore.
-- Token e chat stanno solo nei secret di Actions.
+- Token e chat stanno solo nei secret di Actions e del Worker.
 
 ## A mano
 
@@ -39,4 +39,5 @@ gh workflow run scan.yml -f dry_run=true -f budget_min=3   # prova: non pubblica
 gh workflow run deploy.yml                    # ripubblica il sito
 ```
 
+Comandi del bot e preferiti del sito girano su un Worker Cloudflare (`worker/`, deploy con `bash worker/deploy.sh`).
 Dettagli del bot in `bot/SETUP.md`. Foto: crediti e licenze in `img/credits.json`.

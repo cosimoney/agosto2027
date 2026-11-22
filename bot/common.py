@@ -2,7 +2,7 @@
 """Funzioni condivise dal bot: configurazione, stato su file, client Telegram, formattazione.
 Solo libreria standard. Nessun chat_id viene mai scritto su file o stampato: nei log e nello stato
 compare solo un hash HMAC (chiave = token del bot), non reversibile senza il token."""
-import hashlib, hmac, html, json, os, re, sys, unicodedata, urllib.error, urllib.parse, urllib.request
+import copy, hashlib, hmac, html, json, os, re, sys, unicodedata, urllib.error, urllib.parse, urllib.request
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -80,6 +80,64 @@ def load_prefs(cfg):
     p.setdefault("paused", [])
     p.setdefault("muted", {})  # {id meta: "YYYY-MM-DD" fino a quando non mandare avvisi}
     return p
+
+
+def worker_url(cfg=None):
+    """Base del Worker Cloudflare che tiene preferiti e soglie (variabile WORKER_URL o "worker_url" in config.json). '' se manca."""
+    u = str(os.environ.get("WORKER_URL") or (cfg or {}).get("worker_url") or "").strip().rstrip("/")
+    return u if re.match(r"^https://", u) else ""
+
+
+def prefs_key():
+    """Chiave per GET /api/prefs: il secret PREFS_SECRET se c'e', altrimenti una chiave derivata dal token del bot
+    (HMAC-SHA256, il Worker la calcola allo stesso modo), cosi' funziona anche dove il secret non e' passato al passo."""
+    k = (os.environ.get("PREFS_SECRET") or "").strip()
+    if k or not bot_token():
+        return k
+    return hmac.new(bot_token().encode(), b"agosto2027-prefs-v1", hashlib.sha256).hexdigest()
+
+
+def fetch_remote_prefs(cfg, tries=3, timeout=20):
+    """Preferenze dal Worker, o None se non configurato / non raggiungibile / risposta non valida. Nei log solo il tipo di errore."""
+    import time
+    url, key = worker_url(cfg), prefs_key()
+    if not (url and key):
+        return None
+    for i in range(tries):
+        try:
+            req = urllib.request.Request(url + "/api/prefs", headers={"Authorization": "Bearer " + key, "User-Agent": "agosto2027-alerts/1.0", "Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                p = json.loads(r.read().decode("utf-8"))
+            if isinstance(p, dict) and isinstance(p.get("favorites"), dict):
+                return p
+            print("preferenze dal Worker: risposta non valida")
+            return None
+        except urllib.error.HTTPError as e:
+            print("preferenze dal Worker: HTTP %s" % e.code)
+            if e.code in (401, 403, 404):
+                return None
+        except Exception as e:
+            print("preferenze dal Worker: %s" % type(e).__name__)
+        if i < tries - 1:
+            time.sleep(3 * (i + 1))
+    return None
+
+
+def load_prefs_live(cfg, notified=None):
+    """Preferenze per gli avvisi. -> (prefs, origine). Ordine: Worker (fonte di verita'), poi l'ultima copia arrivata dal
+    Worker (notified["prefs_cache"], salvata a ogni giro riuscito), poi state/prefs.json."""
+    p, src = fetch_remote_prefs(cfg), "worker"
+    if p is None and isinstance((notified or {}).get("prefs_cache"), dict):
+        p, src = copy.deepcopy(notified["prefs_cache"]), "copia dell'ultimo giro"
+    if p is None:
+        return load_prefs(cfg), "prefs.json"
+    p.setdefault("threshold", cfg["threshold_pp"])
+    for k, v in (("favorites", {}), ("paused", []), ("muted", {})):
+        if not isinstance(p.get(k), type(v)):
+            p[k] = v
+    if src == "worker" and notified is not None:
+        notified["prefs_cache"] = copy.deepcopy(p)
+    return p, src
 
 
 def local_time(cfg=None, utc=None):

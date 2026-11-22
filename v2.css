@@ -52,7 +52,24 @@ ul,ol{padding:0;list-style:none}
 .top nav a:hover,.top nav a[aria-current="page"]{background:rgba(255,255,255,.16)}
 .back{display:inline-flex;align-items:center;gap:8px;color:inherit;text-decoration:none;font-weight:600;font-size:14px;padding:8px 14px 8px 10px;border-radius:999px;background:rgba(255,255,255,.14);border:0;cursor:pointer}
 .back:hover{background:rgba(255,255,255,.26)}
-@media (max-width:720px){.top nav a.opt{display:none}.brand i{display:none}}
+.top nav a.nav-fav{display:inline-flex;align-items:center;gap:6px}
+.top nav a.nav-fav svg{width:15px;height:15px;color:var(--sun)}
+.menu-b{display:none}
+@media (max-width:1040px){.brand i{display:none}}
+/* telefono: le sezioni (Nuove mete, Già visitati, Popular trips, Preferiti) stanno in un menu a tendina */
+@media (max-width:720px){
+  .menu-b{display:inline-grid;place-items:center;margin-left:auto;width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.14);color:inherit;cursor:pointer}
+  .menu-b span,.menu-b span::before,.menu-b span::after{display:block;width:18px;height:2px;border-radius:2px;background:currentColor}
+  .menu-b span{position:relative}
+  .menu-b span::before,.menu-b span::after{content:"";position:absolute;left:0}
+  .menu-b span::before{top:-6px}.menu-b span::after{top:6px}
+  .top nav.main{display:none;position:absolute;top:calc(var(--bar) - 2px);left:12px;right:12px;margin:0;flex-direction:column;gap:2px;padding:8px;border-radius:16px;background:var(--night);box-shadow:0 18px 40px -12px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.1)}
+  .top nav.main.open{display:flex}
+  .top nav.main a{padding:13px 14px;font-size:16px;border-radius:12px}
+  .top nav:not(.main) .nav-fav span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+  .top nav:not(.main) .nav-fav{padding:10px}
+  .top nav:not(.main) .nav-fav svg{width:19px;height:19px}
+}
 
 /* ---------- hero ---------- */
 .hero{position:relative;isolation:isolate;display:grid;align-items:end;min-height:min(92svh,920px);background:var(--night);color:var(--on-photo);overflow:hidden}
@@ -364,6 +381,23 @@ body{overflow-x:clip}
 .card-r{margin-right:54px}
 .fav{position:absolute;top:12px;right:12px;z-index:3;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:rgba(var(--veil),.6);color:var(--on-photo);border:1px solid rgba(255,255,255,.4);transition:background .2s,color .2s,transform .2s}
 .fav:hover{background:var(--sun);color:var(--on-sun);border-color:var(--sun);transform:scale(1.06)}
+button.fav{padding:0;cursor:pointer;font:inherit}
+.fav.on,.btn.ghost.on{background:var(--sun);color:var(--on-sun);border-color:var(--sun)}
+button.btn{font-family:inherit}
+/* pagina preferiti */
+.fv-page{min-height:70vh}
+.fv-grid{margin-top:clamp(22px,3vw,36px)}
+.fv-warn{color:var(--warn);font-weight:600;margin-bottom:10px}
+.fv-by svg{width:14px;height:14px;color:var(--sun);vertical-align:-2px;margin-right:2px}
+.fv-by .b{margin-left:2px}
+.fv-act{display:flex;flex-wrap:wrap;gap:8px;position:relative;z-index:3;margin-top:2px}
+.fv-act .pill{height:38px;text-decoration:none;color:var(--ink);font-family:inherit}
+.fv-act .pill.rm{color:var(--ink-2)}
+.fv-act .pill:hover{border-color:var(--ink-2)}
+.fv-on{position:absolute;top:12px;right:12px;z-index:1;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--sun);color:var(--on-sun)}
+.fv-me{margin-top:28px;font-size:13.5px;color:var(--ink-2)}
+.toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:120;max-width:min(92vw,460px);padding:12px 18px;border-radius:999px;background:var(--night);color:var(--on-photo);font-size:14.5px;font-weight:600;text-align:center;box-shadow:0 12px 34px -10px rgba(0,0,0,.55)}
+.toast[hidden]{display:none}
 .btn svg{flex:none}
 .d-when{display:grid;gap:3px;font-size:14.5px;min-width:0}
 .d-when b{font-family:var(--f-display);font-weight:800;font-size:clamp(22px,2.6vw,30px);text-transform:uppercase;line-height:1;letter-spacing:.01em}

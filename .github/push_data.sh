@@ -3,7 +3,7 @@
 # il branch non accumula storia, quindi il repo non cresce con le scansioni giornaliere.
 set -euo pipefail
 MSG="${1:-Dati ultimo giro}"
-FILES="raw_v2.jsonl trips_raw_v2.jsonl trips_data.json scan_meta.json bot/snapshot.json"
+FILES="raw_v2.jsonl trips_raw_v2.jsonl trips_data.json scan_meta.json bot/snapshot.json bot/snapshot_lite.json"
 export GIT_INDEX_FILE="$(pwd)/.git/index.data.$$"
 trap 'rm -f "$GIT_INDEX_FILE"' EXIT
 for f in $FILES; do

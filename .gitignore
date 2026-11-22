@@ -9,6 +9,7 @@ __pycache__/
 /trips_data.json
 /scan_meta.json
 /bot/snapshot.json
+/bot/snapshot_lite.json
 /raw.jsonl
 /trips_raw.jsonl
 /prev/

@@ -398,6 +398,25 @@ def build(raw=None, trips=None, weekend=None, cfg=None, today=None, root=None):
     return {"generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "sources": sources, "targets": targets, "offers": offers}
 
 
+def lite(snap, alt=3):
+    """Versione ridotta per il Worker (comandi /top, /meta, preferiti): per ogni meta l'offerta migliore e le prime
+    `alt` con date diverse, piu' l'elenco di tutti i prezzi (targets[id]["prices"]) per i conteggi. Stesso schema."""
+    by = C.by_target(snap)
+    targets = {tid: dict(t) for tid, t in snap["targets"].items()}
+    offers = []
+    for tid, lst in by.items():
+        keep, seen = [lst[0]], {(lst[0]["dep"], lst[0]["ret"])}
+        for o in lst[1:]:
+            if len(keep) > alt:
+                break
+            if (o["dep"], o["ret"]) not in seen:
+                seen.add((o["dep"], o["ret"]))
+                keep.append(o)
+        offers += keep
+        targets.setdefault(tid, {})["prices"] = [o["price_pp"] for o in lst]
+    return {"generated": snap.get("generated"), "lite": True, "sources": snap.get("sources", {}), "targets": targets, "offers": offers}
+
+
 def main():
     ap = argparse.ArgumentParser(description="Normalizza le fonti in snapshot.json")
     ap.add_argument("--raw", help="un solo file; default: raw.jsonl + raw_v2.jsonl (vince v2)")
@@ -407,8 +426,12 @@ def main():
     a = ap.parse_args()
     snap = build(a.raw, a.trips, a.weekend)
     Path(a.out).write_text(json.dumps(snap, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+    small = lite(snap)
+    lp = Path(a.out).with_name(Path(a.out).stem + "_lite.json")
+    lp.write_text(json.dumps(small, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     for name, st in snap["sources"].items():
         print("%-11s %s" % (name, st))
+    print("snapshot ridotto per il Worker: %d offerte, %d KB -> %s" % (len(small["offers"]), lp.stat().st_size // 1024, lp))
     print("snapshot: %d offerte, %d mete (%d con voli) -> %s" % (len(snap["offers"]), len(snap["targets"]),
           sum(1 for t in snap["targets"].values() if t["n"]), a.out))
     if not any(s.get("ok") for s in snap["sources"].values()):

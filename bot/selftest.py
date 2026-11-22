@@ -203,7 +203,7 @@ def main():
     check(all(("e altre %d mete" % (n - mx) in secs[i]) == (n > mx) for i, n in enumerate(st["sections"].values())), "coda 'e altre N mete' nelle sezioni lunghe", st["sections"])
     sec_prices = [[int(x.replace(".", "")) for x in re.findall(r"^(?:<blockquote expandable>)?• .*?: <b>([\d.]+) € pp</b>", b, re.M)] for b in secs]
     check(all(pp == sorted(pp) for pp in sec_prices), "dentro ogni sezione le righe sono in ordine di prezzo pp", sec_prices)
-    both = next((t for t in sorted({k[0] for k in pairs}, key=lambda t: min(pairs[(t, s)] for s in ("LIN", "MXP") if (t, s) in pairs) if any((t, s) in pairs for s in ("LIN", "MXP")) else 10 ** 9)
+    both = next((t for t in sorted({k[0] for k in pairs}, key=lambda t: (min(pairs[(t, s)] for s in ("LIN", "MXP") if (t, s) in pairs) if any((t, s) in pairs for s in ("LIN", "MXP")) else 10 ** 9, t))
                  if (t, "LIN") in pairs and (t, "MXP") in pairs and pairs[(t, "LIN")] != pairs[(t, "MXP")]), None)
     if both:
         nm = "<b>%s</b></a>" % C.esc(C.display_name(snap["targets"][both]))
@@ -782,6 +782,71 @@ def main():
     check(not any(str(x) in blob for x in (ME, LAVI, STRANGER)) and "SELFTEST" not in blob, "nei file di stato non ci sono chat_id ne' token")
     check(set(p.name for p in Path(TMP).glob("*.json")) >= {"prefs.json", "offset.json", "last_snapshot.json", "notified.json"}, "i 4 file di stato vengono creati")
     check(C.save_json(C.state_dir() / "prefs.json", prefs) is False, "salvataggio idempotente: nessuna riscrittura se nulla cambia")
+
+    # ---------- 4. Worker: preferenze remote con ripiego, snapshot ridotto ----------
+    section("4. preferenze dal Worker (senza rete) e snapshot ridotto")
+    for k in ("WORKER_URL", "PREFS_SECRET"):
+        os.environ.pop(k, None)
+    check(C.worker_url({}) == "" and C.worker_url({"worker_url": "https://x.workers.dev/"}) == "https://x.workers.dev" and C.worker_url({"worker_url": "http://x"}) == "",
+          "worker_url: da config o variabile, solo https, senza barra finale")
+    check(C.fetch_remote_prefs(dict(cfg, worker_url="")) is None, "senza Worker configurato nessuna chiamata di rete")
+    check(re.fullmatch(r"[0-9a-f]{64}", C.prefs_key()) and "SELFTEST" not in C.prefs_key(), "chiave per /api/prefs derivata dal token del bot, non reversibile")
+    os.environ["PREFS_SECRET"] = "abc"
+    check(C.prefs_key() == "abc", "PREFS_SECRET, se presente, ha la precedenza")
+    os.environ.pop("PREFS_SECRET")
+    cfg_off = dict(cfg, worker_url="")
+    pl, src = C.load_prefs_live(cfg_off, {})
+    check(src == "prefs.json" and pl == C.load_prefs(cfg), "Worker assente e nessuna copia: si usa state/prefs.json")
+    cache = {"prefs_cache": {"favorites": {"d_TBS": {"added": "2026-11-22", "p": 190, "by": "X"}}, "threshold": 800}}
+    pl, src = C.load_prefs_live(cfg_off, cache)
+    check(src != "prefs.json" and pl["threshold"] == 800 and "d_TBS" in pl["favorites"] and pl["paused"] == [] and pl["muted"] == {},
+          "Worker assente: si usa l'ultima copia salvata in notified.json, completata con i campi mancanti")
+    real = urllib.request.urlopen
+    seen = {}
+
+    class FakeResp:
+        def __init__(self, body):
+            self.body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return self.body
+
+    def fake(req, timeout=0):
+        seen.update(url=req.full_url, auth=req.get_header("Authorization"))
+        return FakeResp(json.dumps({"favorites": {"d_EVN": {"added": "2026-11-22", "p": 230}}, "threshold": 900, "paused": [], "muted": {}}).encode())
+
+    urllib.request.urlopen = fake
+    try:
+        nt = {}
+        pl, src = C.load_prefs_live(dict(cfg, worker_url="https://w.example.workers.dev/"), nt)
+    finally:
+        urllib.request.urlopen = real
+    check(src == "worker" and pl["threshold"] == 900 and seen.get("url") == "https://w.example.workers.dev/api/prefs" and seen.get("auth") == "Bearer " + C.prefs_key()
+          and nt.get("prefs_cache") == pl, "Worker raggiungibile: preferenze da /api/prefs con Bearer, copia salvata per il giro dopo")
+    small = S.lite(snap)
+    by_full, by_small = C.by_target(snap), C.by_target(small)
+    check(set(by_full) == set(by_small) and all(by_full[t][0] == by_small[t][0] and 1 <= len(by_small[t]) <= 4 for t in by_full),
+          "snapshot ridotto: stesse mete, stessa offerta migliore, al massimo 4 offerte per meta (%d offerte su %d)" % (len(small["offers"]), len(snap["offers"])))
+    check(all(small["targets"][t]["prices"] == [o["price_pp"] for o in by_full[t]] for t in by_full) and "prices" not in next(iter(snap["targets"].values())),
+          "snapshot ridotto: elenco completo dei prezzi per i conteggi di /meta, snapshot originale non toccato")
+    kb = K.Bot(C.Telegram(None, dry_run=True, quiet=True), cfg, small, {"threshold": 1000, "favorites": {}, "paused": [], "muted": {}})
+    kf = K.Bot(C.Telegram(None, dry_run=True, quiet=True), cfg, snap, {"threshold": 1000, "favorites": {}, "paused": [], "muted": {}})
+    check(kb.cmd_top("", ME) == kf.cmd_top("", ME), "/top identico con snapshot ridotto e completo")
+    check(any(c == "sito" for c, _ in K.MENU) and "/sito" in K.HELP, "/sito nel menu e nell'aiuto")
+    wk_dir = C.ROOT / "worker"
+    if wk_dir.exists():
+        wfiles = [f for f in wk_dir.rglob("*") if f.is_file() and "node_modules" not in f.parts and ".wrangler" not in f.parts and f.name != ".dev.vars"]
+        txt = {f: f.read_text(encoding="utf-8", errors="replace") for f in wfiles}
+        check(not any(tok.search(t) for t in txt.values()), "nessun token Telegram nei file del Worker (%d file controllati)" % len(wfiles))
+        js = (wk_dir / "src" / "bot.js").read_text(encoding="utf-8")
+        m = re.search(r"export const HELP = `(.*?)`;", js, re.S)
+        check(m and m.group(1) == K.HELP, "testo di /help identico tra bot/commands.py e worker/src/bot.js")
 
     print("\n%d controlli, %d falliti%s" % (N[0], len(FAILS), (": " + "; ".join(FAILS)) if FAILS else ""))
     print("stato di prova in %s" % TMP)

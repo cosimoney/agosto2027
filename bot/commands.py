@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Comandi del bot via polling getUpdates (nessun server, nessun webhook): pensato per un workflow ogni ~13 minuti.
+"""Comandi del bot via polling getUpdates. DAL VIVO NON SI USA PIU': i comandi li gestisce il Worker Cloudflare
+(worker/src/bot.js, stessa logica e stessi testi) tramite webhook, e con il webhook attivo getUpdates non funziona.
+Questo file resta come riferimento, per le prove in locale (--dry-run --simulate), per selftest.py e per --register.
+Se cambi un testo o una regola qui, cambiala anche in worker/src/bot.js: worker/test/parity.test.mjs li confronta.
 
 Uso:
   python bot/commands.py                     un passaggio: legge gli update in coda, risponde, salva lo stato
@@ -33,6 +36,7 @@ HELP = """<b>Comandi</b>
 /silenzia &lt;meta&gt; [giorni] - niente avvisi su una meta per 7 giorni (<code>/silenzia TBS off</code> per riattivarla)
 /digest - ogni quanto mandare il riepilogo: a ogni giro, giornaliero o settimanale
 /pausa e /riprendi - sospende o riattiva gli avvisi in questa chat
+/sito - il tuo link personale per usare i preferiti dal sito
 
 Le mete si indicano con codice aeroporto, nome o ID (d_TBS destinazione, t_georgia-armenia giro, w_BCN weekend).
 I prezzi sono sempre A/R <b>a persona</b>; tra parentesi o dopo il punto trovi la coppia."""
@@ -40,7 +44,8 @@ I prezzi sono sempre A/R <b>a persona</b>; tra parentesi o dopo il punto trovi l
 MENU = [("top", "Le 5 mete migliori sotto soglia"), ("meta", "Miglior prezzo e date di una meta"), ("preferiti", "I tuoi preferiti"),
         ("aggiungi", "Aggiungi un preferito"), ("rimuovi", "Rimuovi un preferito"), ("soglia", "Imposta la soglia in euro a persona"),
         ("silenzia", "Silenzia una meta per 7 giorni"), ("digest", "Frequenza del riepilogo"),
-        ("pausa", "Sospendi gli avvisi"), ("riprendi", "Riattiva gli avvisi"), ("help", "Elenco comandi")]
+        ("pausa", "Sospendi gli avvisi"), ("riprendi", "Riattiva gli avvisi"), ("sito", "Link personale per i preferiti sul sito"),
+        ("help", "Elenco comandi")]
 
 
 def btn(text, data):
@@ -309,6 +314,10 @@ class Bot:
             self.prefs["paused"].append(h)
         return "⏸ Avvisi in pausa per questa chat. I comandi restano attivi; per ripartire /riprendi.", rows([btn("▶️ Riprendi", "resume")])
 
+    def cmd_sito(self, arg, chat):
+        # dal vivo risponde il Worker (worker/src/index.js) con il link firmato; qui si arriva solo in polling o in simulazione
+        return "I preferiti dal sito non sono ancora attivi su questo bot. Per ora usa /aggiungi oppure la stella sul sito, che apre questa chat.", None
+
     def cmd_riprendi(self, arg, chat):
         h = C.chat_hash(chat)
         self.prefs["paused"] = [x for x in self.prefs["paused"] if x != h]
@@ -439,6 +448,12 @@ def main():
         _, stats = process(bot, ups, allowed or [chat], offset)
         print("simulazione: %s (stato non scritto)" % stats)
         return 0
+    try:  # con il webhook attivo (Worker Cloudflare) getUpdates non riceve nulla: si esce subito. Mai stampare l'URL: contiene un segreto
+        if (tg.call("getWebhookInfo") or {}).get("url"):
+            print("webhook attivo: i comandi li gestisce il Worker, niente polling.")
+            return 0
+    except (C.TelegramError, AttributeError):
+        pass
     deadline = time.time() + max(0, a.loop_seconds)
     total = {"ok": 0, "ignored": 0, "skip": 0, "error": 0}
     while True:

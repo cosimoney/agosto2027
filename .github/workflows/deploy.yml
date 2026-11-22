@@ -16,6 +16,7 @@ on:
       - "itineraries.py"
       - "popular_trips.py"
       - "pipeline.py"
+      - "bot/config.json"
       - ".github/workflows/deploy.yml"
   workflow_dispatch:
 

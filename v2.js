@@ -1,7 +1,11 @@
 /* Agosto 2027 v2: sito di viaggio a pagine (hash routing). Dati: RAW (build.py + build_trips.py), foto: PH (img/manifest.json).
-   Rotte: #/ (nuove mete) · #/visitati · #/trips · #/d/<IATA> · #/t/<trip.id> · #/crediti */
+   Rotte: #/ (nuove mete) · #/visitati · #/trips · #/d/<IATA> · #/t/<trip.id> · #/preferiti · #/login/<token> · #/crediti
+   Preferiti: se API (base del Worker Cloudflare, da bot/config.json "worker_url") e' valorizzata e il dispositivo ha un
+   token personale (link #/login/<token> mandato dal bot con /sito), la stella salva subito via Worker; altrimenti apre Telegram. */
 "use strict";
 const BOT_USERNAME = "Trip2027_bot";
+const API = "/*__API__*/".replace(/\/+$/, "");
+const WEEKEND_URL = "https://cosimoney.github.io/flightsMI/";
 const RAW = /*__DATA__*/;
 const PH = /*__PHOTOS__*/;
 
@@ -86,7 +90,69 @@ const TABS = {new:{hash:"#/", label:"Nuove mete", sub:"Paesi dove non siete mai 
               pop:{hash:"#/trips", label:"Popular trips", sub:"Itinerari completi, anche open-jaw: tappe, voli e costo a terra."}};
 const favUrl = id => `https://t.me/${BOT_USERNAME}?start=fav_${encodeURIComponent(id)}`;
 const star = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2.6l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.5l-5.9 3.1 1.2-6.5L2.5 9.5l6.6-.9z"/></svg>`;
-const favBtn = (id, name) => `<a class="fav" href="${favUrl(id)}" target="_blank" rel="noopener" aria-label="Salva ${esc(name)} tra i preferiti su Telegram" title="Salva tra i preferiti (Telegram)">${star}</a>`;
+
+/* ------------------------------------------------------------------ preferiti (Worker) */
+// FAV.state: off (nessun Worker) | anon (manca il token) | loading | ok | expired (token non piu' valido) | error (rete)
+const TOKEN_KEY = "agosto2027.token";
+const FAV = {token:"", map:new Map(), me:"", state:"off", busy:new Set(), toastT:null};
+function readToken(){ try { return localStorage.getItem(TOKEN_KEY) || ""; } catch(e){ return ""; } }
+function saveToken(v){
+  FAV.token = v || "";
+  try { if(v) localStorage.setItem(TOKEN_KEY, v); else localStorage.removeItem(TOKEN_KEY); } catch(e){ /* navigazione privata: il token resta solo in memoria */ }
+}
+const favLive = () => !!(API && FAV.token);
+const favOn = id => FAV.map.has(id);
+async function favCall(path, body){
+  const r = await fetch(API + path, {method: body ? "POST" : "GET", body: body ? JSON.stringify(body) : undefined,
+    headers: Object.assign({Authorization: "Bearer " + FAV.token}, body ? {"Content-Type": "application/json"} : {})});
+  if(r.status === 401){ const e = new Error("unauthorized"); e.auth = true; throw e; }
+  if(!r.ok) throw new Error("http " + r.status);
+  return r.json();
+}
+function favApply(j){ FAV.map = new Map((j.favs || []).map(f => [f.id, f])); FAV.me = j.me || ""; FAV.state = "ok"; }
+function favExpired(){ saveToken(""); FAV.map = new Map(); FAV.me = ""; FAV.state = "expired"; }
+function favPaint(){
+  document.querySelectorAll("[data-act='fav']").forEach(el => {
+    const on = favOn(el.dataset.id), l = el.querySelector(".lbl");
+    el.classList.toggle("on", on); el.setAttribute("aria-pressed", String(on)); el.setAttribute("title", on ? "Togli dai preferiti" : "Salva tra i preferiti");
+    if(l) l.textContent = on ? "Nei preferiti" : "Salva tra i preferiti";
+  });
+  if(S.page === "favs") $("app").innerHTML = favsHTML();
+}
+async function loadFavs(){
+  if(!favLive()) return;
+  if(FAV.state !== "ok") FAV.state = "loading";
+  try { favApply(await favCall("/api/favs")); }
+  catch(e){ if(e.auth) favExpired(); else if(FAV.state !== "ok") FAV.state = "error"; }
+  favPaint();
+}
+function toast(msg){
+  const el = $("toast"); if(!el) return;
+  el.textContent = msg; el.hidden = false;
+  clearTimeout(FAV.toastT); FAV.toastT = setTimeout(() => { el.hidden = true; }, 3600);
+}
+// ottimistico: la stella cambia subito; se il Worker non conferma torna com'era
+async function toggleFav(id){
+  if(!favLive() || FAV.busy.has(id)) return;
+  const was = FAV.map.get(id), on = !was;
+  FAV.busy.add(id);
+  if(on) FAV.map.set(id, {id, by:FAV.me, at:new Date().toISOString(), p:null, cur:null}); else FAV.map.delete(id);
+  favPaint();
+  try { favApply(await favCall("/api/fav", {id, on})); toast(on ? "Salvato tra i preferiti" : "Tolto dai preferiti"); }
+  catch(e){
+    if(was) FAV.map.set(id, was); else FAV.map.delete(id);
+    if(e.auth){ favExpired(); toast("Il link personale non vale più: chiedine uno nuovo al bot con /sito"); }
+    else toast("Non sono riuscito a salvare. Riprova tra poco.");
+  }
+  FAV.busy.delete(id);
+  favPaint();
+}
+const favBtn = (id, name) => favLive()
+  ? `<button class="fav${favOn(id) ? " on" : ""}" data-act="fav" data-id="${esc(id)}" aria-pressed="${favOn(id)}" aria-label="${esc(name)} tra i preferiti" title="${favOn(id) ? "Togli dai preferiti" : "Salva tra i preferiti"}">${star}</button>`
+  : `<a class="fav" href="${favUrl(id)}" target="_blank" rel="noopener" aria-label="Salva ${esc(name)} tra i preferiti su Telegram" title="Salva tra i preferiti (Telegram)">${star}</a>`;
+const favCta = id => favLive()
+  ? `<button class="btn ghost${favOn(id) ? " on" : ""}" data-act="fav" data-id="${esc(id)}" aria-pressed="${favOn(id)}">${star} <span class="lbl">${favOn(id) ? "Nei preferiti" : "Salva tra i preferiti"}</span></button>`
+  : `<a class="btn ghost" href="${favUrl(id)}" target="_blank" rel="noopener">${star} Salva tra i preferiti</a>`;
 
 /* ------------------------------------------------------------------ destinazioni: logica */
 // volo: [prezzo, compagnie, durataMin andata, scali, partenza, arrivo, giorni+, scali via, da, a]
@@ -286,11 +352,16 @@ function cardT(a, i, feat){
 }
 
 /* ------------------------------------------------------------------ home */
+// detail: false = home (barra trasparente sulla foto, menu completo) · "nav" = pagina di sezione (barra piena, menu completo)
+//         "photo" / "plain" = pagina di dettaglio (indietro + marchio), "plain" con barra piena
 function topHTML(detail){
-  const nav = Object.entries(TABS).map(([k, t]) => `<a href="${t.hash}"${!detail && S.page === "home" && S.tab === k ? ` aria-current="page"` : ""}${k === "vis" ? ` class="opt"` : ""}>${t.label}</a>`).join("");
-  return `<div class="top${detail === "plain" ? " solid" : ""}" id="top"><div class="wrap top-in">
-    ${detail ? `<a class="back" href="${TABS[S.tab].hash}" data-act="back"><span aria-hidden="true">←</span> Tutte le mete</a>` : `<a class="brand" href="#/">Agosto 2027<i>da Milano</i></a>`}
-    <nav aria-label="Sezioni">${detail ? `<a class="brand" href="#/">Agosto 2027</a>` : nav}</nav></div></div>`;
+  const main = !detail || detail === "nav", solid = detail === "plain" || detail === "nav";
+  const favA = API ? `<a class="nav-fav" href="#/preferiti"${S.page === "favs" ? ` aria-current="page"` : ""}>${star}<span>Preferiti</span></a>` : "";
+  const nav = Object.entries(TABS).map(([k, t]) => `<a href="${t.hash}"${!detail && S.page === "home" && S.tab === k ? ` aria-current="page"` : ""}>${t.label}</a>`).join("") + favA;
+  return `<div class="top${solid ? " solid" : ""}" id="top"${solid ? ` data-solid="1"` : ""}><div class="wrap top-in">
+    ${main ? `<a class="brand" href="#/">Agosto 2027<i>da Milano, Roma, Pisa</i></a>` : `<a class="back" href="${TABS[S.tab].hash}" data-act="back"><span aria-hidden="true">←</span> Tutte le mete</a>`}
+    ${main ? `<button class="menu-b" data-act="menu" aria-expanded="false" aria-controls="topnav" aria-label="Menu"><span aria-hidden="true"></span></button>` : ""}
+    <nav id="topnav" aria-label="Sezioni"${main ? ` class="main"` : ""}>${main ? nav : favA + `<a class="brand" href="#/">Agosto 2027</a>`}</nav></div></div>`;
 }
 /* copertine della home: posti esotici e iconici tra le mete del progetto [foto, meta]. A ogni caricamento si parte da una
    a caso e si ruota tra 4; il box "In copertina" segue la foto (prezzo pp e link alla pagina della meta). */
@@ -309,8 +380,8 @@ function heroPicks(){
 }
 const heroPP = h => h.min != null ? "da " + eur(h.min) + " pp" : "scopri la meta";
 function footHTML(){
-  return `<footer class="foot"><div class="wrap foot-in"><span>Agosto 2027 da Milano · prezzi Google Flights al ${esc(META.date || "")}</span>
-    <span><a href="#/crediti">Crediti delle foto</a> · <a href="https://t.me/${BOT_USERNAME}" target="_blank" rel="noopener">Bot Telegram</a></span></div></footer>`;
+  return `<footer class="foot"><div class="wrap foot-in"><span>Agosto 2027 da Milano, Roma, Pisa · prezzi Google Flights al ${esc(META.date || "")}</span>
+    <span>${API ? `<a href="#/preferiti">Preferiti</a> · ` : ""}<a href="#/crediti">Crediti delle foto</a> · <a href="https://t.me/${BOT_USERNAME}" target="_blank" rel="noopener">Bot Telegram</a></span></div></footer>`;
 }
 function homeHTML(){
   const picks = S.hero = heroPicks(), p0 = picks[0];
@@ -573,7 +644,7 @@ function destHTML(code){
           ${b ? `<div class="tag"><span class="pp num">${eur(a.min)}</span><span class="u">a persona · A/R<small class="num">coppia ${eur(a.min * 2)}</small></span></div>` : `<div class="tag"><span class="pp">n.d.</span><span class="u">voli<small>non ancora in vendita</small></span></div>`}
           <div class="d-when">${b ? `<b>${fmtD(b.c.dep)} → ${fmtD(ret)}</b><span>${b.c.n} giorni · da ${esc(oName(b.c.o))} · ${stopsTxt(b.o.f)}</span>` : `<span>Date da ricontrollare più avanti</span>`}</div>
         </div>
-        <div class="d-cta">${b ? `<button class="btn sun" data-act="scroll" data-to="voli">Vedi i voli</button>` : ""}<a class="btn ghost" href="${favUrl("d_" + code)}" target="_blank" rel="noopener">${star} Salva tra i preferiti</a></div>
+        <div class="d-cta">${b ? `<button class="btn sun" data-act="scroll" data-to="voli">Vedi i voli</button>` : ""}${favCta("d_" + code)}</div>
       </div>
       <div class="d-facts rise" style="--i:3"><span class="b glass">clima ${esc(d.g)}</span><span class="b glass">${esc(d.temp)}</span>${a ? `<span class="b glass">punteggio ${a.bestS}/100</span>` : ""}${a ? oBadge(b.c.o, a.origins, true) : ""}${d.flag ? `<span class="b glass">${esc(d.flag)}</span>` : ""}</div>
     </div>
@@ -664,7 +735,7 @@ function tripHTML(id){
           ${b ? `<div class="tag"><span class="pp num">${eur(b.o.voli)}</span><span class="u">a persona · voli<small class="num">totale stimato ~${eur(a.min)} pp</small></span></div>` : `<div class="tag"><span class="pp num">${eur(t.land[0])}+</span><span class="u">a persona · a terra<small>voli non ancora disponibili</small></span></div>`}
           <div class="d-when">${b ? `<b>${fmtD(b.c.dep)} → ${fmtD(ret)}</b><span>${b.c.n} giorni · da ${esc(oName(b.c.o))} · coppia ${eur(a.min * 2)} tutto compreso</span>` : `<span>Date da ricontrollare più avanti</span>`}</div>
         </div>
-        <div class="d-cta"><button class="btn sun" data-act="scroll" data-to="voli">Costi e voli</button><a class="btn ghost" href="${favUrl("t_" + id)}" target="_blank" rel="noopener">${star} Salva tra i preferiti</a></div>
+        <div class="d-cta"><button class="btn sun" data-act="scroll" data-to="voli">Costi e voli</button>${favCta("t_" + id)}</div>
       </div>
       <div class="d-facts rise" style="--i:3"><span class="b glass">${t.type === "oj" ? "open-jaw" : "A/R"}</span><span class="b glass">clima ${esc(t.g)}</span><span class="b glass">${esc(t.temp)}</span><span class="b glass">ritmo ${esc(t.pace)}</span>${a ? `<span class="b glass">punteggio ${a.bestS}/100</span>` : ""}${a ? oBadge(b.c.o, a.origins, true) : ""}</div>
     </div>
@@ -701,19 +772,103 @@ function creditsHTML(){
     <ul class="cr">${items}</ul></main>` + footHTML();
 }
 
+/* ------------------------------------------------------------------ pagina preferiti */
+// miglior prezzo dei soli voli di un trip (voli + tratte stimate), come nel bot
+function flightT(t, origin){
+  let m = null;
+  for(const c of t.cells){
+    if(!oMatch(c.o, origin)) continue;
+    const o = poptions(t, c, 1)[0];
+    if(o && (m == null || o.voli + o.extra < m.pp)) m = {pp:o.voli + o.extra, o:c.o, dep:c.dep, ret:addD(c.dep, c.n), n:c.n, stops:null};
+  }
+  return m;
+}
+function fmtWhen(at){
+  if(!at) return "";
+  const x = new Date(String(at).length === 10 ? at + "T12:00:00" : at), now = new Date();
+  if(isNaN(x.getTime())) return "";
+  if(x.toDateString() === now.toDateString()) return "oggi";
+  return `il ${x.getDate()} ${MESI[x.getMonth()]}${x.getFullYear() !== now.getFullYear() ? " " + x.getFullYear() : ""}`;
+}
+const pctTxt = (a, b) => { const p = Math.round(100 * Math.abs(b - a) / a); return p ? ` (${b < a ? "−" : "+"}${p}%)` : ""; };
+function favCard(f, i){
+  const kind = f.id[0], key = f.id.slice(2), d = kind === "d" ? DEST[key] : null, t = kind === "t" ? PT[key] : null;
+  const k = d ? coverD(key) : t ? coverT(t) : null;
+  const name = d ? d.city : t ? t.name : (f.name || key);
+  const where = d ? `${esc(d.country)} · <span class="iata">${esc(d.code)}</span>` : t ? `${esc(t.countries.join(" + "))} · ${t.nights} notti` : kind === "w" ? "Weekend da Milano" : esc(f.country || "");
+  const href = d ? "#/d/" + esc(key) : t ? "#/t/" + esc(key) : kind === "w" ? WEEKEND_URL : "";
+  // prezzo di oggi: quello del bot (stessa base del prezzo all'aggiunta); se manca, quello calcolato dai dati della pagina
+  let cur = f.cur && f.cur.pp != null ? f.cur : null;
+  if(!cur && d){ const a = viewD(key, "all", 1) || viewD(key, "all", 2); if(a) cur = {pp:a.min, o:a.cheap.c.o, dep:a.cheap.c.dep, ret:addD(a.cheap.c.dep, a.cheap.c.n), n:a.cheap.c.n, stops:a.cheap.o.f[3]}; }
+  if(!cur && t) cur = flightT(t, "all");
+  const city = g => { if(d){ const a = viewD(key, g, 1); return a ? a.min : null; } if(t){ const a = flightT(t, g); return a ? a.pp : null; } return null; };
+  const cities = CITIES.map(([g, nm]) => [nm, city(g)]).filter(x => x[1] != null), lo = cities.length ? Math.min(...cities.map(x => x[1])) : null;
+  const stops = cur && cur.stops != null ? (cur.stops === 0 ? "diretto" : cur.stops === 1 ? "1 scalo" : cur.stops + " scali") : "";
+  const when = cur && cur.dep && cur.ret ? [`<b>${fmtD(cur.dep)} → ${fmtD(cur.ret)}</b>`, cur.n != null ? `${cur.n} giorni` : "", cur.o ? `da ${esc(oName(cur.o))}` : "", stops].filter(Boolean).join(" · ") : "";
+  let delta = "";
+  if(f.p != null && cur){
+    const diff = cur.pp - f.p;
+    delta = ` · all'aggiunta <b class="num">${eur(f.p)} pp</b> ` + (diff < 0 ? `<span class="b ok">sceso di ${eur(-diff)}${pctTxt(f.p, cur.pp)}</span>` : diff > 0 ? `<span class="b warn">salito di ${eur(diff)}${pctTxt(f.p, cur.pp)}</span>` : `<span class="b plain">prezzo invariato</span>`);
+  }
+  const added = [f.by ? `da <b>${esc(f.by)}</b>` : "", fmtWhen(f.at)].filter(Boolean).join(" ");
+  return `<article class="card fv rise" style="--i:${Math.min(i, 8)}">
+    <div class="card-ph">${k ? img(k, {alt:PHO[k].cap + ", " + name}) : noPhoto(d ? d.code : t ? t.arr : key)}
+      <div class="card-top"><span class="bs"><span class="b glass">${kind === "t" ? "giro" : kind === "w" ? "weekend" : "meta"}</span>${cur && cur.o ? `<span class="b glass">da ${esc(oName(cur.o))}</span>` : ""}</span></div>
+      <div class="card-name"><span class="k">${where}</span><h3 class="n">${esc(name)}</h3></div>
+    </div>
+    <div class="card-bd">
+      ${cur ? `<div class="pr"><span class="pp num">${eur(cur.pp)}</span><span class="u">a persona · ${kind === "t" ? "voli" : "A/R"}</span><span class="cp num">coppia ${eur(cur.pp * 2)}</span></div>` : `<div class="pr"><span class="pp">n.d.</span><span class="u">voli non ancora in vendita</span></div>`}
+      ${when ? `<p class="meta">${when}</p>` : ""}
+      ${cities.length ? `<div class="bs" aria-label="Miglior prezzo per città di partenza">${cities.map(([nm, pp]) => `<span class="b ${pp === lo ? "ok" : "plain"}">${nm} <b class="num">${eur(pp)}</b></span>`).join("")}</div>` : ""}
+      <p class="meta fv-by">${star} Aggiunto${added ? " " + added : ""}${delta}</p>
+      <div class="fv-act">${href ? `<a class="pill" href="${href}"${kind === "w" ? ` target="_blank" rel="noopener"` : ""}>Apri la pagina</a>` : ""}<button class="pill rm" data-act="fav-rm" data-id="${esc(f.id)}" aria-label="Rimuovi ${esc(name)} dai preferiti">Rimuovi</button></div>
+    </div>
+    ${href && kind !== "w" ? `<a class="card-link" href="${href}"><span class="sr">Apri ${esc(name)}</span></a>` : ""}
+    <div class="fv-on" aria-hidden="true">${star}</div>
+  </article>`;
+}
+function favsHTML(){
+  const head = topHTML("nav") + `<main class="wrap cr-head sec fv-page" id="favs"><p class="eyebrow">Preferiti</p><h1 class="h2" style="margin:8px 0 14px">Le mete <i>da tenere d'occhio</i></h1>`;
+  const ask = `<p class="sub">I preferiti sono privati. Per vederli e salvarli da questo dispositivo scrivi <b>/sito</b> a @${BOT_USERNAME}: ti risponde con un link personale da aprire qui.</p>
+    <p style="margin-top:22px"><a class="btn" href="https://t.me/${BOT_USERNAME}?start=sito" target="_blank" rel="noopener">Chiedi il link al bot</a></p>`;
+  let body;
+  if(!favLive()) body = (FAV.state === "expired" ? `<p class="sub fv-warn">Il link usato su questo dispositivo non vale più.</p>` : "") + ask;
+  else if(FAV.state === "error") body = `<p class="sub">Non riesco a leggere i preferiti in questo momento.</p><p style="margin-top:22px"><button class="btn" data-act="fav-retry">Riprova</button></p>`;
+  else if(FAV.state !== "ok") body = `<p class="sub">Carico i preferiti…</p>`;
+  else {
+    const list = [...FAV.map.values()].sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+    body = (list.length
+      ? `<p class="sub">${list.length === 1 ? "Un preferito condiviso" : list.length + " preferiti condivisi"} tra voi due. Il bot scrive su Telegram quando uno scende di prezzo o escono nuove date.</p>
+         <div class="grid fv-grid">${list.map(favCard).join("")}</div>`
+      : `<p class="sub">Ancora nessun preferito. Tocca la stella su una meta o su un giro: si salva subito e arriva la conferma su Telegram.</p>
+         <p style="margin-top:22px"><a class="btn" href="#/">Tutte le mete</a></p>`)
+      + `<p class="fv-me">${FAV.me ? `Collegato come <b>${esc(FAV.me)}</b> · ` : ""}<button class="achip all" data-act="fav-logout">Scollega questo dispositivo</button></p>`;
+  }
+  return head + body + `</main>` + footHTML();
+}
+
 /* ------------------------------------------------------------------ router */
 function parse(hash){
   const h = String(hash || "").replace(/^#\/?/, "").split("?")[0], parts = h.split("/").filter(Boolean).map(x => { try { return decodeURIComponent(x); } catch(e){ return x; } });
   if(parts[0] === "d" && parts[1]) return {page:"dest", id:parts[1].toUpperCase()};
   if(parts[0] === "t" && parts[1]) return {page:"trip", id:parts[1]};
   if(parts[0] === "crediti") return {page:"credits"};
+  if(parts[0] === "preferiti") return {page:"favs"};
+  if(parts[0] === "login") return {page:"login", token:parts[1] || ""};
   return {page:"home", tab:parts[0] === "visitati" ? "vis" : parts[0] === "trips" ? "pop" : "new"};
 }
 function pageHTML(r){
-  return r.page === "dest" ? destHTML(r.id) : r.page === "trip" ? tripHTML(r.id) : r.page === "credits" ? creditsHTML() : homeHTML();
+  return r.page === "dest" ? destHTML(r.id) : r.page === "trip" ? tripHTML(r.id) : r.page === "credits" ? creditsHTML() : r.page === "favs" || r.page === "login" ? favsHTML() : homeHTML();
 }
 function go(){
-  const r = parse(location.hash), prev = S.route, app = $("app");
+  let r = parse(location.hash);
+  const prev = S.route, app = $("app");
+  if(r.page === "login"){
+    // link personale mandato dal bot: si salva il token e lo si toglie subito dalla barra degli indirizzi e dalla cronologia
+    if(API && r.token){ saveToken(r.token); FAV.map = new Map(); FAV.state = "loading"; loadFavs(); }
+    try { history.replaceState(null, "", "#/preferiti"); } catch(e){ /* resta l'indirizzo com'e' */ }
+    r = {page:"favs"};
+  } else if(r.page === "favs" && favLive() && FAV.state !== "loading") loadFavs();
   S.prev = prev;
   if(prev && prev.page === "home") S.homeY = window.scrollY || 0;
   clearInterval(S.heroT);
@@ -729,7 +884,7 @@ function go(){
   } else {
     S.page = r.page; S.route = r; S.panel = false;
     app.innerHTML = pageHTML(r);
-    const name = r.page === "dest" ? (DEST[r.id] || {}).city : r.page === "trip" ? (PT[r.id] || {}).name : "Crediti foto";
+    const name = r.page === "dest" ? (DEST[r.id] || {}).city : r.page === "trip" ? (PT[r.id] || {}).name : r.page === "favs" ? "Preferiti" : "Crediti foto";
     document.title = (name ? name + " · " : "") + "Agosto 2027 da Milano";
     window.scrollTo(0, 0);
   }
@@ -759,7 +914,7 @@ function startHero(){
 }
 function onScroll(){
   const top = $("top"); if(!top || !top.classList) return;
-  if(S.page === "credits") return;
+  if(S.page === "credits" || (top.dataset && top.dataset.solid)) return;
   top.classList.toggle("solid", (window.scrollY || 0) > 80);
 }
 function openLb(i){
@@ -780,8 +935,14 @@ function init(){
   if("scrollRestoration" in history) history.scrollRestoration = "manual";
   document.addEventListener("click", e => {
     const t = e.target, act = t.closest("[data-act]");
+    const tn = $("topnav");
+    if(tn && tn.classList.contains("open") && !(act && act.dataset.act === "menu")){ tn.classList.remove("open"); const mb = document.querySelector(".menu-b"); if(mb) mb.setAttribute("aria-expanded", "false"); }
     if(act){
       const a = act.dataset.act;
+      if(a === "menu"){ const on = !tn.classList.contains("open"); tn.classList.toggle("open", on); act.setAttribute("aria-expanded", String(on)); return; }
+      if(a === "fav" || a === "fav-rm"){ e.preventDefault(); toggleFav(act.dataset.id); return; }
+      if(a === "fav-retry"){ FAV.state = "loading"; favPaint(); loadFavs(); return; }
+      if(a === "fav-logout"){ saveToken(""); FAV.map = new Map(); FAV.me = ""; FAV.state = "anon"; favPaint(); return; }
       if(a === "back"){ if(S.prev && S.prev.page === "home"){ e.preventDefault(); history.back(); } return; }
       if(a === "panel"){ setPanel(!S.panel); return; }
       if(a === "panel-close"){ setPanel(false); return; }
@@ -807,8 +968,11 @@ function init(){
   });
   window.addEventListener("hashchange", go);
   window.addEventListener("scroll", onScroll, {passive:true});
+  FAV.token = API ? readToken() : "";
+  FAV.state = !API ? "off" : FAV.token ? "loading" : "anon";
+  if(favLive()) loadFavs();
   go();
 }
-const App = {S, parse, pageHTML, homeParts, aggD, aggT, viewD, viewT, go, favUrl, BOT_USERNAME};
+const App = {S, parse, pageHTML, homeParts, aggD, aggT, viewD, viewT, go, favUrl, BOT_USERNAME, API, FAV, favsHTML, toggleFav, loadFavs, flightT};
 if(typeof window !== "undefined") window.App = App;
 if(typeof document !== "undefined") init();

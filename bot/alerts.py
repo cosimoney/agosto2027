@@ -36,10 +36,14 @@ Regole:
    mostrato solo con almeno typical_min_samples giorni di storia.
  - Rotte prima vuote su cui compaiono voli: nel digest, anche sopra soglia.
 
-File di stato scritti SOLO da questo script (cosi' non va in conflitto con commands.py, che scrive prefs/offset):
+Preferiti e soglie: la fonte di verita' e' il Worker Cloudflare (worker/, KV), che li riceve dal sito e dal bot. Qui si
+leggono con GET <WORKER_URL>/api/prefs; se il Worker non risponde si usa l'ultima copia ricevuta (notified.json,
+"prefs_cache") e in mancanza state/prefs.json.
+
+File di stato scritti SOLO da questo script:
   state/last_snapshot.json  {generated, targets: {id meta: {s: fonte, n, min, o: {"ORIG:andata:ritorno": prezzo}}}}
   state/notified.json       {global: {"<id meta>@<sezione>": {min}}, fav: {id meta: {thr, last, under}},
-                             cards: {day, n}, digest_last: "YYYY-MM-DD"}
+                             cards: {day, n}, digest_last: "YYYY-MM-DD", prefs_cache: ultima copia delle preferenze}
   state/history.json        {id meta: [["YYYY-MM-DD", minimo pp del giorno], ...]}  (ultimi 90 giorni)
 Gli id delle offerte (e quindi le chiavi di dedup) contengono l'origine: <meta>:<ORIG>:<andata>:<ritorno>.
 In --dry-run i messaggi vengono stampati e lo stato NON viene scritto, a meno di --save-state.
@@ -353,9 +357,11 @@ def main():
     if not snap["offers"] and not any(s.get("ok") for s in snap["sources"].values()):
         print("Snapshot vuoto o illeggibile: alert saltati, stato invariato.")
         return 0
-    prefs = C.load_prefs(cfg)
     prev = C.load_json(sd / "last_snapshot.json", {})
     notified = C.load_json(sd / "notified.json", {})
+    # preferiti e soglie: dal Worker (li cambiano sito e bot in tempo reale); in dry-run solo dai file, senza rete
+    prefs, src = (C.load_prefs(cfg), "prefs.json (dry-run)") if a.dry_run else C.load_prefs_live(cfg, notified)
+    print("preferenze da: %s (%d preferiti)" % (src, len(prefs["favorites"])))
     history = C.load_json(sd / "history.json", {})
     messages, new_prev, stats = compute(snap, prev, prefs, notified, cfg, history=history)
     print("alert: %s" % stats)

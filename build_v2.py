@@ -5,7 +5,7 @@ Dati: esegue in memoria build.py (RAW) e build_trips.py (RAW.trips_popular) senz
 (agosto-2027.html e trips_data.json restano come sono).
 Foto: solo quelle davvero presenti in img/. Uso: python build_v2.py [--raw v1|v2|auto]
 """
-import io, json, os, sys, types, contextlib
+import io, json, os, re, sys, types, contextlib
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 os.chdir(ROOT); sys.path.insert(0, ROOT)
@@ -63,6 +63,17 @@ def manifest():
             "gallery": {c: [k for k in ks if k in ph] for c, ks in man.get("gallery", {}).items()},
             "pop": {c: k for c, k in man.get("pop", {}).items() if k in ph}, "stage": [x for x in man.get("stage", []) if x[1] in ph]}
 
+def worker_url():
+    """Base del Worker dei preferiti: variabile WORKER_URL, altrimenti "worker_url" in bot/config.json. '' = stella solo via Telegram."""
+    u = os.environ.get("WORKER_URL") or ""
+    if not u:
+        try:
+            u = json.load(open(os.path.join("bot", "config.json"), encoding="utf-8")).get("worker_url") or ""
+        except (OSError, ValueError):
+            u = ""
+    u = u.strip().rstrip("/")
+    return u if re.fullmatch(r"https://[A-Za-z0-9.-]+(/[A-Za-z0-9._~/-]*)?", u) else ""
+
 def dump(o):
     return json.dumps(o, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
 
@@ -70,8 +81,9 @@ def main():
     blob, src1 = pick()
     man = manifest()
     js = open("v2.js", encoding="utf-8").read()
-    assert "/*__DATA__*/" in js and "/*__PHOTOS__*/" in js
-    js = js.replace("/*__DATA__*/", dump(blob), 1).replace("/*__PHOTOS__*/", dump(man), 1)
+    assert "/*__DATA__*/" in js and "/*__PHOTOS__*/" in js and "/*__API__*/" in js
+    api = worker_url()
+    js = js.replace("/*__API__*/", api, 1).replace("/*__DATA__*/", dump(blob), 1).replace("/*__PHOTOS__*/", dump(man), 1)
     tpl = open("template_v2.html", encoding="utf-8").read()
     out = tpl.replace("/*__CSS__*/", open("v2.css", encoding="utf-8").read(), 1).replace("/*__JS__*/", js, 1)
     open("agosto-2027-v2.html", "w", encoding="utf-8", newline="\n").write(out)
@@ -79,6 +91,7 @@ def main():
     codes = {c["d"] for c in blob["combos"] if c["a"]}
     pop = [t["id"] for t in blob["trips_popular"]["trips"] if t["best"]]
     print("dati:", src1)
+    print("preferiti:", "Worker " + api if api else "solo link Telegram (worker_url non impostato)")
     print("html bytes", len(out.encode("utf-8")), "| foto", len(man["photos"]), "| mete con voli", len(codes), "senza cover:", sorted(codes - set(man["cover"])),
           "| trip con voli", len(pop), "senza cover dedicata:", sorted(set(pop) - set(man["pop"])), "| origini:", sorted({c["o"] for c in blob["combos"]}))
 

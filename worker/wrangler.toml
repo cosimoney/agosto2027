@@ -1,0 +1,19 @@
+# Worker Cloudflare del bot voli (piano gratuito). Deploy e secret: vedi deploy.sh e bot/SETUP.md.
+name = "agosto2027"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+preview_urls = false
+
+[observability]
+enabled = true
+
+# Preferiti e soglie. L'id lo scrive deploy.sh alla prima esecuzione (non e' un segreto).
+[[kv_namespaces]]
+binding = "PREFS"
+id = "KV_ID_DA_CREARE"
+
+[vars]
+ALLOWED_ORIGIN = "https://cosimoney.github.io"
+SITE_URL = "https://cosimoney.github.io/agosto2027/"
+SNAPSHOT_BASE = "https://raw.githubusercontent.com/cosimoney/agosto2027/data/bot/"

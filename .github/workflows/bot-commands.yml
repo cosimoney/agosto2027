@@ -1,3 +1,8 @@
+# SUPERATO dal Worker Cloudflare (worker/): i comandi arrivano via webhook e la risposta e' immediata.
+# worker/deploy.sh disattiva questo workflow; se parte lo stesso, commands.py vede il webhook attivo ed esce subito.
+# Serve solo come ripiego: togliendo il webhook (deleteWebhook) e riattivandolo, il bot torna a funzionare in polling,
+# ma con i preferiti di bot/state/prefs.json e non con quelli del Worker.
+#
 # Legge i comandi Telegram (polling, nessun server). Parte ogni ~13 minuti e resta in ascolto 10 minuti in
 # long-polling: dentro quella finestra il bot risponde in 1-2 secondi, fuori si aspetta il giro successivo.
 # Solo libreria standard di Python: nessun pip install.
