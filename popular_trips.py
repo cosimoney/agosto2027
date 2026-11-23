@@ -470,6 +470,54 @@ PATCH = {
         "aug": "Mese più secco dell'anno nel Pacific Northwest, sentieri alti liberi dalla neve. Alla Hoh Rain Forest code fino a 2 ore: entrare prima delle 8. Costo a terra non verificato voce per voce."},
 }
 
+# =====================================================================================================
+# CINA DELL'OVEST (aggiunta il 23 novembre 2026). Clima di agosto, permessi e tappe ricontrollati online lo stesso giorno
+# (fonti in SRC). Voli interni: ordini di grandezza presi da aggregatori, non tariffe di agosto 2027. Costi a terra: fasce
+# stimate su tour privati e noleggi con autista, non verificate voce per voce. Ingresso: esenzione dal visto fino a 30 giorni
+# per gli italiani confermata fino al 31/12/2026, proroga al 2027 non ancora annunciata.
+# =====================================================================================================
+_CN_VISTO = " Esenzione visto 30 giorni confermata solo fino al 31/12/2026: per agosto 2027 va ricontrollata."
+TRIPS += [
+    T("cina-via-della-seta", "Cina: Via della Seta da Urumqi a Lanzhou", ["Cina"], "Asia", "oj", "URC", "LHW",
+      [("Urumqi", 2, "bazar internazionale, lago Tianchi sul Tianshan"), ("Turpan", 1, "rovine di Jiaohe all'alba, Monti Fiammeggianti"),
+       ("Dunhuang", 3, "grotte di Mogao, dune di Mingsha, Yadan"), ("Jiayuguan", 1, "forte, ultima porta della Grande Muraglia"),
+       ("Zhangye", 2, "Danxia arcobaleno, tempio del Grande Buddha"), ("Lanzhou", 1, "Fiume Giallo e spaghetti di manzo")],
+      "Treni veloci lungo tutta la linea Urumqi-Lanzhou (Dunhuang è su una diramazione: treni diretti o cambio a Liuyuan), taxi o autista per le visite",
+      [], (1100, 1600), ["cultura", "on the road", "natura"], "intenso",
+      ["Grotte di Mogao e dune di Mingsha a Dunhuang", "Montagne arcobaleno del Danxia di Zhangye", "Forte di Jiayuguan, fine della Grande Muraglia"],
+      "Corridoio di Hexi secco e caldo a mezzogiorno (Dunhuang 17-33°C, Zhangye 13-28°C); Turpan sta sui 38°C di media e nel 2026 ha toccato 45°C: una notte sola, visite all'alba. Mogao: biglietto nominativo, 6.000 ingressi al giorno, da prendere appena aprono le vendite. Alta stagione cinese." + _CN_VISTO,
+      "buono", "17-33°C (38+ a Turpan)",
+      [("oj", "URC", "LHW"),
+       ("rt", "PEK", [("Pechino-Urumqi", 170), ("Lanzhou-Pechino", 110)], "A/R su Pechino più due voli interni: Pechino-Urumqi (4 ore) all'andata e Lanzhou-Pechino (2 ore e mezza) al ritorno")],
+      flag="controlli di polizia nello Xinjiang"),
+    T("cina-qinghai-gansu", "Cina: grande anello Qinghai-Gansu", ["Cina"], "Asia", "rt", "XNN", "XNN",
+      [("Xining", 1, "monastero di Kumbum, acclimatamento a 2.300 m"), ("Lago Qinghai", 1, "riva sud a 3.200 m, alba sul lago"),
+       ("Chaka", 1, "salina, lo «specchio del cielo»"), ("Dachaidan", 1, "bacino del Qaidam, laghi salati"),
+       ("Dunhuang", 2, "grotte di Mogao, dune di Mingsha"), ("Jiayuguan", 1, "forte della Grande Muraglia"),
+       ("Zhangye", 1, "Danxia arcobaleno al tramonto"), ("Qilian e Menyuan", 1, "praterie dei monti Qilian"), ("Xining", 1, "rientro")],
+      "Auto con autista (per guidare da soli serve la patente cinese temporanea): circa 3.000 km, tappe da 300-500 km",
+      [], (1300, 1900), ["on the road", "natura", "cultura"], "intenso",
+      ["Lago Qinghai e salina di Chaka sopra i 3.000 m", "Grotte di Mogao e dune di Dunhuang", "Danxia di Zhangye e praterie dei Qilian"],
+      "È il giro dell'estate cinese: clima giusto (Xining 12-24°C, lago più fresco, Dunhuang 33°C secco) ma folla e prezzi al picco. Agosto è il mese più piovoso a Xining (80-110 mm, rovesci brevi). Primo giorno tranquillo per la quota; Mogao da prenotare appena aprono le vendite." + _CN_VISTO,
+      "buono", "12-24°C (6-18 al lago, 17-33 a Dunhuang)",
+      [("rt", "XNN", [], ""),
+       ("rt", "PEK", [("Pechino-Xining A/R", 200)], "A/R su Pechino più volo interno A/R per Xining (2 ore e mezza a tratta)"),
+       ("oj", "XNN", "LHW")]),
+    T("cina-sichuan-ovest", "Cina: Chengdu e l'altopiano del Sichuan occidentale", ["Cina"], "Asia", "rt", "TFU", "TFU",
+      [("Chengdu", 2, "base dei panda al mattino, case da tè, hotpot"), ("Siguniang (Rilong)", 2, "valli di Shuangqiao e Changping"),
+       ("Danba", 2, "torri di pietra e villaggi tibetani di Zhonglu"), ("Tagong", 1, "prateria e monastero sotto lo Yala"),
+       ("Kangding", 1, "passo Zheduo, ponte di Luding"), ("Chengdu", 2, "rientro, con un giorno di margine")],
+      "Auto con autista (Chengdu-Rilong 212 km in 4 ore, Chengdu-Danba 330 km in 6-7 ore)",
+      [], (1100, 1600), ["montagna", "cultura", "natura", "cibo e vino"], "medio-intenso",
+      ["Valli glaciali sotto il Siguniang", "Villaggi-torre tibetani di Danba", "Prateria di Tagong e cucina del Sichuan"],
+      "Altopiano verde e fresco (5-20°C) ma è la stagione delle piogge: rovesci quasi quotidiani e rischio frane sulle strade tra fine giugno e agosto. Chengdu 22-31°C, afosa, 200-290 mm nel mese. Yading si può aggiungere, ma ad agosto ha 19 giorni di pioggia e le cime si vedono poco." + _CN_VISTO,
+      "accettabile", "22-31°C a Chengdu, 5-20 sull'altopiano",
+      [("rt", "TFU", [], "")],
+      flag="stagione delle piogge"),
+]
+CITY.update({"URC": "Urumqi", "LHW": "Lanzhou", "XNN": "Xining", "TFU": "Chengdu", "PEK": "Pechino"})
+SKIPPED.append("Cina classica (Pechino, Xi'an, Shanghai, Guilin) e Yunnan: afa, piogge e tifoni; Tibet solo con permesso e tour, in stagione delle piogge")
+
 SRC.update({
     "georgia-armenia": ["https://www.weroad.it/viaggi/Georgia-Armenia-viaggio-cuore-millenario-Caucaso", "https://www.gadventures.com/trips/best-of-georgia-armenia/EXGA/"],
     "georgia-svaneti": ["https://wander-lush.org/things-to-do-in-svaneti-itinerary/", "https://wander-lush.org/ushguli-to-kutaisi-zagari-pass/"],
@@ -502,6 +550,9 @@ SRC.update({
     "canada-rockies": ["https://www.kimkim.com/c/western-canada-panorama-calgary-to-vancouver-road-trip-10-days", "https://parks.canada.ca/pn-np/ab/banff/visit/parkbus/louise"],
     "canada-quebec": ["https://www.authentikcanada.com/fr-fr/blog/le-meilleur-circuit-de-10-jours-au-quebec", "https://www.croisieresaml.com/en/plan-your-cruise/tadoussac/zodiac-expedition/detail/"],
     "usa-rockies-yellowstone": ["https://www.goway.com/destinations/us-canada/united-states/trips/denver-yellowstone", "https://www.nps.gov/aboutus/nonresident-fees.htm"],
+    "cina-via-della-seta": ["https://www.asiaodysseytravel.com/silk-road-tours/9days-northwest-china-tour-by-high-speed-train.html", "https://www.thechinajourney.com/mogao-caves/"],
+    "cina-qinghai-gansu": ["https://www.chinahighlights.com/silk-road/tours/qinghai-legendary-silk-road.htm", "https://us.trip.com/moments/gaolan-2801/"],
+    "cina-sichuan-ovest": ["https://www.chinahighlights.com/chengdu/western-sichuan-itinerary.htm", "https://www.sichuantravelguide.com/hiking-and-trekking/landslide-season.html"],
     "usa-pacific-northwest": ["https://www.earthtrekkers.com/washington-itinerary-national-parks-road-trip/", "https://nps.gov/mora/learn/news/mount-rainier-national-park-will-not-require-timed-entry-reservations-in-2026.htm"],
 })
 

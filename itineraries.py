@@ -1043,6 +1043,119 @@ TRIPS = {
 }
 
 
+# ====================== CINA DELL'OVEST E DEL NORD (aggiunta il 23 novembre 2026) ======================
+# Clima, permessi e tappe ricontrollati online il 23/11/2026 (fonti in SRC). Costi a terra: fasce stimate su tour privati
+# e noleggi con autista trovati online, non verificate voce per voce. Ingresso: esenzione dal visto fino a 30 giorni per
+# gli italiani confermata fino al 31/12/2026; per agosto 2027 la proroga non è ancora stata annunciata.
+_VISTO = " Esenzione visto 30 giorni confermata solo fino al 31/12/2026: per agosto 2027 va ricontrollata."
+TRIPS.update({
+    "URC": [
+        T("Nord Xinjiang: Kanas, Hemu e lago Sayram", ["natura", "road trip"], "intenso",
+          "Urumqi 1|Burqin 1|Kanas 2|Hemu 1|Karamay (Città del Diavolo) 1|Lago Sayram 1|Yining 2|Urumqi 1",
+          "Auto con autista per tutto l'anello (online un tour privato di 10 giorni con autista e ingressi parte da circa 1.130 € a testa in due); rientro da Yining a Urumqi in treno o in volo (1 ora)", "1.600–2.300 € pp",
+          ["Lago Kanas e villaggio di tronchi di Hemu sotto gli Altai", "Lago Sayram a 2.000 m e praterie dell'Ili", "Calanchi di Urho, la Città del Diavolo, al tramonto"],
+          "Estate dei pascoli: a Kanas circa 20°C di giorno e 8°C di notte, 12 giorni con rovesci. È il picco del turismo interno cinese, alloggi a Kanas e Hemu da bloccare con mesi di anticipo. Molti gruppi locali non accettano stranieri e non tutti gli hotel sono abilitati: meglio un'agenzia. Controlli di polizia frequenti, passaporto sempre con sé; il villaggio di Baihaba chiede il permesso di frontiera." + _VISTO),
+        T("Ili e Tianshan: Sayram, Nalati e strada Duku", ["natura", "road trip"], "medio",
+          "Urumqi 1|Lago Sayram 1|Yining 2|Tekes (Kalajun) 1|Nalati 2|Bayanbulak 1|Kuqa 1|Urumqi 1",
+          "Auto con autista; volo o treno Kuqa-Urumqi al rientro", "1.400–2.000 € pp",
+          ["Praterie di Nalati e Kalajun con le yurte kazake", "Anse del fiume Kaidu a Bayanbulak, la palude dei cigni", "Strada Duku attraverso il Tianshan e canyon rosso di Kuqa"],
+          "Ili è la zona più verde e piovosa dello Xinjiang: 27-31°C a Yining, 10-20°C sulle praterie. La Duku apre solo da giugno a ottobre e chiude a tratti per frane o neve: tenere un piano B dal tunnel del Tianshan. Kuqa, sul lato sud, è calda (oltre 33°C)." + _VISTO),
+        T("Via della Seta: da Urumqi a Dunhuang e Zhangye", ["cultura", "road trip"], "medio",
+          "Urumqi 2|Turpan 1|Dunhuang 3|Jiayuguan 1|Zhangye 2|Lanzhou 1",
+          "Treni veloci lungo tutta la linea Urumqi-Lanzhou (Dunhuang si raggiunge dalla stazione di Liuyuan), taxi o autista per le visite", "1.100–1.600 € pp",
+          ["Grotte di Mogao e dune di Mingsha a Dunhuang", "Forte di Jiayuguan, fine della Grande Muraglia", "Montagne arcobaleno del Danxia di Zhangye"],
+          "Turpan ad agosto sta sui 38°C di media e nel 2026 ha toccato 45°C: una notte sola e visite all'alba, o si salta. Dunhuang 17-33°C, secco. Mogao: biglietto A nominativo con passaporto, 6.000 ingressi al giorno, in agosto va preso appena aprono le vendite." + _VISTO,
+          "Si riparte da Lanzhou (LHW), oppure si chiude a Xining aggiungendo il lago Qinghai."),
+    ],
+    "KHG": [
+        T("Kashgar e la Karakoram Highway", ["cultura", "avventura"], "medio",
+          "Kashgar 4|Lago Karakul 1|Tashkurgan 2|Kashgar 2|Urumqi 1",
+          "Auto con autista tramite agenzia sulla Karakoram Highway (230 km, 4-5 ore fino a Tashkurgan); volo Kashgar-Urumqi (2 ore)", "1.200–1.800 € pp",
+          ["Città vecchia uigura, moschea Id Kah e mercato del bestiame della domenica", "Lago Karakul sotto il Muztagh Ata (7.546 m)", "Forte di pietra e praterie del Pamir a Tashkurgan"],
+          "Kashgar 18-32°C, secca; sul Pamir (3.100-3.600 m) 5-18°C. Per Karakul e Tashkurgan gli stranieri hanno bisogno del permesso di frontiera e in pratica di un'agenzia (1-7 giorni di attesa, fonti discordi sui dettagli). Controlli di polizia continui e presenza di sicurezza molto visibile." + _VISTO),
+        T("Kashgar, Pamir e praterie dell'Ili", ["cultura", "natura"], "intenso",
+          "Kashgar 3|Tashkurgan 2|Kashgar 1|Urumqi 1|Lago Sayram 1|Yining 2",
+          "Autista sul Pamir, voli Kashgar-Urumqi e Yining-Urumqi, auto con autista tra Sayram e Ili", "1.500–2.200 € pp",
+          ["Bazar e vicoli di Kashgar", "Karakoram Highway fino a Tashkurgan", "Lago Sayram e valle dell'Ili"],
+          "Unisce il sud uiguro (caldo secco) al nord verde: due voli interni da prenotare presto, è alta stagione. Stesse regole su permesso di frontiera e hotel abilitati agli stranieri." + _VISTO,
+          "Rientro più comodo da Urumqi (URC) che da Kashgar."),
+    ],
+    "XNN": [
+        T("Grande anello Qinghai-Gansu", ["natura", "road trip"], "intenso",
+          "Xining 1|Lago Qinghai 1|Chaka 1|Dachaidan 1|Dunhuang 2|Jiayuguan 1|Zhangye 1|Qilian 1|Xining 1",
+          "Auto con autista o noleggio (serve la patente cinese temporanea): circa 2.500-3.000 km, tappe da 300-500 km", "1.300–1.900 € pp",
+          ["Lago Qinghai a 3.200 m e salina di Chaka, lo «specchio del cielo»", "Grotte di Mogao e dune di Dunhuang", "Danxia di Zhangye e praterie dei monti Qilian"],
+          "È il giro dell'estate cinese: clima giusto (Xining 12-24°C, lago Qinghai più fresco, Dunhuang 33°C secco) ma folla e prezzi al picco. Agosto è il mese più piovoso a Xining (80-110 mm, rovesci brevi). Lago e Chaka sono sopra i 3.000 m: primo giorno tranquillo. Mogao va prenotato appena aprono le vendite." + _VISTO),
+        T("Qinghai tibetano e Labrang", ["cultura", "natura"], "medio",
+          "Xining 2|Lago Qinghai 2|Tongren (Rebkong) 2|Xiahe (Labrang) 2|Lanzhou 1",
+          "Auto con autista; Xiahe-Lanzhou sono 250 km, 3 ore e mezza", "1.000–1.500 € pp",
+          ["Monastero di Kumbum (Ta'er) vicino a Xining", "Botteghe di thangka a Tongren", "Kora dei pellegrini intorno al monastero di Labrang"],
+          "Altopiano tra 2.300 e 3.200 m, fresco, con rovesci frequenti ad agosto. Tappe a Tongren e Xiahe prese da itinerari di tour operator, clima di agosto di Xiahe non verificato su dati di stazione." + _VISTO,
+          "Si riparte da Lanzhou (LHW)."),
+    ],
+    "LHW": [
+        T("Corridoio di Hexi in treno veloce", ["cultura", "natura"], "medio",
+          "Lanzhou 1|Zhangye 2|Jiayuguan 1|Dunhuang 3|Xining 2|Lanzhou 1",
+          "Treni veloci Lanzhou-Zhangye-Jiayuguan-Dunhuang, rientro in treno o volo su Xining; taxi o autista per le visite", "1.000–1.500 € pp",
+          ["Danxia arcobaleno di Zhangye al tramonto", "Forte di Jiayuguan", "Grotte di Mogao, dune di Mingsha e Yadan di Dunhuang"],
+          "Zhangye 13-28°C con qualche rovescio (30-45 mm nel mese), Dunhuang 17-33°C e secco: caldo a mezzogiorno, visite al mattino e al tramonto. Alta stagione cinese: treni e Mogao da prenotare appena aprono le vendite." + _VISTO),
+        T("Gannan tibetano: Labrang, Langmusi e Zhagana", ["cultura", "trekking"], "medio",
+          "Lanzhou 1|Xiahe (Labrang) 3|Langmusi 2|Zhagana 2|Linxia 1|Lanzhou 1",
+          "Auto con autista (i mezzi pubblici sono scomodi): Lanzhou-Xiahe 250 km, Xiahe-Langmusi 220 km", "900–1.400 € pp",
+          ["Monastero di Labrang e prateria di Sangke", "Langmusi, a cavallo tra Gansu e Sichuan", "Villaggi di pietra di Zhagana sotto le guglie calcaree"],
+          "Praterie a 3.000 m, verdi e fresche (intorno ai 20°C di giorno): ad agosto piove spesso, ma i dati di pioggia per Xiahe e Zhagana non sono stati verificati. Zona tibetana fuori dalla Regione Autonoma: non serve il permesso per il Tibet." + _VISTO),
+    ],
+    "LXA": [
+        T("Lhasa, Shigatse e campo base dell'Everest", ["cultura", "trekking"], "intenso",
+          "Lhasa 4|Gyantse 1|Shigatse 1|Campo base Everest (Rongbuk) 1|Shigatse 1|Lhasa 1",
+          "Solo con agenzia: guida, veicolo e permessi inclusi (tour di gruppo di 8 giorni da circa 1.050-1.450 USD a testa, voli esclusi)", "1.500–2.300 € pp",
+          ["Potala, Jokhang e kora del Barkhor", "Lago Yamdrok e Kumbum di Gyantse", "Parete nord dell'Everest dal monastero di Rongbuk (5.000 m)"],
+          "Stagione delle piogge: a Lhasa 10-23°C con 20-25 giorni di pioggia, quasi sempre di notte; l'Everest è spesso coperto e le strade possono chiudere per frane. Obbligatori Tibet Travel Permit e tour organizzato (anche privato in due): la pratica la fa l'agenzia, documenti almeno 20 giorni prima; il permesso può essere sospeso senza preavviso. Tre notti a Lhasa per acclimatarsi a 3.650 m." + _VISTO),
+        T("Lhasa, valle dello Yarlung e lago Namtso", ["cultura", "natura"], "medio",
+          "Lhasa 4|Tsetang (Samye) 2|Lhasa 1|Namtso 1|Lhasa 1",
+          "Solo con agenzia: guida, veicolo e permessi inclusi", "1.300–2.000 € pp",
+          ["Monasteri di Drepung e Sera", "Samye, il primo monastero del Tibet, e Yumbulakang", "Lago Namtso a 4.700 m"],
+          "Versione più morbida, senza la quota dell'Everest. Stesse regole: permesso e tour obbligatori, piogge notturne, ad agosto è alta stagione anche per il turismo cinese." + _VISTO),
+    ],
+    "TFU": [
+        T("Sichuan ovest: Siguniang, Danba e Tagong", ["trekking", "cultura"], "medio",
+          "Chengdu 2|Siguniang (Rilong) 2|Danba 2|Tagong 1|Kangding 1|Chengdu 2",
+          "Auto con autista (Chengdu-Rilong 212 km, 4 ore; Chengdu-Danba 330 km, 6-7 ore)", "1.100–1.600 € pp",
+          ["Valli di Shuangqiao e Changping sotto il Siguniang (6.250 m)", "Torri di pietra e villaggi tibetani di Danba", "Prateria e monastero di Tagong con lo Yala sullo sfondo"],
+          "Altopiano verde e fresco (5-20°C) ma è la stagione delle piogge: rovesci quasi quotidiani, rischio frane sulle strade tra fine giugno e agosto, tenere un giorno di margine. Chengdu 22-31°C, afosa, 200-290 mm di pioggia nel mese. Base panda a Chengdu al mattino presto." + _VISTO),
+        T("Fino a Yading: l'altopiano del Kham", ["trekking", "avventura"], "intenso",
+          "Chengdu 1|Siguniang (Rilong) 1|Danba 1|Xinduqiao 1|Litang 1|Daocheng Yading 2|Yajiang 1|Kangding 1|Chengdu 1",
+          "Auto con autista; in alternativa volo Chengdu-Daocheng (aeroporto a 4.411 m) per accorciare", "1.300–1.900 € pp",
+          ["Tre montagne sacre e lago del Latte a Yading (4.600 m)", "Litang, la città a 4.000 m, e il suo monastero", "Passi sopra i 4.000 m lungo la strada Sichuan-Tibet"],
+          "A Daocheng circa 90 mm e 19 giorni di pioggia ad agosto: le cime di Yading si vedono a tratti, e in passato il parco ha chiuso per alluvioni e frane. Quote alte (notti a 3.700-4.000 m): salire per gradi. La stagione migliore qui è ottobre." + _VISTO),
+        T("Jiuzhaigou, Huanglong e prateria di Ruoergai", ["natura", "cultura"], "medio",
+          "Chengdu 3|Jiuzhaigou 3|Songpan (Huanglong) 1|Ruoergai 1|Chengdu 1",
+          "Treno veloce Chengdu-Huanglong Jiuzhai (linea aperta nel 2024, circa 2 ore) più navetta, auto con autista per Huanglong e Ruoergai", "1.000–1.500 € pp",
+          ["Laghi turchesi di Jiuzhaigou", "Vasche calcaree di Huanglong a 3.500 m", "Prima ansa del Fiume Giallo e lago Huahu a Ruoergai"],
+          "Jiuzhaigou ad agosto è fresca e piovosa (rovesci brevi, mattine fino a 8°C) e in pieno picco di visitatori: ingressi a numero chiuso da comprare online. Frane possibili sulle strade di montagna." + _VISTO),
+    ],
+    "HLD": [
+        T("Anello di Hulunbuir: prateria, Ergun e confine russo", ["natura", "road trip"], "medio",
+          "Hailar 2|Ergun 1|Enhe 1|Shiwei 2|Heishantou 1|Manzhouli 2|Hailar 1",
+          "Fuoristrada con autista (600-1.200 yuan al giorno, carburante incluso) da prenotare 1-2 mesi prima; il noleggio senza autista richiede la patente cinese", "900–1.400 € pp",
+          ["Anse del fiume Morigele sulla prateria", "Zona umida di Ergun e villaggi russi di Enhe e Shiwei", "Strada di confine lungo l'Argun e notte in yurta a Heishantou"],
+          "Estate fresca: 13-25°C a Hailar, circa 90 mm di pioggia nel mese; l'erba è al massimo tra fine giugno e metà agosto, a fine mese comincia a ingiallire. Picco del turismo interno, yurte e hotel cari. Pochi parlano inglese e i distributori sono rari sulla strada di confine." + _VISTO),
+        T("Hulunbuir e foreste del Grande Khingan", ["natura", "road trip"], "medio",
+          "Hailar 2|Ergun 2|Shiwei 1|Genhe 1|Manzhouli 2|Hailar 1",
+          "Fuoristrada con autista", "900–1.400 € pp",
+          ["Prateria di Hulunbuir a cavallo", "Foresta boreale e allevatori di renne evenki a Genhe", "Manzhouli, città di frontiera con la Russia, e lago Hulun"],
+          "Come sopra; nelle foreste del Khingan le notti scendono sotto i 10°C. Tappa di Genhe non verificata online voce per voce." + _VISTO),
+    ],
+    "PEK": [
+        T("Pechino e la Grande Muraglia, poi a ovest", ["cultura"], "medio",
+          "Pechino 4|Gubeikou (Grande Muraglia) 1|Datong 2|Pingyao 2|Pechino 1",
+          "Treni veloci Pechino-Datong-Pingyao, autista per la Muraglia", "1.000–1.500 € pp",
+          ["Città Proibita e Tempio del Cielo", "Grande Muraglia a Jinshanling o Mutianyu", "Grotte di Yungang a Datong e mura di Pingyao"],
+          "Agosto è il mese più umido di Pechino: 22-32°C, umidità al 77%, 12 giorni di pioggia e 120-160 mm, più la folla delle vacanze scolastiche. Ha senso soprattutto come porta con voli diretti verso Xinjiang, Qinghai o Mongolia Interna. Tappe di Datong e Pingyao non verificate online." + _VISTO),
+    ],
+})
+
+
 # Fonti consultate online (novembre 2026), per itinerario nell'ordine di TRIPS[codice]
 _RG = "https://www.roughguides.com/"
 _NR = "https://www.nps.gov/aboutus/nonresident-fees.htm"
@@ -1119,6 +1232,27 @@ SRC = {
     "ASR": [["https://kimkim.com/c/cappadocia-southeastern-turkey-8-days", "https://www.chasingthedonkey.com/southeastern-turkey-itinerary/"], [], []],
     "SIN": [["https://www.thejakartapost.com/indonesia/2025/01/30/local-businesses-demand-removal-of-borobudurs-visitor-limit.html"], [], []],
 }
+_CH = "https://www.chinahighlights.com/"
+_VF = "https://fujian.gov.cn/english/services/visas/202511/t20251105_7030611.htm"   # proroga dell'esenzione visto al 31/12/2026
+SRC.update({
+    "URC": [["https://www.klook.com/en-US/activity/192820-10-day-private-xinjiang-tour/", "https://www.chinadiscovery.com/xinjiang/altay/kanas-weather.html"],
+            [_CH + "xinjiang/best-time-to-visit.htm", "https://www.tourhq.com/tours/108037/10-day-northern-xinjiang-tour-from-urumqi-to-kanas-lake-and-duku-highway-china"],
+            ["https://www.asiaodysseytravel.com/silk-road-tours/9days-northwest-china-tour-by-high-speed-train.html", "https://www.thechinajourney.com/mogao-caves/"]],
+    "KHG": [["https://www.farwestchina.com/tips/visas-and-permits-for-xinjiang/", "https://www.gov.uk/foreign-travel-advice/china/regional-risks"],
+            ["https://www.travelchinaguide.com/cityguides/xinjiang/kashgar/weather-in-august.htm", "https://mychina.guide/blog/tashkurgan-to-kashgar-bus-guide-2026"]],
+    "XNN": [[_CH + "silk-road/tours/qinghai-legendary-silk-road.htm", "https://weather-and-climate.com/Xining-August-averages"],
+            [_CH + "silk-road/tours/gannan-tibetan-culture.htm", _VF]],
+    "LHW": [["https://www.asiaodysseytravel.com/silk-road-tours/9days-northwest-china-tour-by-high-speed-train.html", "https://travelchinaguide.com/cityguides/gansu/dunhuang/weather-in-august.htm"],
+            [_CH + "silk-road/tours/gannan-tibetan-culture.htm", "https://travelchinaguide.com/cityguides/gansu/gannan"]],
+    "LXA": [["https://www.tibettravel.org/tibet-travel-permit/tibet-permits.html", _CH + "tibet/weather/august.htm"],
+            ["https://www.gov.uk/foreign-travel-advice/china/regional-risks", "https://www.tibettravel.org/tibet-weather/august.html"]],
+    "TFU": [[_CH + "chengdu/western-sichuan-itinerary.htm", "https://www.sichuantravelguide.com/hiking-and-trekking/landslide-season.html"],
+            ["https://hellochinatrip.com/product/10-days-western-sichuan-panorama-tour-with-yading-danba-mount-siguniang/", "https://snowliontours.com/news-notes/warnings-and-updates-on-tourists-destinations-due-to-heavy-rains/"],
+            [_CH + "jiuzhaigou/weather/august.htm", "https://www.travelchinaguide.com/cityguides/sichuan/chengdu/weather-august.htm"]],
+    "HLD": [["https://www.chinadiscovery.com/inner-mongolia/hulunbuir/weather.html", "https://weather-and-climate.com/Hailar-August-averages"],
+            ["https://www.chinadiscovery.com/inner-mongolia/hulunbuir/weather.html"]],
+    "PEK": [["https://www.travelchinaguide.com/cityguides/beijing/weather-august.htm", _VF]],
+})
 for _code, _lists in SRC.items():
     assert len(_lists) == len(TRIPS[_code]), _code
     for _t, _s in zip(TRIPS[_code], _lists):

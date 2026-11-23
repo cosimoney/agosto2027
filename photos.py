@@ -111,6 +111,33 @@ P("ihlara", ["Ihlara Valley", "Selime Monastery"], "Valle di Ihlara", "Ihlara")
 P("ishak-pasha", ["Ishak Pasha Palace", "Mount Ararat Doğubayazıt"], "Palazzo di Ishak Pasha", "Doğubayazıt")
 P("akdamar", ["Akdamar Island church", "Lake Van"], "Akdamar, lago di Van", "Van")
 P("sumela", ["Sumela Monastery", "Uzungöl"], "Monastero di Sumela", "Trabzon", "Sumela")
+# Cina dell'ovest e del nord (23 novembre 2026)
+P("kanas", ["Kanas Lake", "Hemu Village Xinjiang"], "Lago Kanas, Xinjiang", "Kanas", "Hemu", "Burqin")
+P("sayram", ["Sayram Lake", "Sailimu Lake"], "Lago Sayram", "Sayram")
+P("nalati", ["Nalati grassland", "Kalajun grassland", "Ili grassland Xinjiang"], "Praterie dell'Ili", "Nalati", "Tekes", "Yining")
+P("tianchi", ["Tianchi Tianshan Xinjiang", "Heavenly Lake of Tianshan"], "Lago Tianchi, Tianshan", "Urumqi")
+P("turpan", ["Jiaohe ruins", "Flaming Mountains Turpan"], "Rovine di Jiaohe, Turpan", "Turpan")
+P("kashgar", ["Kashgar old city", "Id Kah Mosque"], "Kashgar", "Kashgar")
+P("karakul", ["Muztagh Ata", "Karakul Lake Kashgar", "Karakul Lake Xinjiang"], "Lago Karakul e Muztagh Ata", "Karakul", "Tashkurgan")
+P("qinghai-lake", ["Qinghai Lake", "Koko Nor Qinghai"], "Lago Qinghai", "Lago Qinghai")
+P("chaka", ["Chaka Salt Lake", "Caka Salt Lake"], "Salina di Chaka", "Chaka")
+P("zhangye", ["Zhangye Danxia", "Zhangye National Geopark"], "Danxia di Zhangye", "Zhangye")
+P("dunhuang", ["Crescent Lake Dunhuang", "Mingsha Shan Dunhuang", "Dunhuang dunes"], "Dune di Mingsha, Dunhuang", "Dunhuang")
+P("jiayuguan", ["Jiayuguan Fort", "Jiayu Pass"], "Forte di Jiayuguan", "Jiayuguan")
+P("labrang", ["Labrang Monastery", "Xiahe Labrang"], "Monastero di Labrang", "Labrang")
+P("lanzhou", ["Zhongshan Bridge Lanzhou", "Lanzhou Yellow River"], "Lanzhou e il Fiume Giallo", "Lanzhou")
+P("potala", ["Potala Palace", "Potala Lhasa"], "Potala, Lhasa", "Lhasa")
+P("yamdrok", ["Yamdrok Lake", "Yamdrok Tso"], "Lago Yamdrok", "Gyantse", "Shigatse")
+P("everest-nord", ["Rongbuk Monastery Everest", "Everest north face Tibet"], "Everest da Rongbuk", "Everest", "Rongbuk")
+P("siguniang", ["Siguniang Mountain", "Four Sisters Mountain Sichuan", "Mount Siguniang", "Siguniangshan"], "Monte Siguniang", "Siguniang")
+P("danba", ["Danba Tibetan village", "Jiaju Tibetan village", "Danba Sichuan"], "Villaggi tibetani di Danba", "Danba")
+P("tagong", ["Tagong grassland", "Tagong Sichuan", "Yala Snow Mountain"], "Prateria di Tagong", "Tagong", "Xinduqiao")
+P("yading", ["Yading", "Daocheng Yading", "Yading Nature Reserve"], "Yading", "Yading")
+P("jiuzhaigou", ["Jiuzhaigou Five Flower Lake", "Jiuzhaigou Valley"], "Jiuzhaigou", "Jiuzhaigou")
+P("chengdu", ["Chengdu Research Base of Giant Panda Breeding", "giant panda Chengdu"], "Panda a Chengdu", "Chengdu")
+P("hulunbuir", ["Hulunbuir grassland", "Hulun Buir grassland", "Ergun wetland"], "Prateria di Hulunbuir", "Hailar", "Ergun", "Enhe", "Shiwei", "Heishantou", "Manzhouli", "Genhe")
+P("grande-muraglia", ["Jinshanling Great Wall", "Mutianyu Great Wall"], "Grande Muraglia a Jinshanling", "Grande Muraglia", "Gubeikou")
+P("pechino", ["Forbidden City Beijing", "Temple of Heaven Beijing"], "Città Proibita, Pechino", "Pechino")
 # ---------------------------------------------------------------- Oceania
 P("barrier-reef", ["Great Barrier Reef aerial", "Whitehaven Beach"], "Grande Barriera Corallina", "Cairns", "Whitsunday")
 P("kakadu", ["Kakadu National Park", "Ubirr Kakadu"], "Kakadu", "Kakadu")
@@ -274,6 +301,7 @@ COVER = {
  "YYC": "moraine", "YHZ": "peggys-cove", "CPT": "cape-town", "JNB": "blyde", "DUR": "drakensberg", "PLZ": "addo", "CTS": "biei",
  "OKA": "okinawa", "KIX": "nachi", "HND": "kamikochi", "FUK": "aso", "AGA": "taghazout", "ASR": "cappadocia", "TZX": "sumela",
  "IXL": "ladakh", "DEL": "delhi", "USM": "samui", "BKK": "bangkok", "AMM": "petra", "DXB": "dubai", "MNL": "palawan", "SIN": "singapore",
+ "URC": "kanas", "KHG": "karakul", "XNN": "qinghai-lake", "LHW": "zhangye", "HLD": "hulunbuir", "LXA": "potala", "TFU": "siguniang", "PEK": "grande-muraglia",
 }
 GALLERY = {
  "DPS": ["nusa-penida", "uluwatu", "bromo", "munduk", "gili"],
@@ -302,6 +330,13 @@ GALLERY = {
  "AGA": ["essaouira", "imsouane", "tafraoute", "legzira"],
  "ASR": ["nemrut", "mardin", "ihlara", "ishak-pasha", "akdamar"],
  "SIN": ["bromo", "ijen", "toba", "borobudur", "bukit-lawang", "tioman"],
+ "URC": ["sayram", "nalati", "tianchi", "turpan", "dunhuang"],
+ "KHG": ["kashgar", "sayram", "nalati"],
+ "XNN": ["chaka", "dunhuang", "zhangye", "labrang", "jiayuguan"],
+ "LHW": ["dunhuang", "jiayuguan", "labrang", "lanzhou", "qinghai-lake"],
+ "LXA": ["yamdrok", "everest-nord"],
+ "TFU": ["danba", "tagong", "yading", "jiuzhaigou", "chengdu"],
+ "PEK": ["pechino"],
 }
 POPCOVER = {
  "georgia-armenia": "gergeti", "georgia-svaneti": "ushguli", "kirghizistan-almaty": "charyn", "mongolia-gobi": "khongor",
@@ -311,6 +346,7 @@ POPCOVER = {
  "reunion-mauritius": "fournaise", "peru-classico": "machu-picchu", "peru-bolivia": "titicaca", "atacama-uyuni": "uyuni",
  "ecuador-galapagos": "quilotoa", "argentina-nord": "humahuaca", "argentina-bariloche": "llao-llao", "brasile-rota-emocoes": "jericoacoara",
  "canada-rockies": "icefields", "giava-bali": "bromo", "costa-rica": "arenal", "brasile-rio-iguacu": "iguazu", "canada-quebec": "saguenay", "usa-rockies-yellowstone": "yellowstone", "usa-pacific-northwest": "olympic",
+ "cina-via-della-seta": "dunhuang", "cina-qinghai-gansu": "qinghai-lake", "cina-sichuan-ovest": "danba",
 }
 # correzioni dopo la revisione visiva: SKIP[k] = quanti candidati validi saltare; FILE[k] = titolo esatto su Commons
 SKIP = {}
