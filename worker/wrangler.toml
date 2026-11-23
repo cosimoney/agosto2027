@@ -11,7 +11,7 @@ enabled = true
 # Preferiti e soglie. L'id lo scrive deploy.sh alla prima esecuzione (non e' un segreto).
 [[kv_namespaces]]
 binding = "PREFS"
-id = "KV_ID_DA_CREARE"
+id = "e527581b2a0c412a97632a606ee58a24"
 
 [vars]
 ALLOWED_ORIGIN = "https://cosimoney.github.io"

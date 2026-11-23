@@ -22,6 +22,6 @@
   "dashboard_url": "https://cosimoney.github.io/agosto2027/",
   "weekend_dashboard_url": "https://cosimoney.github.io/flightsMI/",
   "weekend_source": "https://cosimoney.github.io/flightsMI/",
-  "worker_url": "",
+  "worker_url": "https://agosto2027.agosto2027-worker.workers.dev",
   "bot_username": "Trip2027_bot"
 }
