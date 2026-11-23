@@ -1,6 +1,21 @@
 {
- "digest_last": "2026-11-22",
- "fav": {},
+ "cards": {
+  "day": "2026-11-23",
+  "n": 2
+ },
+ "digest_last": "2026-11-23",
+ "fav": {
+  "d_CMB": {
+   "last": 749,
+   "thr": 1000,
+   "under": true
+  },
+  "d_KUL": {
+   "last": 792,
+   "thr": 1000,
+   "under": true
+  }
+ },
  "global": {
   "d_ALA@FCO-CIA": {
    "min": 603
@@ -29,8 +44,14 @@
   "d_TBS@FCO-CIA": {
    "min": 367
   },
+  "d_TBS@LIN": {
+   "min": 317
+  },
   "d_TBS@MXP": {
    "min": 190
+  },
+  "t_canada-quebec@FCO-CIA": {
+   "min": 643
   },
   "t_canada-quebec@MXP": {
    "min": 926
@@ -54,7 +75,7 @@
    "min": 354
   },
   "t_georgia-svaneti@LIN": {
-   "min": 415
+   "min": 317
   },
   "t_georgia-svaneti@MXP": {
    "min": 190
@@ -72,7 +93,7 @@
    "min": 821
   },
   "t_sri-lanka@MXP": {
-   "min": 839
+   "min": 749
   },
   "t_sudafrica-kruger-garden@MXP": {
    "min": 945
@@ -92,5 +113,24 @@
   "t_usa-rockies-yellowstone@MXP": {
    "min": 888
   }
+ },
+ "prefs_cache": {
+  "favorites": {
+   "d_CMB": {
+    "added": "2026-11-23",
+    "at": "2026-11-23T08:20:50.998Z",
+    "by": "Cosimo",
+    "p": 749
+   },
+   "d_KUL": {
+    "added": "2026-11-23",
+    "at": "2026-11-23T08:20:57.525Z",
+    "by": "Cosimo",
+    "p": 792
+   }
+  },
+  "muted": {},
+  "paused": [],
+  "threshold": 1000
  }
 }
