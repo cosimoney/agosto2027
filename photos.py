@@ -355,6 +355,61 @@ P("waterton", ["Waterton Lakes National Park"], "Waterton Lakes", "Waterton")
 P("tofino", ["Tofino beach", "Pacific Rim National Park Long Beach"], "Tofino", "Tofino", "Whistler")
 P("peggys-cove", ["Peggys Cove lighthouse", "Cabot Trail"], "Peggy's Cove", "Halifax", "Cape Breton")
 
+# ---------------------------------------------------------------- Aggiunte del 24 novembre 2026
+P("mana-pools", ["Mana Pools National Park", "Mana Pools Zambezi"], "Mana Pools", "Mana Pools")
+P("hwange", ["Hwange elephants", "Hwange National Park"], "Hwange", "Hwange")
+P("kariba", ["Lake Kariba Matusadona", "Lake Kariba"], "Lago Kariba", "Kariba")
+P("kgalagadi", ["Kgalagadi Transfrontier Park", "Kgalagadi lion"], "Kgalagadi", "Kgalagadi")
+P("augrabies", ["Augrabies Falls"], "Cascate di Augrabies", "Augrabies")
+P("loango", ["Loango National Park", "Loango Gabon"], "Loango", "Loango")
+P("lope", ["Lopé National Park", "Lope Gabon"], "Lopé", "Lopé")
+P("ruaha", ["Ruaha National Park", "Great Ruaha River"], "Ruaha", "Ruaha")
+P("nyerere", ["Selous Game Reserve Rufiji", "Selous Game Reserve", "Nyerere National Park"], "Rufiji, Nyerere", "Nyerere")
+P("tundavala", ["Tundavala", "Serra da Leba"], "Tundavala, Lubango", "Lubango")
+P("namibe", ["Namibe desert Angola", "Iona National Park Angola", "Namibe Angola"], "Deserto di Namibe", "Namibe")
+P("kalandula", ["Kalandula Falls"], "Cascate di Kalandula", "Kalandula")
+P("kuelap", ["Kuelap", "Kuélap fortress"], "Kuélap", "Chachapoyas")
+P("gocta", ["Catarata de Gocta", "Gocta waterfall", "Gocta Cataracts"], "Cascata di Gocta")
+P("anavilhanas", ["Anavilhanas", "Rio Negro Amazon"], "Anavilhanas, Rio Negro", "Anavilhanas", "Rio Negro")
+P("manaus", ["Encontro das Águas Manaus", "Meeting of Waters Manaus", "Teatro Amazonas"], "Manaus", "Manaus", "Presidente Figueiredo")
+P("st-johns", ["St. John's Newfoundland harbour", "Signal Hill St. John's", "St. John's Newfoundland"], "St. John's", "St. John's")
+P("gros-morne", ["Western Brook Pond", "Gros Morne National Park"], "Western Brook Pond, Gros Morne", "Gros Morne", "Deer Lake")
+P("bonavista", ["Cape Bonavista", "Trinity Newfoundland", "Elliston Newfoundland"], "Penisola di Bonavista", "Bonavista")
+P("fogo-island", ["Fogo Island Newfoundland", "Tilting Fogo Island"], "Fogo Island", "Fogo Island")
+P("twillingate", ["Twillingate"], "Twillingate", "Twillingate")
+P("churchill", ["Beluga whales Churchill", "Polar bear Churchill Manitoba", "Churchill Manitoba Hudson Bay"], "Churchill, baia di Hudson", "Churchill")
+P("riding-mountain", ["Riding Mountain National Park"], "Riding Mountain", "Riding Mountain")
+P("winnipeg", ["Winnipeg skyline", "The Forks Winnipeg"], "Winnipeg", "Winnipeg")
+P("great-bear", ["Great Bear Rainforest", "Bella Coola", "Bella Coola valley"], "Great Bear Rainforest", "Bella Coola")
+P("telegraph-cove", ["Telegraph Cove", "Johnstone Strait"], "Telegraph Cove", "Telegraph Cove", "Port Hardy")
+P("kluane", ["Kluane National Park", "Kathleen Lake Kluane"], "Kluane", "Kluane", "Whitehorse")
+P("dawson", ["Dawson City Yukon", "Dawson City"], "Dawson City", "Dawson City")
+P("tombstone", ["Tombstone Territorial Park"], "Tombstone", "Tombstone")
+P("glacier-np", ["Grinnell Glacier", "Many Glacier", "Glacier National Park Montana"], "Glacier National Park", "Many Glacier", "Lake McDonald", "St. Mary", "Whitefish")
+P("samosir", ["Samosir Batak house", "Tuk Tuk Samosir", "Samosir"], "Samosir, lago Toba", "Samosir")
+P("berastagi", ["Mount Sibayak", "Berastagi"], "Sibayak, Berastagi", "Berastagi")
+P("tanjung-puting", ["Tanjung Puting National Park", "Camp Leakey", "Tanjung Puting orangutan"], "Tanjung Puting", "Tanjung Puting")
+P("sumba", ["Ratenggaro", "Sumba traditional village", "Sumba Indonesia"], "Ratenggaro, Sumba", "Sumba")
+P("waingapu", ["Walakiri beach", "Sumba savanna", "East Sumba"], "Sumba est", "Waingapu")
+P("zanskar", ["Phugtal Monastery", "Zanskar valley", "Karsha Monastery"], "Zanskar", "Padum", "Phugtal", "Lingshed", "Rangdum")
+P("lamayuru", ["Lamayuru Monastery", "Lamayuru"], "Lamayuru", "Lamayuru", "Alchi")
+P("spiti", ["Key Monastery", "Spiti valley"], "Monastero di Key, Spiti", "Kaza", "Tabo")
+P("chandratal", ["Chandra Taal", "Chandratal lake"], "Lago Chandratal", "Chandratal", "Jispa")
+P("bako", ["Bako National Park"], "Bako, Sarawak", "Bako")
+P("mulu", ["Gunung Mulu Pinnacles", "Gunung Mulu National Park", "Deer Cave Mulu"], "Mulu", "Mulu", "Camp 5")
+P("kuching", ["Kuching waterfront", "Kuching"], "Kuching", "Kuching", "Batang Ai", "Miri")
+P("tasiilaq", ["Tasiilaq"], "Tasiilaq, Groenlandia orientale", "Tasiilaq")
+P("vik", ["Reynisfjara", "Vík í Mýrdal"], "Reynisfjara, Vík", "Costa sud")
+P("skye", ["Quiraing", "Old Man of Storr"], "Isola di Skye", "Skye")
+P("luskentyre", ["Luskentyre", "Isle of Harris beach"], "Luskentyre, Harris", "Harris")
+P("callanish", ["Callanish Stones", "Calanais"], "Pietre di Callanish, Lewis", "Lewis")
+P("glencoe", ["Glen Coe", "Buachaille Etive Mor"], "Glencoe", "Glencoe")
+P("edinburgh", ["Edinburgh skyline Calton Hill", "Edinburgh Castle"], "Edimburgo", "Edimburgo")
+P("orkney", ["Ring of Brodgar", "Skara Brae"], "Orcadi", "Orcadi")
+P("ullapool", ["Ullapool", "Stac Pollaidh"], "Ullapool", "Ullapool", "Durness")
+P("uluru", ["Uluru", "Kata Tjuta"], "Uluru", "Uluru", "Kings Canyon", "Alice Springs")
+P("gibb-river", ["Bell Gorge", "Windjana Gorge", "Gibb River Road"], "Kimberley, Gibb River Road", "Bell Gorge", "Windjana", "Manning Gorge", "Broome", "Dampier")
+
 COVER = {
  "DPS": "bali", "LOP": "rinjani", "CMB": "sigiriya", "KUL": "kuala-lumpur", "BKI": "kinabalu", "UBN": "mongolia", "FRU": "song-kul",
  "ALA": "almaty", "TBS": "tbilisi", "EVN": "khor-virap", "CNS": "barrier-reef", "DRW": "kakadu", "PER": "pinnacles", "AKL": "auckland",
@@ -431,6 +486,17 @@ POPCOVER = {
  "lofoten-tromso": "reine", "groenlandia-nuuk-ilulissat": "ilulissat", "kruger-mozambico": "bazaruto", "zambia-malawi": "south-luangwa",
  "capo-verde-isole": "santo-antao", "sao-tome-principe": "principe",
 }
+COVER.update({"HRE": "mana-pools", "LBV": "loango", "KNO": "toba", "CGK": "tanjung-puting", "DAR": "ruaha", "KCH": "bako", "MAO": "anavilhanas",
+              "YYT": "st-johns", "YWG": "churchill", "YXY": "kluane", "LAD": "tundavala", "EDI": "skye"})
+GALLERY.update({"HRE": ["hwange", "kariba", "victoria-falls"], "LBV": ["lope"], "KNO": ["bukit-lawang", "samosir", "berastagi"], "CGK": ["borobudur", "bromo"],
+                "DAR": ["nyerere", "zanzibar"], "KCH": ["mulu", "kuching"], "MAO": ["manaus"], "YYT": ["gros-morne", "bonavista", "fogo-island", "twillingate"],
+                "YWG": ["riding-mountain", "winnipeg"], "YXY": ["dawson", "tombstone"], "LAD": ["namibe", "kalandula"],
+                "EDI": ["luskentyre", "callanish", "glencoe", "orkney", "edinburgh"], "IXL": ["zanskar", "spiti", "lamayuru", "chandratal"]})
+POPCOVER.update({"zimbabwe-hwange-mana": "hwange", "sudafrica-namaqualand-kgalagadi": "kgalagadi", "gabon-loango": "loango", "tanzania-sud": "ruaha",
+                 "angola-sud": "namibe", "peru-nord": "kuelap", "amazzonia-rio-negro": "anavilhanas", "canada-terranova": "gros-morne",
+                 "canada-great-bear": "great-bear", "canada-churchill": "churchill", "canada-yukon": "tombstone", "glacier-waterton": "glacier-np",
+                 "sumatra-nord": "bukit-lawang", "bali-sumba-komodo": "sumba", "borneo-tanjung-puting-giava": "tanjung-puting", "ladakh-zanskar": "zanskar",
+                 "sarawak-mulu": "mulu", "islanda-groenlandia-est": "tasiilaq", "scozia-ebridi": "luskentyre"})
 # correzioni dopo la revisione visiva: SKIP[k] = quanti candidati validi saltare; FILE[k] = titolo esatto su Commons
 SKIP = {}
 FILE = {"maputo": "File:60 Skyline (36931644911).jpg"}
@@ -505,7 +571,8 @@ def usable(p, large):
     if ii.get("mime") != "image/jpeg" or BAD.search(p["title"]):
         return None
     w, h = ii.get("width", 0), ii.get("height", 0)
-    if w < (1600 if large else 1200) or not h:
+    # sotto 1920 / 1280 px l'API restituisce l'originale su upload.wikimedia.org, che risponde 429: si chiedono solo miniature standard
+    if w < (1920 if large else 1280) or not h:
         return None
     if not (1.15 <= w / h <= 2.05):
         return None

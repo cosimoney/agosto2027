@@ -1694,6 +1694,213 @@ SRC.update({
     "GOH": [["https://www.greenland-travel.com/trips/bestseller-summer-sun-and-huge-icebergs-in-greenland/", "https://www.flightconnections.com/flights-to-nuuk-goh", "https://flights.airgreenland.com/en/flights-from-nuuk-to-ilulissat"]],
     "JAV": [["https://www.euronews.com/2026/10/30/historic-milestone-for-greenland-as-new-international-airport-opens-in-ilulissat", "https://www.aeroroutes.com/eng/261001-fins27", "https://www.greenland-travel.com/trips/bestseller-summer-sun-and-huge-icebergs-in-greenland/"]],
 })
+# ====================== AGGIUNTE DEL 24 NOVEMBRE 2026 ======================
+# Mete confermate (Zimbabwe, Namaqualand e Kgalagadi, Gabon, Perù del nord, Sumatra, Sumba, Tanjung Puting, Zanskar e Spiti,
+# Terranova, Churchill, Groenlandia orientale) e idee prese dalle proposte di agosto dei tour operator (Tanzania del sud,
+# Sarawak, Amazzonia, Yukon, Angola, Scozia delle isole, Glacier, Red Centre, Kimberley ovest). Clima, ingresso e sicurezza
+# ricontrollati online il 24/11/2026 (fonti in SRC). Viaggiare Sicuri non era leggibile: avvisi presi da gov.uk e
+# travel.gc.ca. Costi a terra: fasce stimate sui prezzi trovati, dichiarate come stime nelle note. Tariffe dei voli interni
+# non verificate per agosto 2027.
+def _add(code, trip, src):
+    TRIPS.setdefault(code, [])
+    SRC.setdefault(code, [[] for _ in TRIPS[code]])
+    TRIPS[code].append(trip); SRC[code].append(src)
+
+_ZW = " Ingresso: visto all'arrivo oppure KAZA Univisa da 50 $ valido per Zimbabwe e Zambia (regole lette per passaporti britannici: per gli italiani da riconfermare). Malaria nella valle dello Zambesi e a Hwange: profilassi."
+_IDN = " Ingresso: visto all'arrivo o e-VOA da 500.000 rupie (30 giorni); un aumento a 750.000-1.000.000 è stato proposto nell'agosto 2026 e non risulta in vigore."
+_IN = " Ingresso: e-visa turistico di 30 giorni (25 $) e carta d'arrivo online entro 72 ore dal volo."
+_CA = " Ingresso in Canada: eTA online da 7 dollari canadesi."
+
+_add("VFA", T("Cascate, Hwange e Mana Pools in volo", ["safari", "avventura"], "medio",
+     "Victoria Falls 2|Hwange 3|Mana Pools 4|Harare 1",
+     "Transfer su strada da Victoria Falls a Hwange, poi piccoli aerei condivisi Hwange-Mana Pools e Mana Pools-Harare (Mack Air, tariffe solo su preventivo)", "7.500–13.000 € pp",
+     ["Elefanti alle pozze di Hwange", "Canoa sullo Zambesi tra ippopotami ed elefanti", "Safari a piedi tra le acacie di Mana Pools"],
+     "Hwange 8-28°C e zero pioggia, Mana Pools 13-30°C: le mattine sui veicoli aperti sono fredde. Agosto è alta stagione piena a Mana Pools: i campi costano da 630 a 1.500 $ a testa a notte e un giro di 10 giorni con Hwange, Mana Pools, Kariba e le cascate è venduto a circa 14.000 $ a testa, voli internazionali esclusi; la fascia indicata viene da questi prezzi. Tassa del parco 24 $ al giorno dopo l'aumento del 2026." + _ZW,
+     "Si riparte da Harare (HRE)."),
+     ["https://climatestotravel.com/climate/zimbabwe/hwange-national-park", "https://safaribookings.com/mana-pools/best-time", "https://www.safari.com/safaris/ten-day-scenic-safari-through-zimbabwe", "https://www.gov.uk/foreign-travel-advice/zimbabwe/entry-requirements"])
+
+_add("HRE", T("Mana Pools, Hwange e cascate Vittoria", ["safari", "avventura"], "medio",
+     "Harare 1|Mana Pools 4|Hwange 3|Victoria Falls 2",
+     "Piccoli aerei condivisi Harare-Mana Pools e Mana Pools-Hwange (tariffe solo su preventivo), transfer su strada da Hwange alle cascate", "7.500–13.000 € pp",
+     ["Safari a piedi e in canoa a Mana Pools", "Branchi di elefanti a Hwange", "Cascate Vittoria dal lato Zimbabwe"],
+     "Lo stesso giro delle cascate in senso inverso, chiudendo con due giorni tranquilli a Victoria Falls. Stagione secca piena, notti fredde. Costo trainato dai campi di Mana Pools (da 630 $ a testa a notte in agosto) e dai voli leggeri: fascia costruita sui prezzi dei tour venduti." + _ZW,
+     "Si riparte da Victoria Falls (VFA)."),
+     ["https://safaribookings.com/mana-pools/best-time", "https://www.chaloafrica.com/accommodation/kanga-expeditions-mana-pools-national-park-zimbabwe/", "https://atta.travel/resource/zimparks-lifts-victoria-falls-entry-fees-as-vat-takes-effect.html", "https://www.gov.uk/foreign-travel-advice/zimbabwe/entry-requirements"])
+_add("HRE", T("Solo Zambesi: Mana Pools e lago Kariba", ["safari", "natura"], "rilassato",
+     "Harare 1|Mana Pools 5|Kariba (Matusadona) 3|Harare 1",
+     "Piccoli aerei condivisi da Harare (Mack Air copre Harare, Kariba, Hwange e Victoria Falls), barca sul lago Kariba", "6.500–11.000 € pp",
+     ["Cinque notti lungo lo Zambesi", "Tramonti sul lago Kariba tra gli alberi sommersi", "Canoa nei canali di Mana Pools"],
+     "Versione lenta, senza Hwange né cascate. Kariba e Matusadona non sono stati ricontrollati voce per voce: tappe e costi sono una stima sui prezzi dei campi di Mana Pools." + _ZW),
+     ["https://safaribookings.com/mana-pools/best-time", "https://mackair.co.bw/seat-rates-zimbabwe/", "https://www.gov.uk/foreign-travel-advice/zimbabwe/entry-requirements"])
+
+_add("CPT", T("Namaqualand in fiore e Kgalagadi", ["road trip", "safari", "natura"], "intenso",
+     "Cape Town 1|Cederberg (Clanwilliam) 1|Namaqualand (Kamieskroon) 2|Springbok 1|Augrabies 1|Kgalagadi 4",
+     "Auto alta o 4x4 a noleggio: 560 km sulla N7 fino a Springbok, poi la N14 verso Upington e 250 km asfaltati fino al cancello di Twee Rivieren; rientro in volo Airlink Upington-Città del Capo (1h15, un volo al giorno)", "1.400–2.200 € pp",
+     ["Tappeti di margherite a Skilpad, nel Namaqua National Park", "Leoni dalla criniera nera nei letti secchi dell'Auob e del Nossob", "Cielo notturno del Kalahari"],
+     "SANParks indica il picco dei fiori tra metà agosto e metà settembre, ma dipende dalle piogge invernali: nel 2026 la siccità ha accorciato la stagione. Più tardi si parte, meglio è. Nel Kgalagadi giornate miti e secche, mattine intorno a 2°C con gelate. I camp SANParks si prenotano fino a 11 mesi prima: per agosto 2027 le prenotazioni sono aperte da settembre 2026 e i posti nel parco finiscono presto. Sul lato sudafricano il 4x4 non è obbligatorio ma le berline faticano sulla sabbia. Tariffe dei camp e del volo non verificate: fascia stimata.",
+     "L'auto si lascia a Upington (UTN): supplemento di sola andata da verificare."),
+     ["https://www.sanparks.org/news/namaqua-national-park-begins-to-bloom-as-wildflower-season-unfolds", "https://www.sanparks.org/parks/kgalagadi/travel/how-to-get-there", "https://www.sanparks.org/contact/faq/online-bookings", "https://safaribookings.com/kgalagadi/climate"])
+
+_add("LBV", T("Loango, Pongara e Lopé", ["natura", "safari", "avventura"], "medio",
+     "Libreville 1|Pongara 1|Loango 4|Lopé 2|Libreville 1",
+     "Tutto organizzato dall'operatore: barca per Pongara, volo interno di 35 minuti e 3 ore e mezza di auto o barca per Loango, treno Transgabonais per Lopé (non verificato)", "5.500–11.000 € pp",
+     ["Elefanti di foresta e bufali sulla spiaggia di Loango", "Megattere al largo, da metà luglio a metà settembre", "Mandrilli e savane di Lopé"],
+     "Stagione secca (24-30°C, cielo spesso coperto). Gli ippopotami tra le onde sono rari anche secondo i lodge. Attenzione: il gestore dichiarava Loango Lodge e i campi satellite non operativi, con riapertura prevista a fine 2026, da confermare prima di prenotare. Fascia presa da tour venduti: gruppo di 10 giorni da 4.499 sterline con partenza il 28/7/2027, privati da 10.000 € a testa. Visto obbligatorio prima della partenza (e-visa dal dicembre 2025, circa 70-85 €; regole per gli italiani da riconfermare) e certificato di febbre gialla obbligatorio. Malaria: profilassi. Il Canada invita a un alto grado di cautela: situazione calma dopo le elezioni dell'aprile 2025."),
+     ["https://www.responsibletravel.com/holiday/33913/gabon-wildlife-tour", "https://www.chaloafrica.com/safari-tours/lets-go-to-gabon-safari-2027/", "https://www.gov.uk/foreign-travel-advice/gabon/entry-requirements", "https://travelhealthpro.org.uk/countries/gabon"])
+
+_add("LIM", T("Perù del nord: Cordillera Blanca e Chachapoyas", ["trekking", "cultura", "avventura"], "intenso",
+     "Lima 1|Huaraz 4|Lima 1|Chachapoyas 4|Lima 1",
+     "Due voli interni andata e ritorno da Lima: LATAM per Huaraz (Anta, 1h05) e ATSA per Chachapoyas (1h30) oppure LATAM per Jaén; escursioni con agenzie locali", "1.800–2.800 € pp",
+     ["Laguna 69 sotto il Chacraraju", "Fortezza di Kuélap in telecabina", "Cascata di Gocta e sarcofagi di Karajía"],
+     "Huaraz è in piena stagione secca (6-15°C, notti sotto zero in quota) ed è a 3.050 m: i primi due giorni servono per acclimatarsi. Chachapoyas è più umida (4-21°C, 60-86 mm). A Kuélap la muraglia sud è stata riaperta nell'agosto 2026 dopo il crollo del 2022; a inizio 2026 il sito era stato dichiarato in emergenza per le piogge. Il trek di Santa Cruz in 4 giorni (da 380 $ in gruppo) sostituisce le gite giornaliere da Huaraz. Trujillo con Chan Chan e Chiclayo con Sipán chiedono 2-3 notti in più; a Trujillo e a Lima lo stato di emergenza per criminalità è stato prorogato più volte nel 2026. Fascia stimata, voli interni inclusi (66 $ a tratta per Huaraz, dato 2025)."),
+     ["https://www.latamairlines.com/pe/es/destinos/vuelos-a-huaraz", "https://elperuano.pe/noticia/297260-kuelap-abre-el-circuito-muralla-sur-y-muestra-avances-en-la-recuperacion-de-su-sector-mas-emblematico", "https://terandes.com/en/tours/trekking/santa-cruz-trek-4-days/", "https://www.onthegotours.com/us/Peru/Chachapoyas-Heritage-Nature-4-days"])
+
+_add("KNO", T("Sumatra del nord: oranghi, Berastagi e lago Toba", ["natura", "avventura", "cultura"], "medio",
+     "Medan 1|Bukit Lawang 3|Berastagi 2|Samosir (Tuk Tuk) 3|Medan 1",
+     "Auto con autista (Medan-Bukit Lawang 3 ore, Parapat-aeroporto 4-5 ore), traghetto Parapat-Samosir", "900–1.500 € pp",
+     ["Due giorni di trek tra gli oranghi del Gunung Leuser, con una notte in campo", "Villaggi batak di Samosir", "Cascata Sipiso-Piso sul bordo del Toba"],
+     "Giro ispirato al «Sumatra Adventure» di Intrepid (10 giorni). Medan 23-32°C con 180 mm in 11 giorni: piove a rovesci, di solito la sera, ed è alta stagione a Bukit Lawang. Il Sinabung ha eruttato il 31/8/2026 (allerta III): Berastagi è vicina, da ricontrollare prima di prenotare; la salita al Sibayak non risulta chiusa. Dopo le alluvioni di fine 2025 strade riaperte da gennaio 2026, nuove piene a ottobre 2026. Trek di 2 giorni circa 120 € a testa. Fascia stimata. Malaria presente: chiedere a un centro di medicina dei viaggi." + _IDN),
+     ["https://www.intrepidtravel.com/us/indonesia/sumatra-adventure-166569", "https://climatestotravel.com/climate/indonesia/medan", "https://www.thejakartapost.com/indonesia/2026/09/01/mt-sinabung-erupts-after-five-years-status-raised-to-alert", "https://www.ttgasia.com/2025/12/03/sumatra-tourism-remains-operational-as-floods-recede/"])
+
+_add("CGK", T("Tanjung Puting in klotok e Giava centrale", ["natura", "cultura", "avventura"], "medio",
+     "Giacarta 1|Klotok a Tanjung Puting 3|Yogyakarta 4|Bali 2",
+     "Volo Giacarta-Pangkalan Bun (Batik Air o NAM Air, 1h20), barca klotok privata da Kumai sul fiume Sekonyer, volo per Semarang o Surabaya e treno per Yogyakarta, volo per Bali", "1.100–1.700 € pp",
+     ["Camp Leakey e le stazioni di alimentazione degli oranghi", "Notti sul ponte del klotok lungo il Sekonyer", "Borobudur e Prambanan"],
+     "Stagione secca (24-32°C) e finestra più richiesta per gli oranghi. Il rischio vero è il fumo: nel 2026 il Kalimantan Centrale ha dichiarato l'emergenza incendi fino al 31/10, con voli in ritardo ad agosto e 55 giorni di fumo, e per il 2027 è previsto ancora El Niño. Effetto su Pangkalan Bun non verificato: tenere un giorno di margine. Klotok privato 3 giorni e 2 notti da circa 320 € a testa in due, tutto incluso; fascia stimata, voli interni esclusi e non verificati. Malaria a bassa trasmissione nel Kalimantan." + _IDN,
+     "Si riparte da Bali (DPS); in alternativa si torna a Giacarta."),
+     ["https://www.seeksophie.com/experiences/pangkalan-bun-tanjung-puting-private-3d2n-jungle-cruise-to-hidden-orangutan-haven-cooking-add-on-available-32-o9g589nyjn", "https://www.thejakartapost.com/indonesia/2026/08/12/schools-close-flights-delayed-as-wildfire-haze-blankets-kalimantan.html", "https://www.flightconnections.com/flights-from-cgk-to-pkn", "https://www.gov.uk/foreign-travel-advice/indonesia/safety-and-security"])
+
+_add("DPS", T("Bali, Sumba e Komodo", ["avventura", "cultura", "mare"], "intenso",
+     "Ubud 2|Sumba ovest (Tambolaka) 3|Waingapu 2|Labuan Bajo 3",
+     "Volo Bali-Tambolaka (NAM Air, Wings Air, Batik Air: 23 a settimana a marzo 2026), auto con autista da ovest a est (35-60 € al giorno), volo Waingapu-Bali e Bali-Labuan Bajo, barca nel parco di Komodo", "1.400–2.100 € pp",
+     ["Villaggio marapu di Ratenggaro e laguna di Weekuri", "Colline di Sumba est e Walakiri al tramonto", "Padar e i draghi di Komodo"],
+     "Sumba è in piena stagione secca: a Waingapu 20-31°C e 5 mm di pioggia, colline gialle a est. La Pasola si tiene a febbraio-marzo, non ad agosto. Il volo diretto Sumba-Labuan Bajo non è confermato: si ripassa da Bali. Hotel semplici da 40-55 $ a notte, resort da 120-160 $. Fascia stimata, voli interni esclusi e non verificati; la sola parte di Sumba vale 450-800 € a testa. A Bali tassa turistica di 150.000 rupie." + _IDN,
+     "Da Labuan Bajo si rientra a Bali per il volo di ritorno."),
+     ["https://climatestotravel.com/climate/indonesia/sumba", "https://www.backindo.com/pasola-sumba", "https://www.skyscanner.co.in/routes/dps/tmc/bali-denpasar-to-tambolaka.html", "https://dispar.sbdkab.go.id/trip/wonderful-sumba-tour-5d/"])
+
+_add("IXL", T("Zanskar da Leh: Lingshed, Padum e Phugtal", ["avventura", "cultura", "road trip"], "intenso",
+     "Leh 3|Alchi 1|Lingshed 1|Padum 2|Purne (Phugtal) 1|Rangdum 1|Lamayuru 1",
+     "Fuoristrada con autista: da Lamayuru a Padum per il Singe La (circa 195 km, 7-9 ore, sterrato sui passi), rientro per il Pensi La, Kargil e Lamayuru; a Phugtal si arriva a piedi, 6 km per tratta", "900–1.500 € pp",
+     ["Monastero rupestre di Phugtal", "Karsha e Stongdey sopra la piana di Padum", "Ghiacciaio Drang Drung dal Pensi La"],
+     "Leh 12-26°C con 15 mm: il monsone di norma non arriva, ma nell'agosto 2025 Leh ha avuto 80 mm, record in 52 anni, con piene a Lamayuru e il Ladakh isolato per tre giorni. Passi aperti da metà giugno a metà ottobre; Singe La oltre i 5.000 m, quindi servono almeno due giorni fermi a Leh. Per lo Zanskar gli stranieri non hanno bisogno di permessi, solo della tassa ecologica. A Padum 2-3 hotel a 40-60 € a notte, altrove homestay. Auto con autista da circa 1.200 € a vettura per il giro; fascia stimata. Si arriva in volo da Delhi, mai via Srinagar (il Regno Unito sconsiglia il Jammu e Kashmir). Nessun soccorso alpino commerciale sopra i 3.000 m: assicurazione con elisoccorso." + _IN),
+     ["https://www.lehladakhtaxis.com/sightseeing-tours/zanskar-valley", "https://climatestotravel.com/climate/india/leh", "https://www.downtoearth.org.in/climate-change/leh-records-highest-rainfall-in-52-years-august-2025-sees-unprecedented-802-mm", "https://travel.gc.ca/destinations/india"])
+_add("IXL", T("Spiti da Leh, andata e ritorno", ["avventura", "cultura", "road trip"], "intenso",
+     "Leh 2|Jispa 1|Chandratal 1|Kaza 3|Tabo 1|Jispa 1|Leh 1",
+     "Fuoristrada con autista sulla Manali-Leh Highway fino a Keylong, poi Gramphu, Batal e Kunzum La (4.551 m); stesso percorso al ritorno", "700–1.300 € pp",
+     ["Monastero di Key e villaggio di Kibber", "Langza, Hikkim e Komic sopra i 4.400 m", "Lago Chandratal"],
+     "Spiti è in ombra pluviometrica (Kaza 3.800 m, massime 12-17°C), ma gli accessi classici no: la statale Kullu-Manali è stata spazzata via nell'agosto 2025 e l'11/8/2026 in Himachal c'erano 260 strade chiuse, con la NH-5 interrotta nel Kinnaur. Per questo il giro entra ed esce da Leh. Sono molte ore di guida (tempi Leh-Jispa non verificati) e anche il tratto Baralacha La-Keylong può chiudere per piene. Le guide locali indicano giugno-luglio e settembre come mesi migliori. Per Tabo e Dhankar gli stranieri hanno bisogno del permesso d'area protetta, che si fa a Kaza tramite agenzia. Fascia stimata su tour locali (da circa 430 € a testa in sei persone)." + _IN),
+     ["https://discoverwithdheeraj.com/spiti-valley-faqs-planning-sightseeing-routes/", "https://hplahaulspiti.nic.in/foreigner-section/", "https://www.tribuneindia.com/news/himachal/scenic-kullu-manali-lahaul-cut-off-for-3rd-day-2000-vehicles-stranded-after-rain-fury", "https://www.spitiholidayadventure.com/package/spiti-valley-tour-ten-days"])
+
+_add("YYT", T("Terranova da est a ovest", ["road trip", "natura"], "medio",
+     "St. John's 2|Trinity e Bonavista 2|Twillingate 1|Fogo Island 1|Rocky Harbour (Gros Morne) 3|Deer Lake 1",
+     "Auto a noleggio a senso unico da St. John's a Deer Lake (640 km diretti, 7 ore), traghetto di 45 minuti per Fogo", "2.500–3.800 € pp",
+     ["Balene e pulcinelle a Witless Bay e a Elliston", "Fiordo di Western Brook Pond a Gros Morne", "Fogo Island"],
+     "St. John's 11-20°C con 100-150 mm e nebbie. Le balene hanno il picco tra metà giugno e metà agosto, le pulcinelle restano fino a metà settembre; gli iceberg di norma sono finiti a inizio luglio. L'Anse aux Meadows aggiunge 5 ore per tratta da Deer Lake: solo con due notti in più. Il nodo è l'auto: nel 2026 le agenzie di St. John's erano esaurite per quasi tutta l'estate, con settimane da 1.300 a 2.900 dollari canadesi; va prenotata con un anno di anticipo. Fascia stimata, senza un pacchetto venduto dietro." + _CA,
+     "Si riparte da Deer Lake (YDF) via Toronto, Montréal o Halifax."),
+     ["https://www.newfoundlandlabrador.com/getting-here-and-around/driving-distances", "https://www.newfoundlandlabrador.com/trip-ideas/travel-stories/where-to-see-puffins-in-newfoundland-and-labrador", "https://www.ctvnews.ca/canada/newfoundland-and-labrador/article/nls-rental-car-problem-has-boiled-over-the-top-says-expert/", "https://www.canada.ca/en/immigration-refugees-citizenship/services/visit-canada/eta.php"])
+_add("YYT", T("Anello da St. John's: Avalon, Bonavista e Fogo", ["road trip", "natura"], "rilassato",
+     "St. John's 3|Trinity e Bonavista 3|Twillingate 2|Fogo Island 2",
+     "Auto a noleggio con rientro a St. John's (Gander è a 335 km, 3 ore e 45)", "2.300–3.500 € pp",
+     ["Colonia di pulcinelle di Witless Bay in barca", "Scogliere di Elliston e villaggi della penisola di Bonavista", "Due notti a Fogo Island"],
+     "Versione senza Gros Morne, con meno chilometri e l'auto riportata dove la si è presa. Stesso clima fresco e umido, stessa scarsità di auto a noleggio. Fascia stimata." + _CA),
+     ["https://www.newfoundlandlabrador.com/getting-here-and-around/driving-distances", "https://www.newfoundlandlabrador.com/trip-ideas/road-trips/central/kittiwake-coast-islands-experience", "https://matadornetwork.com/read/whales-seabirds-icebergs-newfoundland-labrador"])
+
+_add("YWG", T("Churchill d'estate: beluga, orsi e tundra", ["natura", "avventura"], "medio",
+     "Winnipeg 2|Churchill 4|Riding Mountain 3|Winnipeg 1",
+     "Pacchetto da Winnipeg con volo per Churchill incluso (2 ore e mezza), poi auto a noleggio per il parco di Riding Mountain", "6.800–8.500 € pp",
+     ["Kayak o gommone tra i beluga alla foce del Churchill", "Costa della baia di Hudson in barca, in cerca di orsi polari", "Tundra in fiore e Prince of Wales Fort"],
+     "Churchill 9-16°C, mese più piovoso. Beluga al picco; gli orsi polari d'estate si vedono soprattutto dalla barca, ma nessuno li garantisce; l'aurora torna possibile a fine agosto. Il pacchetto estivo di Lazy Bear (2 notti a Winnipeg più 4 a Churchill, voli e pasti inclusi) costa 9.890 dollari canadesi a testa per il 2027 e le partenze del 7 e dell'11 agosto sono già esaurite; quelle del 15 e 16 agosto hanno pochi posti. Da soli: volo Calm Air 1.800-1.900 dollari canadesi andata e ritorno, oppure treno di quasi due giorni con ritardi frequenti. Riding Mountain non è stato ricontrollato. Fascia costruita sul pacchetto più tre notti in autonomia." + _CA),
+     ["https://www.lazybearlodge.com/expeditions/ultimate-bears-and-belugas-summer-adventure", "https://frontiersnorth.com/adventures/summer/belugas-bears-and-blooms", "https://www.travelmanitoba.com/blog/the-ultimate-guide-to-summer-in-churchill-manitoba/", "https://www.viarail.ca/en/explore-our-destinations/trains/regional-trains/winnipeg-churchill"])
+
+_add("KEF", T("Costa sud dell'Islanda e Groenlandia orientale", ["natura", "avventura"], "medio",
+     "Reykjavík 1|Costa sud (Vík) 3|Reykjavík 1|Tasiilaq 4|Reykjavík 1",
+     "Auto a noleggio in Islanda; volo Icelandair Keflavík-Kulusuk (4 a settimana nell'estate 2027), poi barca (circa 1 ora) o elicottero Air Greenland (15 minuti) per Tasiilaq", "3.600–4.900 € pp",
+     ["Fiordo di Sermilik tra gli iceberg", "Villaggio di Tiniteqilaaq sul bordo della calotta", "Cascate e laguna glaciale della costa sud"],
+     "Tasiilaq 4-10°C con circa 60 mm. I voli per Kulusuk ci sono da marzo a settembre; nell'orario 2027 partono da Keflavík e scendono da 6 a 4 a settimana: da riconfermare alla prenotazione. Andata e ritorno Reykjavík-Kulusuk intorno a 1.000-1.100 €, compresi nella fascia; barca per Tasiilaq circa 135 € a tratta, legata a meteo e ghiaccio. Hotel a Tasiilaq circa 200 € a notte, escursione in barca tra gli iceberg da 150 €. Parte groenlandese stimata in 2.300-3.200 € a testa; trekking e kayak non ricontrollati. Tenere un giorno di margine a Reykjavík." + _GL),
+     ["https://www.aeroroutes.com/eng/261001-fins27", "https://guidetogreenland.com/book-trips-holiday/boat-transfer-between-kulusuk-and-tasiilaq-east-greenland", "https://flights.airgreenland.com/en/flights-to-tasiilaq", "https://climatestotravel.com/climate/greenland/tasiilaq"])
+
+# ---------- idee dalle proposte di agosto dei tour operator ----------
+_add("DAR", T("Tanzania del sud in volo: Ruaha e Nyerere", ["safari", "avventura"], "medio",
+     "Dar es Salaam 1|Ruaha 4|Nyerere 4|Dar es Salaam 1",
+     "Voli leggeri Dar es Salaam-Ruaha, Ruaha-Nyerere e Nyerere-Dar es Salaam, safari dei campi", "4.500–9.000 € pp",
+     ["Leoni, licaoni e baobab lungo il Great Ruaha", "Safari a piedi e notte in fly-camp", "Safari in barca sul Rufiji"],
+     "Giro ispirato al «Southern Safari Circuit» di Original Travel e al «Southern Tanzania's wild Nyerere & Ruaha» di Abercrombie & Kent. Ruaha è secco, 11-14°C di notte e 26-28°C di giorno. Fascia stimata: 7 giorni Nyerere-Ruaha in volo sono venduti a 4.600-5.150 $ a testa, i campi di fascia alta superano i 13.000 $ per 10 giorni. Visto elettronico da 50 $ e assicurazione governativa obbligatoria. Malaria e mosche tse-tse nei parchi. Il Regno Unito sconsiglia solo la fascia di 20 km dal confine con Cabo Delgado.",
+     "Volendo l'ultima notte si passa a Zanzibar e si riparte da lì (ZNZ)."),
+     ["https://www.originaltravel.co.uk/itinerary/tanzania-ruaha-nyerere-national-parks-rufiji-river-delta-zanzibar/southern-tanzania-safari-itinerary/pot195989", "https://abercrombiekent.co.uk/destinations/africa/tanzania/southern-tanzanias-wild-nyerere-and-ruaha", "https://safaribookings.com/ruaha/climate", "https://www.gov.uk/foreign-travel-advice/tanzania/entry-requirements"])
+_add("DAR", T("I parchi del sud via terra: Nyerere, Mikumi, Udzungwa, Ruaha", ["safari", "road trip", "natura"], "intenso",
+     "Nyerere 3|Mikumi e Udzungwa 2|Ruaha 3|Zanzibar 2",
+     "Fuoristrada con autista da Dar es Salaam (tappe lunghe via Morogoro e Iringa), volo leggero da Ruaha alla costa", "3.500–6.500 € pp",
+     ["Safari in barca sul Rufiji e a piedi nel Nyerere", "Cascate Sanje nei monti Udzungwa", "Leoni e baobab a Ruaha"],
+     "Giro ispirato a «I selvaggi parchi del sud» di Kel 12 (12-22 agosto 2027, 11 giorni, da 6.900 € con i voli). Stagione secca e mesi più freschi: Iringa 13-26°C e zero pioggia, Morogoro 17-29°C, Zanzibar 21-29°C con 50 mm. Fascia stimata: 10 giorni su strada sono venduti a circa 3.550 $ a testa. Visto elettronico da 50 $ e assicurazione governativa obbligatoria; malaria: profilassi da valutare.",
+     "Si riparte da Zanzibar (ZNZ)."),
+     ["https://kel12.com/icnc_viaggi/i-selvaggi-parchi-del-sud/", "https://www.climatestotravel.com/climate/tanzania", "https://www.safaribookings.com/rates/t105678", "https://www.gov.uk/foreign-travel-advice/tanzania/entry-requirements"])
+
+_add("KCH", T("Sarawak: Bako, Batang Ai e grotte di Mulu", ["natura", "avventura", "trekking"], "intenso",
+     "Kuching 3|Bako 1|Batang Ai 2|Mulu 2|Camp 5 (Pinnacles) 2|Miri 1",
+     "Barca per Bako, auto e longboat per Batang Ai, volo AirBorneo per Mulu (mettere in conto lo scalo a Miri), barca e sentiero per Camp 5", "1.600–2.800 € pp",
+     ["Nasiche a Bako e oranghi a Semenggoh", "Deer Cave con l'uscita dei pipistrelli e Clearwater Cave", "Salita ai Pinnacles"],
+     "Giro ispirato al «Wild Sarawak» di Intrepid, che lo mette tra i viaggi di agosto. Kuching 23-32°C con 120-160 mm: è il periodo meno piovoso, con rovesci pomeridiani; a Mulu piove tutto l'anno. Fascia stimata: il tour di gruppo di 9 notti parte da 1.796 $, i Pinnacles in 3 giorni costano 455 ringgit a testa al parco. Carta d'arrivo digitale MDAC gratuita entro 3 giorni dall'arrivo; l'esenzione dal visto per gli italiani e gli avvisi di sicurezza non sono stati ricontrollati su fonte ufficiale.",
+     "Si riparte da Miri (MYY) via Kuala Lumpur, oppure si torna a Kuching."),
+     ["https://www.intrepidtravel.com/trips/tmsw", "https://mulupark.com/?p=683", "https://www.responsibletravel.com/holidays/sarawak/travel-guide/best-time-to-visit-sarawak", "https://www.selectiveasia.com/borneo-holidays/weather/august"])
+
+_add("MAO", T("Rio Negro: Anavilhanas, crociera e Presidente Figueiredo", ["natura", "avventura"], "medio",
+     "Manaus 2|Anavilhanas (Novo Airão) 3|Crociera sul Rio Negro 3|Presidente Figueiredo 2",
+     "Transfer su strada per Novo Airão (circa 3 ore), barca, auto per Presidente Figueiredo", "3.000–5.000 € pp",
+     ["Canoa nella foresta allagata delle Anavilhanas", "Delfini rosa e Incontro delle Acque", "Cascate e grotte di Presidente Figueiredo"],
+     "Original Travel cita l'Amazzonia da Manaus tra le mete di agosto; Kel 12 e WeRoad la vendono in agosto abbinata a Rio o ai Lençóis. Il Rio Negro ha toccato il picco a fine giugno 2026 (28,50 m) e ad agosto cala; le spiagge fluviali arrivano da settembre. Caldo al limite: 32-34°C con afa. Da fine agosto rischio di fumo (nell'agosto 2024 aria pessima a Manaus). Fascia stimata: lodge alle Anavilhanas da circa 510 $ a testa a notte. Nessun visto per gli italiani fino a 90 giorni; febbre gialla raccomandata. Il Regno Unito sconsiglia solo i fiumi a ovest di Codajás e il Rio Negro oltre Barcelos, lontani da questo giro. Si vola con TAP da Lisbona."),
+     ["https://www.originaltravel.co.uk/destination/brazil/brazilian-amazon-holidays", "https://www.gov.uk/foreign-travel-advice/brazil/regional-risks", "https://www.rainforestcruises.com/guides/best-time-to-visit-manaus", "https://www.flytap.com/en_pt/flights-from-lisbon-to-manaus"])
+
+_add("YXY", T("Yukon: Kluane, Dawson City e Tombstone", ["road trip", "natura", "trekking"], "medio",
+     "Whitehorse 1|Haines Junction (Kluane) 3|Dawson City 3|Tombstone 1|Whitehorse 2",
+     "SUV a noleggio: Whitehorse-Dawson 6-7 ore, Dawson-Tombstone un'ora e mezza di sterrato sulla Dempster (serve il permesso scritto del noleggiatore)", "2.200–3.300 € pp",
+     ["Volo panoramico sui ghiacciai di Kluane e sentiero del King's Throne", "Dawson City e i campi auriferi del Klondike", "Tundra di Tombstone, già rossa a fine agosto"],
+     "Audley propone lo Yukon in self-drive. Whitehorse 7-18°C con 40-60 mm. Rischio incendi: a giugno 2025 fumo a Dawson, voli cancellati e strade chiuse a tratti. Il volo diretto Condor da Francoforte non esiste più: si arriva con Air North da Vancouver o Calgary. Fascia stimata senza un prezzo fonte per il noleggio di agosto." + _CA),
+     ["https://www.travelyukon.com/en/things-to-do/itinerary/klondike-kluane-loop", "https://www.audleytravel.com/canada/country-guides/self-driving-in-the-yukon", "https://www.flyairnorth.com/summer-schedule", "https://www.cbc.ca/news/canada/north/dawson-fire-update-1.7567869"])
+
+_add("LAD", T("Angola del sud: Lubango, deserto di Namibe e Kalandula", ["avventura", "cultura", "road trip"], "intenso",
+     "Luanda 1|Kalandula 1|Cabo Ledo (Kissama) 1|Lubango 3|Namibe 3|Luanda 1",
+     "Fuoristrada con autista e guida di un operatore locale, due voli interni TAAG (Luanda-Lubango e rientro da Namibe o Lubango), notti in campo nel deserto", "3.000–4.500 € pp",
+     ["Serra da Leba e fenditura di Tundavala", "Deserto del Namib tra l'oasi di Curoca e le dune di Tombwa", "Villaggi muila e mucubal"],
+     "Kanaga Africa Tours lo vende in agosto («Landscapes and Tribes», 7-23/8/2026, da 5.290 €) e WeRoad ha un «Angola Expedition» di 10 giorni a catalogo, oggi senza date. Stagione secca e fresca (cacimbo): Luanda 19-25°C, Namibe 14-21°C con nebbie e mare freddo, altopiano 13-28°C, zero pioggia. Kalandula ha meno acqua a fine stagione secca. Nessun visto per gli italiani fino a 30 giorni dal 2023. Certificato di febbre gialla richiesto all'arrivo, malaria: profilassi. Il Canada invita a un alto grado di cautela: criminalità a Luanda, mine fuori dalle strade battute, Cabinda e Lunda Norte da evitare. Da soli non è realistico. Fascia stimata sui tour venduti; tariffe dei voli interni non verificate."),
+     ["https://www.kanaga-at.com/en/trip/angola-en/landscapes-and-tribes-ang01ps260807/", "https://www.weroad.it/viaggi/angola-expedition-tra-oceano-tribu-e-il-deserto-del-namib", "https://www.climatestotravel.com/climate/angola", "https://travel.gc.ca/destinations/angola"])
+
+_add("EDI", T("Skye ed Ebridi Esterne", ["road trip", "natura", "trekking"], "medio",
+     "Edimburgo 1|Glencoe 1|Skye 3|Harris 2|Lewis 2|Ullapool 1",
+     "Auto a noleggio, traghetti CalMac Uig-Tarbert e Stornoway-Ullapool da prenotare appena aprono le vendite", "1.800–2.800 € pp",
+     ["Quiraing e Old Man of Storr", "Spiagge di Luskentyre e pietre di Callanish", "Glencoe ed Eilean Donan"],
+     "Giro ispirato a «Scozia, Skye & Isola di Lewis» di Sivola e a «Scozia remota: trekking nelle isole Ebridi Esterne» di Kel 12 (16-26 agosto 2027). Stornoway 11-16°C con 90 mm in 15 giorni: piove un giorno su due e non fa mai caldo. Midges al picco in luglio-agosto, soprattutto a Skye; sulle Ebridi Esterne il vento li tiene bassi. Skye è affollata. L'orario estivo CalMac 2027 va dal 26/3 al 17/10 e la data di apertura delle prenotazioni non è ancora annunciata. Serve il passaporto con l'ETA britannica (16 sterline, aumento a 20 annunciato). Fascia stimata in autonomia; i tour organizzati di 10 giorni partono da 3.900-4.200 €.",
+     "Da Ullapool si torna a Edimburgo in 4-5 ore di auto."),
+     ["https://www.sivola.it/viaggi/scozia-skye-isola-di-lewis", "https://kel12.com/icnc_viaggi/scozia-remota-trekking-nelle-isole-ebridi-estrene/", "https://www.climatestotravel.com/climate/scotland", "https://www.calmac.co.uk/travel/latest-customer-updates/customer-update-winter-timetables-2026-and-2027/"])
+_add("EDI", T("Highlands e Orcadi", ["road trip", "cultura", "natura"], "medio",
+     "Edimburgo 1|Cairngorms 1|Inverness 1|Orcadi (Kirkwall) 3|Durness 1|Ullapool 2|Glencoe 1",
+     "Auto a noleggio, traghetto per le Orcadi dalla costa nord e ritorno (operatore e tariffe non verificati)", "1.900–2.900 € pp",
+     ["Skara Brae e il cerchio di Brodgar", "Costa nord tra Durness e Ullapool", "Glencoe"],
+     "Variante che sostituisce le Ebridi con le Orcadi: Kirkwall 11-16°C con 75 mm in 13 giorni. Tappe composte sulle stesse fonti di clima; siti delle Orcadi e traghetti non ricontrollati voce per voce. Stesso documento d'ingresso (passaporto ed ETA). Fascia stimata."),
+     ["https://www.climatestotravel.com/climate/scotland", "https://www.visitscotland.com/travel-planning/midges-ticks-scotland", "https://www.evaneos.it/scozia/tour-agosto/"])
+
+_add("YYC", T("Glacier e Waterton: i parchi a cavallo del confine", ["trekking", "road trip", "natura"], "medio",
+     "Calgary 1|Waterton 2|Many Glacier 3|St. Mary 1|Lake McDonald 2|Whitefish 1",
+     "Auto a noleggio da Calgary (3 ore fino a Waterton) con permesso del noleggiatore per entrare negli Stati Uniti", "2.300–3.500 € pp",
+     ["Grinnell Glacier e Iceberg Lake", "Highline Trail da Logan Pass", "Crypt Lake a Waterton"],
+     "Intrepid passa da Glacier con il suo «Best of Montana»; qui si entra da Calgary, che ha i voli migliori. West Glacier 9-27°C, Going-to-the-Sun Road e sentieri alti tutti aperti; incendi e fumo frequenti in agosto. Regole 2026: nessuna prenotazione per i veicoli, ma parcheggio a Logan Pass limitato a 3 ore e navetta solo con biglietto; il 2027 non è annunciato. I lodge del parco si esauriscono un anno prima. Servono ESTA per gli Stati Uniti ed eTA per il Canada; grizzly: spray al seguito. Fascia stimata.",
+     "Da Whitefish si torna a Calgary in 5 ore, oppure si riparte da Kalispell (FCA) con due scali."),
+     ["https://www.nps.gov/glac/learn/news/glacier-national-park-announces-2026-summer-operations.htm", "https://www.nps.gov/glac/planyourvisit/weather.htm", "https://www.intrepidtravel.com/uk/united-states/best-montana-138189", "https://www.backroads.com/trips/WGLQ/montana-glacier-park-hiking-tour"])
+
+_add("DRW", T("Red Centre e Top End: Uluru, Kings Canyon, Kakadu", ["natura", "road trip", "cultura"], "intenso",
+     "Yulara (Uluru) 3|Kings Canyon 1|Alice Springs 2|Darwin 1|Kakadu 2|Litchfield 1",
+     "Auto a noleggio nel Red Centre, volo Alice Springs-Darwin (non verificato), seconda auto nel Top End; all'andata volo interno per Uluru", "2.800–4.200 € pp",
+     ["Giro alla base di Uluru e Valley of the Winds a Kata Tjuta", "Rim Walk a Kings Canyon", "Yellow Water a Kakadu"],
+     "Intrepid («Red Centre & Uluru Explorer») e Audley («Reef to Red Centre») lo vendono proprio in inverno: ad Alice Springs 23°C di giorno, 4°C di notte e 8 mm di pioggia, niente caldo né mosche. Il Red Centre da solo regge 5-6 giorni, quindi si abbina al Top End. Pass del parco di Uluru 38 dollari australiani per 3 giorni (da confermare). Fascia stimata: 6 giorni di tour nel Red Centre da 3.295 dollari australiani. Visto eVisitor gratuito. Il viaggio dall'Italia supera le 25 ore per tratta.",
+     "Si arriva su Uluru (AYQ) con un volo interno e si riparte da Darwin."),
+     ["https://www.intrepidtravel.com/trips/pzrc", "https://www.audleytravel.com/australia/tours/reef-to-red-centre", "https://parksaustralia.gov.au/uluru/plan/passes/", "https://www.bom.gov.au/climate/current/month/nt/archive/202508.summary.shtml"])
+_add("PER", T("Kimberley ovest: da Broome a Kununurra sulla Gibb River Road", ["avventura", "road trip", "natura"], "intenso",
+     "Broome 2|Dampier Peninsula 1|Windjana Gorge 1|Bell Gorge 2|Manning Gorge 1|El Questro 2|Kununurra 1",
+     "Volo Perth-Broome, 4x4 con tenda e autorizzazione scritta del noleggiatore per la Gibb River Road, rientro in volo da Kununurra", "3.500–5.500 € pp",
+     ["Windjana Gorge e Tunnel Creek", "Bagno a Bell Gorge", "Guado del Pentecost ed Emma Gorge"],
+     "Intrepid lo fa in 11 giorni con il «Wild Kimberley Overland», Abercrombie & Kent con «The Kimberley beaches & boabs». La Gibb River Road è aperta solo da maggio a ottobre e agosto è il picco: Broome 15-30°C, pioggia quasi nulla; campeggi e 4x4 da prenotare con molto anticipo. Fascia stimata sul tour di gruppo (da 4.260 $ per il 2027). Visto eVisitor gratuito. Rischi pratici: guadi, coccodrilli, distanze. Dall'Italia sono 25-30 ore per tratta.",
+     "Si arriva a Broome (BME) via Perth e si riparte da Kununurra via Darwin o Perth."),
+     ["https://www.intrepidtravel.com/us/australia/wild-kimberley-overland-160939", "https://abercrombiekent.com.au/journeys/the-kimberley-beaches-boabs", "https://www.wavisitorcentre.com.au/gibb-river-road", "https://www.bom.gov.au/climate/averages/tables/cw_003003.shtml"])
+
 for _code, _lists in SRC.items():
     assert len(_lists) == len(TRIPS[_code]), _code
     for _t, _s in zip(TRIPS[_code], _lists):
