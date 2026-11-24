@@ -138,6 +138,72 @@ P("chengdu", ["Chengdu Research Base of Giant Panda Breeding", "giant panda Chen
 P("hulunbuir", ["Hulunbuir grassland", "Hulun Buir grassland", "Ergun wetland"], "Prateria di Hulunbuir", "Hailar", "Ergun", "Enhe", "Shiwei", "Heishantou", "Manzhouli", "Genhe")
 P("grande-muraglia", ["Jinshanling Great Wall", "Mutianyu Great Wall"], "Grande Muraglia a Jinshanling", "Grande Muraglia", "Gubeikou")
 P("pechino", ["Forbidden City Beijing", "Temple of Heaven Beijing"], "Città Proibita, Pechino", "Pechino")
+# Secondo giro del 23 novembre 2026: Pamir, Karakorum, Indonesia orientale, Caucaso, Africa australe, isole atlantiche, Ande, Pantanal, Oaxaca, Guatemala, Europa remota
+P("pamir", ["Pamir Highway", "Wakhan Corridor Tajikistan", "Pamir Mountains Tajikistan"], "Pamir Highway", "Khorog", "Murghab", "Langar", "Kalaikhum", "Bulunkul", "Karakul (Pamir)", "Sary-Mogol")
+P("iskanderkul", ["Iskanderkul", "Fann Mountains"], "Lago Iskanderkul, monti Fann", "Iskanderkul", "Alauddin", "Penjikent")
+P("hunza", ["Passu Cones", "Hunza Valley", "Karimabad Hunza"], "Coni di Passu, Hunza", "Karimabad", "Passu", "Gilgit")
+P("fairy-meadows", ["Fairy Meadows Nanga Parbat", "Fairy Meadows"], "Nanga Parbat da Fairy Meadows", "Fairy Meadows")
+P("skardu", ["Deosai National Park", "Shangrila Lake Skardu", "Skardu valley"], "Altopiano del Deosai", "Skardu", "Deosai", "Khaplu", "Shigar")
+P("kelimutu", ["Kelimutu", "Kelimutu crater lakes"], "Laghi del Kelimutu, Flores", "Kelimutu", "Ende")
+P("wae-rebo", ["Wae Rebo", "Bena village Flores"], "Wae Rebo, Flores", "Wae Rebo", "Ruteng", "Bajawa")
+P("toraja", ["Tongkonan Tana Toraja", "Kete Kesu", "Tana Toraja"], "Case tongkonan, Tana Toraja", "Rantepao")
+P("bunaken", ["Bunaken", "Bunaken National Park"], "Bunaken", "Bunaken", "Manado")
+P("togean", ["Togian Islands", "Togean Islands"], "Isole Togean", "Togean", "Ampana")
+P("raja-ampat", ["Piaynemo Raja Ampat", "Raja Ampat islands", "Wayag"], "Piaynemo, Raja Ampat", "Mansuar", "Arborek", "Sorong", "Birie")
+P("baku", ["Baku Flame Towers", "Baku old city", "Maiden Tower Baku"], "Baku", "Baku")
+P("sheki", ["Palace of Shaki Khans", "Sheki Azerbaijan", "Shaki caravanserai"], "Palazzo dei Khan, Sheki", "Sheki", "Lahij")
+P("khinalug", ["Khinalug", "Xinaliq", "Quba Azerbaijan mountains"], "Khinalug, Caucaso alto", "Khinalug", "Quba")
+P("bazaruto", ["Bazaruto Archipelago", "Bazaruto Island", "Vilankulo"], "Arcipelago di Bazaruto", "Vilanculos", "Bazaruto")
+P("tofo", ["Tofo beach Mozambique", "Praia do Tofo", "Inhambane"], "Tofo", "Tofo")
+P("maputo", ["Maputo skyline", "Maputo railway station", "Maputo city"], "Maputo", "Maputo")
+P("south-luangwa", ["South Luangwa National Park", "Luangwa River"], "South Luangwa", "South Luangwa")
+P("lower-zambezi", ["Lower Zambezi National Park", "Zambezi River canoe", "Zambezi River Zambia"], "Lower Zambezi", "Lower Zambezi", "Lusaka")
+P("lake-malawi", ["Cape Maclear Lake Malawi", "Lake Malawi", "Likoma Island"], "Lago Malawi", "Lago Malawi", "Cape Maclear", "Mumbo")
+P("liwonde", ["Liwonde National Park", "Shire River Malawi"], "Liwonde", "Liwonde", "Majete")
+P("sal", ["Santa Maria Sal Cape Verde", "Pedra de Lume", "Sal Cape Verde beach"], "Sal, Capo Verde", "Santa Maria")
+P("boa-vista", ["Boa Vista Cape Verde", "Deserto de Viana", "Praia de Santa Monica Boa Vista"], "Boa Vista", "Boa Vista")
+P("fogo", ["Pico do Fogo", "Chã das Caldeiras"], "Pico do Fogo", "Fogo")
+P("cidade-velha", ["Cidade Velha", "Santiago Cape Verde"], "Cidade Velha, Santiago", "Santiago (Praia)")
+P("santo-antao", ["Santo Antão Cape Verde", "Paul valley Santo Antão", "Ribeira Grande Santo Antão"], "Santo Antão", "Santo Antão")
+P("mindelo", ["Mindelo", "Mindelo São Vicente"], "Mindelo, São Vicente", "Mindelo")
+P("sao-tome", ["Pico Cão Grande", "São Tomé island", "São Tomé beach"], "Pico Cão Grande, São Tomé", "São Tomé", "Monte Café")
+P("principe", ["Príncipe island", "Praia Banana Príncipe", "Principe Island beach"], "Príncipe", "Príncipe")
+P("purmamarca", ["Purmamarca", "Salinas Grandes Jujuy"], "Purmamarca", "Purmamarca", "Iruya")
+P("tolar-grande", ["Tolar Grande", "Cono de Arita", "Puna de Atacama Salta"], "Puna di Tolar Grande", "Tolar Grande")
+P("tatio", ["El Tatio geysers", "El Tatio"], "Geyser del Tatio", "Tatio")
+P("bonito", ["Gruta do Lago Azul", "Rio da Prata Bonito", "Bonito Mato Grosso do Sul"], "Gruta do Lago Azul, Bonito", "Bonito")
+P("chapada-guimaraes", ["Chapada dos Guimarães", "Véu de Noiva Chapada dos Guimarães"], "Chapada dos Guimarães", "Chapada dos Guimarães", "Nobres")
+P("oaxaca", ["Monte Albán", "Santo Domingo Oaxaca"], "Monte Albán, Oaxaca", "Oaxaca")
+P("hierve", ["Hierve el Agua"], "Hierve el Agua", "Sierra Norte")
+P("puebla", ["Cholula pyramid Popocatépetl", "Puebla cathedral"], "Cholula e Popocatépetl", "Puebla")
+P("antigua", ["Antigua Guatemala Arco de Santa Catalina", "Antigua Guatemala"], "Antigua", "Antigua")
+P("atitlan", ["Lake Atitlán", "Lago de Atitlán"], "Lago Atitlán", "Atitlán", "Quetzaltenango")
+P("tikal", ["Tikal", "Tikal Temple"], "Tikal", "Tikal")
+P("jokulsarlon", ["Jökulsárlón", "Jokulsarlon glacier lagoon"], "Laguna di Jökulsárlón", "Höfn", "Skaftafell")
+P("landmannalaugar", ["Landmannalaugar"], "Landmannalaugar", "Landmannalaugar")
+P("skogafoss", ["Skógafoss", "Seljalandsfoss"], "Skógafoss", "Hella")
+P("myvatn", ["Mývatn", "Goðafoss", "Dettifoss"], "Mývatn", "Mývatn", "Akureyri")
+P("kirkjufell", ["Kirkjufell"], "Kirkjufell, Snæfellsnes", "Snæfellsnes")
+P("sete-cidades", ["Sete Cidades", "Lagoa das Sete Cidades"], "Sete Cidades, São Miguel", "São Miguel")
+P("pico", ["Mount Pico Azores", "Montanha do Pico", "Pico Island"], "Vulcano Pico", "Pico")
+P("faial", ["Capelinhos", "Horta Faial", "Caldeira Faial"], "Capelinhos, Faial", "Faial")
+P("terceira", ["Angra do Heroísmo", "Terceira Island"], "Angra do Heroísmo, Terceira", "Terceira")
+P("azores-flores", ["Poço da Ribeira do Ferreiro", "Flores Island Azores"], "Cascate di Flores, Azzorre")
+P("madeira", ["Pico do Arieiro", "Pico Ruivo", "Pico do Areeiro Madeira"], "Pico do Areeiro, Madeira", "Santana", "Machico")
+P("levada", ["Levada das 25 Fontes", "Levada do Caldeirão Verde", "Levada Madeira"], "Levada, Madeira", "Calheta")
+P("funchal", ["Funchal", "Funchal bay"], "Funchal", "Funchal")
+P("porto-santo", ["Porto Santo beach", "Porto Santo Island"], "Porto Santo", "Porto Santo")
+P("faroe", ["Múlafossur", "Gásadalur", "Sørvágsvatn"], "Múlafossur, Vágar", "Vágar")
+P("kalsoy", ["Kallur lighthouse", "Kalsoy", "Klaksvík"], "Faro di Kallur, Kalsoy", "Klaksvík")
+P("gjogv", ["Gjógv", "Saksun"], "Gjógv, Eysturoy", "Gjógv", "Tórshavn")
+P("reine", ["Reine Lofoten", "Reinebringen", "Hamnøy"], "Reine, Lofoten", "Reine")
+P("henningsvaer", ["Henningsvær", "Svolvær", "Haukland beach"], "Henningsvær, Lofoten", "Henningsvær", "Svolvær", "Leknes")
+P("senja", ["Senja Segla", "Senja Norway", "Bergsbotn"], "Senja", "Senja", "Andenes")
+P("tromso", ["Tromsø", "Tromsø Arctic Cathedral"], "Tromsø", "Tromsø")
+P("svalbard", ["Longyearbyen", "Svalbard glacier", "Nordenskiöldbreen"], "Longyearbyen, Svalbard", "Longyearbyen")
+P("ilulissat", ["Ilulissat Icefjord", "Ilulissat"], "Fiordo dei ghiacci, Ilulissat", "Ilulissat", "Eqi", "Ilimanaq")
+P("nuuk", ["Nuuk", "Nuuk Sermitsiaq"], "Nuuk", "Nuuk")
+P("disko", ["Qeqertarsuaq", "Disko Island", "Disko Bay"], "Isola di Disko", "Qeqertarsuaq")
 # ---------------------------------------------------------------- Oceania
 P("barrier-reef", ["Great Barrier Reef aerial", "Whitehaven Beach"], "Grande Barriera Corallina", "Cairns", "Whitsunday")
 P("kakadu", ["Kakadu National Park", "Ubirr Kakadu"], "Kakadu", "Kakadu")
@@ -302,6 +368,11 @@ COVER = {
  "OKA": "okinawa", "KIX": "nachi", "HND": "kamikochi", "FUK": "aso", "AGA": "taghazout", "ASR": "cappadocia", "TZX": "sumela",
  "IXL": "ladakh", "DEL": "delhi", "USM": "samui", "BKK": "bangkok", "AMM": "petra", "DXB": "dubai", "MNL": "palawan", "SIN": "singapore",
  "URC": "kanas", "KHG": "karakul", "XNN": "qinghai-lake", "LHW": "zhangye", "HLD": "hulunbuir", "LXA": "potala", "TFU": "siguniang", "PEK": "grande-muraglia",
+ "DYU": "pamir", "ISB": "hunza", "LBJ": "komodo", "UPG": "toraja", "SOQ": "raja-ampat", "GYD": "baku", "VNX": "bazaruto", "MPM": "tofo",
+ "MFU": "south-luangwa", "LUN": "lower-zambezi", "LLW": "lake-malawi", "SID": "sal", "BVC": "boa-vista", "RAI": "fogo", "VXE": "santo-antao", "TMS": "sao-tome",
+ "SLA": "humahuaca", "JUJ": "purmamarca", "CJC": "tatio", "CGB": "pantanal", "CGR": "bonito", "OAX": "oaxaca", "GUA": "atitlan", "KEF": "jokulsarlon",
+ "PDL": "sete-cidades", "TER": "terceira", "FNC": "madeira", "FAE": "faroe", "EVE": "reine", "BOO": "henningsvaer", "TOS": "tromso", "LYR": "svalbard",
+ "GOH": "nuuk", "JAV": "ilulissat",
 }
 GALLERY = {
  "DPS": ["nusa-penida", "uluwatu", "bromo", "munduk", "gili"],
@@ -337,6 +408,14 @@ GALLERY = {
  "LXA": ["yamdrok", "everest-nord"],
  "TFU": ["danba", "tagong", "yading", "jiuzhaigou", "chengdu"],
  "PEK": ["pechino"],
+ "DYU": ["iskanderkul"], "ISB": ["fairy-meadows", "skardu"], "LBJ": ["kelimutu", "wae-rebo"], "UPG": ["bunaken", "togean"],
+ "GYD": ["sheki", "khinalug", "sighnaghi", "tbilisi"], "VNX": ["tofo", "kruger"], "MPM": ["maputo", "bazaruto"], "MFU": ["lower-zambezi", "lake-malawi"],
+ "LUN": ["south-luangwa", "victoria-falls"], "LLW": ["liwonde"], "SID": ["santo-antao", "mindelo"], "BVC": ["sal"], "RAI": ["cidade-velha", "santo-antao", "mindelo"],
+ "VXE": ["mindelo"], "TMS": ["principe"], "SLA": ["cafayate", "salta", "tolar-grande", "purmamarca"], "JUJ": ["humahuaca", "salta"],
+ "CJC": ["atacama", "lagunas", "uyuni", "valparaiso"], "CGB": ["chapada-guimaraes"], "CGR": ["pantanal"], "OAX": ["hierve", "puebla", "teotihuacan"],
+ "GUA": ["antigua", "tikal"], "KEF": ["skogafoss", "landmannalaugar", "myvatn", "kirkjufell"], "PDL": ["pico", "faial", "terceira", "azores-flores"],
+ "TER": ["pico", "faial", "sete-cidades"], "FNC": ["levada", "funchal", "porto-santo"], "FAE": ["kalsoy", "gjogv"], "EVE": ["henningsvaer", "senja"],
+ "BOO": ["reine", "senja", "tromso"], "TOS": ["senja", "svalbard", "reine"], "LYR": ["reine", "henningsvaer"], "GOH": ["ilulissat", "disko"], "JAV": ["disko"],
 }
 POPCOVER = {
  "georgia-armenia": "gergeti", "georgia-svaneti": "ushguli", "kirghizistan-almaty": "charyn", "mongolia-gobi": "khongor",
@@ -347,10 +426,14 @@ POPCOVER = {
  "ecuador-galapagos": "quilotoa", "argentina-nord": "humahuaca", "argentina-bariloche": "llao-llao", "brasile-rota-emocoes": "jericoacoara",
  "canada-rockies": "icefields", "giava-bali": "bromo", "costa-rica": "arenal", "brasile-rio-iguacu": "iguazu", "canada-quebec": "saguenay", "usa-rockies-yellowstone": "yellowstone", "usa-pacific-northwest": "olympic",
  "cina-via-della-seta": "dunhuang", "cina-qinghai-gansu": "qinghai-lake", "cina-sichuan-ovest": "danba",
+ "pamir-highway": "pamir", "flores-komodo-kelimutu": "kelimutu", "sulawesi-toraja-bunaken": "toraja", "baku-tbilisi": "sheki",
+ "atacama-uyuni-salta": "lagunas", "pantanal-bonito": "pantanal", "messico-oaxaca": "hierve", "islanda-ring-road": "skogafoss", "azzorre-isole": "pico",
+ "lofoten-tromso": "reine", "groenlandia-nuuk-ilulissat": "ilulissat", "kruger-mozambico": "bazaruto", "zambia-malawi": "south-luangwa",
+ "capo-verde-isole": "santo-antao", "sao-tome-principe": "principe",
 }
 # correzioni dopo la revisione visiva: SKIP[k] = quanti candidati validi saltare; FILE[k] = titolo esatto su Commons
 SKIP = {}
-FILE = {}
+FILE = {"maputo": "File:60 Skyline (36931644911).jpg"}
 try:
     from photos_fix import SKIP as _S, FILE as _F   # opzionale, vedi photos_fix.py
     SKIP.update(_S); FILE.update(_F)
