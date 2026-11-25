@@ -293,7 +293,8 @@ def compute(snap, prev, prefs, notified, cfg, now=None, history=None):
             parts.append("\n".join(["🛫 <b>%s</b>" % C.esc(sec_info[key][1])] + ["⭐ " + b[2] for b in fav_rest if b[0] == key]))
     if new_routes:
         blk = ["🆕 <b>Primi voli su rotte finora vuote</b> (sopra soglia)"]
-        blk += ["• %s: da <b>%s pp</b>, %s, da %s" % (C.offer_title(b, cfg), C.euro(b["price_pp"]), C.fmt_dates(b["dep"], b["ret"]), C.esc(C.origin_name(b, cfg))) for b, n in new_routes[:mx]]
+        blk += ["• %s: da <b>%s pp</b>, %s, da %s%s" % (C.offer_title(b, cfg), C.euro(b["price_pp"]), C.fmt_dates(b["dep"], b["ret"]), C.esc(C.origin_name(b, cfg)),
+                                                 " · " + C.est_txt(b, short=True) if b.get("est") else "") for b, n in new_routes[:mx]]
         if len(new_routes) > mx:
             blk.append("e altre %d" % (len(new_routes) - mx))
         parts.append("\n".join(blk))

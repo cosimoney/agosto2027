@@ -107,6 +107,7 @@ export function offerBlock(o, cfg) {
     esc((o.airlines || []).join(" + "))];
   if (o.ret_from) bits.splice(3, 0, `rientro da ${esc(o.ret_from)}`);
   if (o.extra_est) bits.push(`incl. ${euro(o.extra_est)} di tratte stimate`);
+  if (o.est) bits.push(o.price_out == null || o.price_ret == null ? "stima: somma di due solo andata" : `stima: somma di due solo andata (andata ${euro(o.price_out)} + ritorno ${euro(o.price_ret)})`);
   if (o.url && o.url_ret) bits.push(`Google Flights: <a href="${esc(o.url)}">andata</a>, <a href="${esc(o.url_ret)}">ritorno</a>`);
   else if (o.url) bits.push(`<a href="${esc(o.url)}">Google Flights</a>`);
   return l1 + "\n   " + bits.filter(Boolean).join(" · ");

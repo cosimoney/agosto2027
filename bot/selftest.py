@@ -466,6 +466,9 @@ def main():
     check(sv2["targets"]["d_TBS"]["min"] == 410 and sv2["targets"]["d_EVN"]["n"] == 0 and st_a["bad_lines"] == 1, "minimo della meta su tutte le origini; riga OW estranea scartata", (sv2["targets"], st_a))
     bfx = C.by_target(sv2)["d_TBS"]
     blk = C.offer_block(bfx[0], cfg)
+    est = dict(bfx[0], est=True, price_out=250, price_ret=160)
+    check("stima: somma di due solo andata (andata 250 € + ritorno 160 €)" in C.offer_block(est, cfg) and "stima: somma di due solo andata" in C.offer_line(est, cfg)
+          and "stima" not in blk and "stima" not in C.offer_line(bfx[0], cfg), "offerta stimata (due solo andata): sempre dichiarata nel messaggio; le altre mai", C.offer_block(est, cfg))
     check("da Roma FCO" in blk and "treno" not in blk and "<b>410 € pp</b>" in blk and 'href="https://example.org/dashboard/#/d/TBS"' in blk, "messaggio: 'da Roma FCO', prezzo volo, link #/d/TBS", blk)
     check("da Pisa" in C.offer_block(next(o for o in bfx if o["origin"] == "PSA"), cfg) and "da Roma CIA" in C.offer_block(next(o for o in bfx if o["origin"] == "CIA"), cfg)
           and C.origin_name("XYZ") == "XYZ" and C.origin_name("MXP") == "Milano MXP", "nomi leggibili delle origini, codice per quelle sconosciute")

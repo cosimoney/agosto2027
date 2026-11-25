@@ -18,6 +18,8 @@ Offerta:
   id      <target>:<origine>:<andata>:<ritorno>   es. d_TBS:MXP:2027-08-07:2027-08-18
   price_pp  prezzo A/R per persona in euro (le query sono per 1 adulto)
   campi extra facoltativi: via (scali), dur (minuti andata), price_1stop (solo se stops=2), dep_time, ret_from (open-jaw)
+  est = True: il prezzo NON e' un A/R ma la somma di due solo andata (estimate.py), per le celle dove Google non da'
+        l'A/R; price_out / price_ret = le due tratte, stops = scali della tratta peggiore. Va sempre dichiarata come stima.
 Regola scali (come build.py): max 1 scalo; 2 scali solo se risparmio >= 25% e >= 150 euro pp sul miglior 1 scalo.
 
 Popular trips, due ingressi (--trips):
@@ -105,6 +107,25 @@ def sig(f):
     return (f["price"], tuple((s["f"], s["t"], s["dt"]) for s in f["segs"]))
 
 
+def load_estimates(root, raw, dests):
+    """Stime "somma di due solo andata" per le celle senza A/R: estimate.py della radice sui solo andata di
+    trips_raw_v2.jsonl. [] se manca uno dei due (o se qualcosa va storto: le offerte vere non devono dipenderne)."""
+    root = Path(root)
+    if not (root / "estimate.py").exists() or not (root / "trips_raw_v2.jsonl").exists():
+        return []
+    try:
+        sys.dont_write_bytecode = True
+        sys.path.insert(0, str(root))
+        try:
+            import estimate
+        finally:
+            sys.path.remove(str(root))
+        return estimate.combos(raw, estimate.load(str(root / "trips_raw_v2.jsonl")), list(dests.values()) or None)
+    except Exception as e:
+        print("stime non calcolate (%s: %s)" % (type(e).__name__, str(e)[:120]))
+        return []
+
+
 def flight_fields(f):
     s = f["segs"]
     return {"stops": len(s) - 1, "airlines": list(f.get("al") or []), "via": [x["t"] for x in s[:-1]], "dur": f.get("dur"), "dep_time": s[0].get("dt")}
@@ -162,7 +183,26 @@ def adapt_raw(paths, cfg, dests):
         off.update(flight_fields(best))
         off.update(extra)
         offers.append(off)
-    return offers, targets, {"ok": True, "queries": len(raw), "bad_lines": bad, "files": [Path(p).name for p in paths],
+    n_est = 0
+    for e in (load_estimates(Path(paths[-1]).parent, raw, dests) if paths else []):
+        if not e["a"]:
+            continue  # solo con 2 scali: fuori regola, come sopra
+        tid = "d_" + e["d"]
+        t = targets.setdefault(tid, {"source": "agosto2027", "code": e["d"], "name": e["d"], "country": "", "q": 0, "ok": 0})
+        out, back = e["b"] or e["a"]
+        off = {"id": "%s:%s:%s:%s" % (tid, e["o"], e["dep"], e["ret"]), "target": tid, "source": "agosto2027", "kind": "roundtrip", "code": e["d"],
+               "name": t["name"], "country": t["country"], "origin": e["o"], "dep": e["dep"], "ret": e["ret"], "nights": e["n"],
+               "price_pp": out["price"] + back["price"], "url": C.gf_url(e["o"], e["d"], e["dep"], e["ret"]),
+               "est": True, "price_out": out["price"], "price_ret": back["price"]}
+        off.update(flight_fields(out))
+        off["stops"] = max(off["stops"], len(back["segs"]) - 1)
+        off["airlines"] += [a for a in (back.get("al") or []) if a not in off["airlines"]]
+        if e["b"]:
+            off["price_1stop"] = e["a"][0]["price"] + e["a"][1]["price"]
+        offers.append(off)
+        t["est"] = t.get("est", 0) + 1
+        n_est += 1
+    return offers, targets, {"ok": True, "queries": len(raw), "bad_lines": bad, "files": [Path(p).name for p in paths], "estimates": n_est,
                              "origins": sorted({o["origin"] for o in offers})}
 
 

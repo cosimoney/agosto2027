@@ -352,6 +352,15 @@ def display_name(o):
     return nm
 
 
+def est_txt(o, short=False):
+    """Dichiarazione obbligatoria per le offerte stimate (o["est"]): il prezzo e' la somma di due solo andata, non un A/R."""
+    if not o.get("est"):
+        return ""
+    if short or o.get("price_out") is None or o.get("price_ret") is None:
+        return "stima: somma di due solo andata"
+    return "stima: somma di due solo andata (andata %s + ritorno %s)" % (euro(o["price_out"]), euro(o["price_ret"]))
+
+
 def offer_title(o, cfg=None):
     c = " (%s)" % esc(o["country"]) if o.get("country") and o.get("source") != "weekend" else ""
     nm = "<b>%s</b>" % esc(display_name(o))
@@ -368,6 +377,8 @@ def offer_block(o, cfg=None, title=True):
         bits.insert(3, "rientro da %s" % esc(o["ret_from"]))
     if o.get("extra_est"):
         bits.append("incl. %s di tratte stimate" % euro(o["extra_est"]))
+    if o.get("est"):
+        bits.append(est_txt(o))
     if o.get("url") and o.get("url_ret"):
         bits.append('Google Flights: <a href="%s">andata</a>, <a href="%s">ritorno</a>' % (esc(o["url"]), esc(o["url_ret"])))
     elif o.get("url"):
@@ -381,7 +392,7 @@ def offer_line(o, cfg=None, show_origin=False):
     bits = ["%s: <b>%s pp</b>" % (offer_title(o, cfg), euro(o["price_pp"])), "coppia %s" % euro(o["price_pp"] * 2), fmt_dates(o["dep"], o["ret"]),
             "da %s" % esc(origin_name(o, cfg)) if show_origin and o.get("origin") else "", stops_txt(o),
             "rientro da %s" % esc(o["ret_from"]) if o.get("ret_from") else "",
-            "incl. %s stimati" % euro(o["extra_est"]) if o.get("extra_est") else ""]
+            "incl. %s stimati" % euro(o["extra_est"]) if o.get("extra_est") else "", est_txt(o, short=True)]
     if o.get("url") and o.get("url_ret"):
         bits.append('voli <a href="%s">andata</a>/<a href="%s">ritorno</a>' % (esc(o["url"]), esc(o["url_ret"])))
     elif o.get("url"):
