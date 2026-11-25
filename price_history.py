@@ -15,6 +15,8 @@ Formato (una riga di testo per giorno e per target, cosi' il diff di un giro e' 
   riga = {"d": "2026-11-22", "A": "MIL", "MIL": voce, "ROM": voce, "PSA": voce, "k": 165, "p": 1, "l": {"MIL": 821}}
     A    gruppo di origine con il minimo assoluto del giorno (MIL = Linate + Malpensa, ROM = Fiumicino, PSA = Pisa)
     voce destinazione = [prezzo A/R pp, origine, andata, giorni, scali]
+                        stima (somma di due solo andata, build.py "e": 1) = gli stessi 5 campi + [0, 0, 1]:
+                        l'ottavo campo a 1 dice che quel prezzo non e' un A/R (sul sito il punto e' segnato come stima)
     voce trip         = [voli pp, origine, andata, giorni, scali, totale stimato pp, extra stimato pp]
                         (minimo per voli + extra, come sul sito; il totale comprende voli interni e spese a terra)
     k    query con voli del target nel giro migliore del giorno
@@ -93,7 +95,7 @@ def snapshot(blob):
         if not g:
             continue
         for f in ((c.get("a") or [])[:1] + ([c["b"]] if c.get("b") else [])):
-            e = [f[0], c["o"], c["dep"], c["n"], f[3]]
+            e = [f[0], c["o"], c["dep"], c["n"], f[3]] + ([0, 0, 1] if c.get("e") else [])
             t = out.setdefault("d_" + c["d"], {"g": {}, "k": (cov.get(c["d"]) or [0, 0])[1]})
             if g not in t["g"] or rank(e) < rank(t["g"][g]):
                 t["g"][g] = e

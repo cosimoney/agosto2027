@@ -148,7 +148,7 @@ for t in P.TRIPS:
             for a, c in zip(air, cov):
                 name = ("%s→%s solo-andata" % (a["a"], a["b"])) if a["k"] == "ow" else ("A/R %s" % a["a"])
                 parts.append("%s: %d ricerche con voli su %d" % (name, c[1], c[0]))
-            why = "Google non ha ancora tariffe complete per agosto 2027 (" + "; ".join(parts) + ")"
+            why = "Google Flights non restituisce voli per agosto 2027 su tutte le tratte del giro (" + "; ".join(parts) + ")"
     best = None
     if valid:
         mid = (t["land"][0] + t["land"][1]) / 2

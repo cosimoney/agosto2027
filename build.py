@@ -1,10 +1,18 @@
 # -*- coding: utf-8 -*-
 """raw_v2.jsonl -> agosto-2027.html (dati inline nel template). Origini: origins.py (LIN, MXP, FCO, PSA).
 Solo prezzi dei voli: nessun costo di posizionamento verso Roma o Pisa.
-Variabili d'ambiente facoltative (per rigenerare una copia da altri dati): RAW, TPL, OUT."""
+Variabili d'ambiente facoltative (per rigenerare una copia da altri dati): RAW, TRIPS_RAW, TPL, OUT.
+
+Stime (estimate.py): le celle senza A/R ma con i due solo andata (righe "OW|..." di trips_raw_v2.jsonl) entrano in
+combos con "e": 1. Il prezzo e' la somma dei due solo andata, non un A/R: va sempre mostrato come stima.
+  opzione stimata = i 10 campi soliti riferiti all'andata, con [0] = somma e [3] = scali della tratta peggiore,
+                    + [10] = ritorno (stessi 10 campi, [0] = prezzo del ritorno) + [11] = prezzo dell'andata
+  cov[meta] = [query, query con voli, min prezzo con 2 scali, celle stimate]
+  bestBy: la voce di una stima ha un sesto campo 1"""
 import json, os, sys
 from datetime import date
 import dests
+import estimate
 import itineraries
 import origins
 
@@ -76,8 +84,24 @@ for k, r in raw.items():
         continue
     combos.append({"o": o, "d": dc, "dep": dep, "n": days(dep, ret), "a": a, "b": b, "x": x})
 
+def est_opt(pair):
+    out, back = pair
+    f = compact(out)
+    f[0] = out["price"] + back["price"]
+    f[3] = max(f[3], len(back["segs"]) - 1)
+    return f + [compact(back), out["price"]]
+
+n_est = 0
+for e in estimate.combos(raw, estimate.load(os.environ.get("TRIPS_RAW", "trips_raw_v2.jsonl"))):
+    pd = per_dest.setdefault(e["d"], {"q": 0, "ok": 0, "min2": None})
+    pd["est"] = pd.get("est", 0) + 1
+    if e["x"] and (pd["min2"] is None or e["x"] < pd["min2"]): pd["min2"] = e["x"]
+    combos.append({"o": e["o"], "d": e["d"], "dep": e["dep"], "n": e["n"], "a": [est_opt(e["a"])] if e["a"] else [],
+                   "b": est_opt(e["b"]) if e["b"] else None, "x": e["x"], "e": 1})
+    n_est += 1
+
 combos.sort(key=lambda c: (c["d"], c["dep"], c["n"], c["o"]))
-cov = {dc: [v["q"], v["ok"], v["min2"]] for dc, v in per_dest.items()}
+cov = {dc: [v["q"], v["ok"], v["min2"], v.get("est", 0)] for dc, v in per_dest.items()}
 # CAMPO NUOVO bestBy: per destinazione e gruppo di origine (MIL, ROM, PSA) la combinazione piu' economica
 #   [prezzo pp, origine, andata, giorni, scali] con <=1 scalo; "two" = idem per l'opzione a 2 scali che rispetta la regola
 best_by = {}
@@ -86,19 +110,20 @@ for c in combos:
     e = best_by.setdefault(c["d"], {})
     if c["a"]:
         f = c["a"][0]
-        if g not in e or f[0] < e[g][0]: e[g] = [f[0], c["o"], c["dep"], c["n"], f[3]]
+        if g not in e or f[0] < e[g][0]: e[g] = [f[0], c["o"], c["dep"], c["n"], f[3]] + ([1] if c.get("e") else [])
     if c["b"]:
         f = c["b"]; t = e.setdefault("two", {})
-        if g not in t or f[0] < t[g][0]: t[g] = [f[0], c["o"], c["dep"], c["n"], f[3]]
+        if g not in t or f[0] < t[g][0]: t[g] = [f[0], c["o"], c["dep"], c["n"], f[3]] + ([1] if c.get("e") else [])
 codes = {d["code"] for d in D}
 trips = {k: v for k, v in itineraries.TRIPS.items() if k in codes}
 assert len(trips) == len(itineraries.TRIPS), sorted(set(itineraries.TRIPS) - codes)
 blob = {"dests": D, "combos": combos, "cov": cov, "bestBy": best_by, "excluded": dests.EXCLUDED, "clima": dests.CLIMA_SCORE, "trips": trips,
-        "meta": {"q": q_tot, "ok": q_ok, "empty": q_empty, "date": "21 novembre 2026", "minPct": MIN_PCT, "minEur": MIN_EUR, **origins.export()}}
+        "meta": {"q": q_tot, "ok": q_ok, "empty": q_empty, "date": "21 novembre 2026", "minPct": MIN_PCT, "minEur": MIN_EUR,
+                 "est": n_est, "estDests": len({c["d"] for c in combos if c.get("e")}), "estNote": estimate.NOTE, **origins.export()}}
 js = json.dumps(blob, ensure_ascii=False, separators=(",", ":")).replace("</", "<" + chr(92) + "/")
 tpl = open(os.environ.get("TPL", "template.html"), encoding="utf-8").read()
 assert "/*__DATA__*/" in tpl
 open(os.environ.get("OUT", "agosto-2027.html"), "w", encoding="utf-8").write(tpl.replace("/*__DATA__*/", js))
 valid = {c["d"] for c in combos if c["a"]}
-print("query", q_tot, "ok", q_ok, "empty", q_empty, "| combos", len(combos), "| dest con <=1 scalo:", len(valid), "| html bytes", len(tpl) + len(js),
+print("query", q_tot, "ok", q_ok, "empty", q_empty, "| combos", len(combos), "di cui stime", n_est, "| dest con <=1 scalo:", len(valid), "| html bytes", len(tpl) + len(js),
       "| itinerari:", sum(len(v) for v in trips.values()), "su", len(trips), "destinazioni; con voli senza itinerari:", sorted(valid - set(trips)))

@@ -88,5 +88,12 @@ try:
 finally:
     PH.ROOT = root0
 
+# stime (somma di due solo andata): la voce porta l'ottavo campo a 1, il prezzo si confronta come gli altri
+be = {"meta": {"groups": {"MIL": ["LIN", "MXP"], "ROM": ["FCO"], "PSA": ["PSA"]}}, "cov": {"XXA": [9, 0, None, 2]}, "trips_popular": {},
+      "combos": [{"o": "MXP", "d": "XXA", "dep": "2027-08-08", "n": 11, "a": [[900, "X", 600, 1, "10:00", "20:00", 0, "CAI", "MXP", "XXA", [400, "Y", 600, 1, "10:00", "20:00", 0, "CAI", "XXA", "MXP"], 500]], "b": None, "x": None, "e": 1},
+                 {"o": "FCO", "d": "XXA", "dep": "2027-08-09", "n": 11, "a": [[950, "X", 600, 1, "10:00", "20:00", 0, "CAI", "FCO", "XXA"]], "b": None, "x": None}]}
+se = PH.snapshot(be)["d_XXA"]["g"]
+ok(se["MIL"] == [900, "MXP", "2027-08-08", 11, 1, 0, 0, 1] and se["ROM"] == [950, "FCO", "2027-08-09", 11, 1] and PH.rank(se["MIL"]) < PH.rank(se["ROM"]), "stima: voce con ottavo campo 1, A/R vero invariato")
+
 print("%d controlli, %d falliti" % (checks, fails))
 sys.exit(1 if fails else 0)
