@@ -277,3 +277,81 @@ test("non configurato: 503, mai un errore non gestito", async () => {
   assert.equal((await s.call("/tg/x", { method: "POST", body: "{}" })).status, 503);
   assert.equal((await s.call("/")).status, 200);
 });
+
+test("voti: ognuno vota per se', vede il voto dell'altro, nessun chat_id esposto", async () => {
+  const s = setup(), tok = await s.token(ME), tokL = await s.token(LAVI);
+  const rate = async (t, id, v) => { const r = await s.api("/api/rate", t, { method: "POST", body: JSON.stringify({ id, s: v }) }); return [r.status, await r.json()]; };
+  let r = await s.api("/api/rates", tok), j = await r.json();
+  assert.equal(r.status, 200);
+  assert.deepEqual(j.rates, {});
+  assert.deepEqual(j.people.map((p) => [p.name, p.me]), [["Cosimo", true], ["Lavi", false]]);
+  assert.ok(j.people.every((p) => /^[0-9a-f]{16}$/.test(p.k)));
+  assert.ok(!JSON.stringify(j).includes(String(ME)) && !JSON.stringify(j).includes(String(LAVI)), "nessun chat_id nella risposta");
+  const [kC, kL] = j.people.map((p) => p.k);
+  let st;
+  [st, j] = await rate(tok, "d_TBS", 4);
+  assert.equal(st, 200);
+  assert.equal(j.changed, true);
+  assert.deepEqual(j.rates, { d_TBS: { [kC]: 4 } });
+  [st, j] = await rate(tokL, "d_tbs", 0);
+  assert.deepEqual(j.rates, { d_TBS: { [kC]: 4, [kL]: 0 } }, "0 stelle e' un voto; id normalizzato");
+  assert.deepEqual(j.people.map((p) => p.me), [false, true]);
+  assert.equal(j.me, "Lavi");
+  [st, j] = await rate(tokL, "t_Georgia-Armenia", 5);
+  assert.deepEqual(j.rates["t_georgia-armenia"], { [kL]: 5 });
+  [st, j] = await rate(tok, "d_TBS", 4);
+  assert.equal(j.changed, false, "stesso voto: nessuna scrittura");
+  // si rilegge dal KV; una chiave per profilo
+  j = await (await s.api("/api/rates", tok)).json();
+  assert.deepEqual(j.rates, { d_TBS: { [kC]: 4, [kL]: 0 }, "t_georgia-armenia": { [kL]: 5 } });
+  assert.deepEqual([...s.kv.keys()].sort(), ["rates:" + kC, "rates:" + kL].sort());
+  assert.match(JSON.parse(s.kv.get("rates:" + kC)).d_TBS[1], /^\d{4}-\d\d-\d\dT/);
+  // togliere il voto tocca solo il proprio
+  [st, j] = await rate(tok, "d_TBS", null);
+  assert.deepEqual(j.rates.d_TBS, { [kL]: 0 });
+  assert.equal(s.sent.length, 0, "i voti non mandano messaggi");
+  assert.equal(s.kv.has("prefs"), false, "i voti non toccano le preferenze del bot");
+});
+
+test("voti: auth e richieste malformate", async () => {
+  const s = setup(), tok = await s.token(ME);
+  assert.equal((await s.call("/api/rates")).status, 401);
+  assert.equal((await s.api("/api/rates", await s.token(STRANGER))).status, 401);
+  assert.equal((await s.api("/api/rate", "non.valido", { method: "POST", body: JSON.stringify({ id: "d_TBS", s: 3 }) })).status, 401);
+  for (const body of ["{", JSON.stringify({ id: "d_TBS" }), JSON.stringify({ id: "d_TBS", s: 6 }), JSON.stringify({ id: "d_TBS", s: -1 }), JSON.stringify({ id: "d_TBS", s: 2.5 }),
+    JSON.stringify({ id: "d_TBS", s: "4" }), JSON.stringify({ id: "w_BCN", s: 3 }), JSON.stringify({ id: "d_<b>", s: 3 }), JSON.stringify({ id: 7, s: 3 }), JSON.stringify({ id: "Tbilisi", s: 3 })]) {
+    assert.equal((await s.api("/api/rate", tok, { method: "POST", body })).status, 400, body);
+  }
+  assert.equal(s.kv.size, 0);
+  // il corpo non puo' scegliere per chi si vota: conta solo il token
+  const j = await (await s.api("/api/rate", tok, { method: "POST", body: JSON.stringify({ id: "d_EVN", s: 2, k: "ffffffffffffffff", who: "Lavi" }) })).json();
+  assert.deepEqual(Object.keys(j.rates.d_EVN), [j.people.find((p) => p.me).k]);
+  assert.equal(j.people.find((p) => p.me).name, "Cosimo");
+  // link revocato: niente piu' voti
+  await s.text(ME, "/sito nuovo");
+  assert.equal((await s.api("/api/rate", tok, { method: "POST", body: JSON.stringify({ id: "d_TBS", s: 3 }) })).status, 401);
+  // CORS come per i preferiti
+  const pre = await s.call("/api/rate", { method: "OPTIONS", headers: { Origin: ORIGIN } });
+  assert.equal(pre.headers.get("access-control-allow-origin"), ORIGIN);
+  // senza CHAT_NAMES: nome dal token per se', etichetta neutra per l'altro
+  const s2 = setup({ CHAT_NAMES: "" });
+  const p2 = (await (await s2.api("/api/rates", await s2.token(LAVI, 1, "Elle"))).json()).people;
+  assert.deepEqual(p2.map((p) => p.name), ["Profilo 1", "Elle"]);
+});
+
+test("webhook: /voti e riga in /help", async () => {
+  const s = setup(), tok = await s.token(ME), tokL = await s.token(LAVI);
+  await s.text(ME, "/voti");
+  assert.match(s.sent[0].text, /Ancora nessun voto/);
+  assert.equal(s.sent[0].reply_markup.inline_keyboard[0][0].url, "https://cosimoney.github.io/agosto2027/#/voti");
+  for (const [t, id, v] of [[tok, "d_TBS", 5], [tokL, "d_TBS", 4], [tok, "d_EVN", 2], [tokL, "t_georgia-armenia", 0]]) {
+    await s.api("/api/rate", t, { method: "POST", body: JSON.stringify({ id, s: v }) });
+  }
+  await s.text(LAVI, "/voti");
+  const t = s.sent[1].text;
+  assert.equal(s.sent[1].chat_id, LAVI);
+  assert.match(t, /<b>Votati da entrambi<\/b>\n1\. <b>Tbilisi<\/b> · Cosimo ★★★★★ · Lavi ★★★★☆ · media 4,5/);
+  assert.match(t, /<b>Manca un voto<\/b>\n1\. <b>Erevan<\/b> · Cosimo ★★☆☆☆ · Lavi –\n2\. <b>Georgia e Armenia<\/b> · Cosimo – · Lavi ☆☆☆☆☆/);
+  await s.text(ME, "/help");
+  assert.match(s.sent[2].text, /\/voti - /);
+});

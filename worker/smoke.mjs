@@ -1,7 +1,8 @@
 // Prove dal vivo dopo il deploy (le lancia deploy.sh). Variabili: WORKER_URL, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_IDS,
 // PREFS_SECRET, WEBHOOK_SECRET; facoltative HMAC_SECRET (per il fav on/off con un token firmato qui) e TEST_CHAT_ID
 // (default: la prima chat di TELEGRAM_CHAT_IDS). Manda UN solo messaggio vero: la risposta a un /help finto, a TEST_CHAT_ID.
-// Il preferito di prova (d_ZZZ, inesistente) viene aggiunto con quiet:true, quindi senza messaggi, e subito tolto.
+// Il preferito di prova (d_ZZZ, inesistente) viene aggiunto con quiet:true, quindi senza messaggi, e subito tolto;
+// lo stesso id riceve un voto di prova, tolto subito dopo.
 import { signToken, derivedPrefsKey } from "./src/index.js";
 
 const env = process.env, U = String(env.WORKER_URL || "").replace(/\/+$/, "");
@@ -41,6 +42,13 @@ if (env.HMAC_SECRET) {
   r = await post("/api/fav", { id: "d_ZZZ", on: false }, auth);
   j = r.status === 200 ? await r.json() : {};
   ok(r.status === 200 && !(j.favs || []).some((f) => f.id === "d_ZZZ"), "fav off via API", String(r.status));
+  r = await post("/api/rate", { id: "d_ZZZ", s: 3 }, auth);
+  j = r.status === 200 ? await r.json() : {};
+  const meK = ((j.people || []).find((p) => p.me) || {}).k;
+  ok(r.status === 200 && meK && (j.rates || {}).d_ZZZ && j.rates.d_ZZZ[meK] === 3, "voto via API con token personale", String(r.status));
+  r = await post("/api/rate", { id: "d_ZZZ", s: null }, auth);
+  j = r.status === 200 ? await r.json() : {};
+  ok(r.status === 200 && !((j.rates || {}).d_ZZZ || {})[meK], "voto tolto via API", String(r.status));
 } else {
   console.log("  [--] fav on/off via API saltato: HMAC_SECRET era gia' impostato e non e' leggibile (prova dal sito dopo /sito)");
 }

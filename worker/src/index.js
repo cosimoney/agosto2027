@@ -2,14 +2,17 @@
 //
 //   POST /api/fav     {id, on}      aggiunge o toglie un preferito            (Bearer: token personale da /sito)
 //   GET  /api/favs                  elenco dei preferiti con chi e quando     (Bearer: token personale)
+//   POST /api/rate    {id, s}       voto 0-5 di chi chiama su una meta o un trip; s null lo toglie   (Bearer: token personale)
+//   GET  /api/rates                 voti di tutti i profili, con i nomi                          (Bearer: token personale)
 //   GET  /api/prefs                 preferenze complete per bot/alerts.py     (Bearer: PREFS_SECRET)
 //   POST /tg/<WEBHOOK_SECRET>       webhook Telegram (controlla anche l'header X-Telegram-Bot-Api-Secret-Token)
 //
-// Stato su KV (binding PREFS): "prefs" = stessa struttura di bot/state/prefs.json, "auth" = versione dei link per chat.
+// Stato su KV (binding PREFS): "prefs" = stessa struttura di bot/state/prefs.json, "auth" = versione dei link per chat,
+// "rates:<chat_hash>" = voti di un profilo {id: [stelle, quando]}: una chiave a testa, cosi' due voti insieme non si pestano.
 // Secret: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_IDS, HMAC_SECRET, PREFS_SECRET, WEBHOOK_SECRET; facoltativo CHAT_NAMES ("id:Nome,id:Nome").
 // Nei log non finiscono mai chat_id, nomi, token o testi dei messaggi.
 import CONFIG from "../../bot/config.json" with { type: "json" };
-import { Bot, ID_RE, loadConfig, normPrefs, resolveTarget, splitMessage, romeToday } from "./bot.js";
+import { Bot, ID_RE, esc, loadConfig, normPrefs, resolveTarget, splitMessage, romeToday } from "./bot.js";
 
 const DEFAULTS = {
   ALLOWED_ORIGIN: "https://cosimoney.github.io",
@@ -18,6 +21,8 @@ const DEFAULTS = {
 };
 const SNAP_TTL_MS = 5 * 60 * 1000;
 const MAX_FAVS = 200;
+const MAX_RATES = 600;
+const RATE_ID_RE = /^[dt]_[A-Za-z0-9-]{2,58}$/;
 const enc = new TextEncoder();
 const conf = (env, k) => (env && env[k]) || DEFAULTS[k];
 
@@ -234,6 +239,87 @@ async function apiFav(req, env, cfg, ctx) {
   return json(req, env, 200, Object.assign(favPayload(bot, user), { changed }));
 }
 
+// ---------- voti di coppia ----------
+// Ogni profilo (chat autorizzata) vota per se': l'identita' viene dal token, mai dal corpo della richiesta.
+// Al sito i profili arrivano come {k: chat_hash, name, me}: il chat_id non esce mai dal Worker.
+async function people(env, user) {
+  const names = chatNames(env), out = [];
+  let i = 0;
+  for (const chat of allowedChats(env)) {
+    i++;
+    const me = !!user && chat === user.chat;
+    out.push({ k: await chatHash(env.TELEGRAM_BOT_TOKEN, chat), name: names[String(chat)] || (me && user.name) || "Profilo " + i, me });
+  }
+  return out;
+}
+const rateKey = (k) => "rates:" + k;
+function cleanRates(o) {
+  const out = {};
+  for (const [id, v] of Object.entries(o || {})) {
+    if (RATE_ID_RE.test(id) && Array.isArray(v) && Number.isInteger(v[0]) && v[0] >= 0 && v[0] <= 5) out[id] = [v[0], String(v[1] || "")];
+  }
+  return out;
+}
+/** -> {people, by: {chat_hash: {id: [stelle, quando]}}} */
+async function loadRates(env, user) {
+  const ps = await people(env, user), by = {};
+  await Promise.all(ps.map(async (p) => { by[p.k] = cleanRates(await kvJson(env, rateKey(p.k), {})); }));
+  return { people: ps, by };
+}
+function ratesPayload(user, R) {
+  const rates = {};
+  for (const p of R.people) for (const [id, v] of Object.entries(R.by[p.k] || {})) (rates[id] = rates[id] || {})[p.k] = v[0];
+  return { ok: true, me: user.name, people: R.people, rates };
+}
+async function apiRates(req, env) {
+  const user = await authUser(req, env);
+  if (!user) return json(req, env, 401, { ok: false, error: "unauthorized" });
+  return json(req, env, 200, ratesPayload(user, await loadRates(env, user)));
+}
+async function apiRate(req, env) {
+  const user = await authUser(req, env);
+  if (!user) return json(req, env, 401, { ok: false, error: "unauthorized" });
+  let body = null;
+  try { body = await req.json(); } catch (e) { /* corpo non JSON */ }
+  const sOk = body && (body.s === null || (Number.isInteger(body.s) && body.s >= 0 && body.s <= 5));
+  if (!body || typeof body.id !== "string" || !sOk || !RATE_ID_RE.test(body.id)) return json(req, env, 400, { ok: false, error: "bad_request" });
+  const id = body.id.slice(0, 2) + (body.id[0] === "d" ? body.id.slice(2).toUpperCase() : body.id.slice(2).toLowerCase());
+  const R = await loadRates(env, user), meP = R.people.find((p) => p.me);
+  if (!meP) return json(req, env, 401, { ok: false, error: "unauthorized" });
+  const mine = R.by[meP.k];
+  const had = id in mine ? mine[id][0] : null, changed = had !== body.s;
+  if (changed) {
+    if (body.s === null) delete mine[id];
+    else {
+      if (!(id in mine) && Object.keys(mine).length >= MAX_RATES) return json(req, env, 400, { ok: false, error: "too_many" });
+      mine[id] = [body.s, new Date().toISOString()];
+    }
+    await env.PREFS.put(rateKey(meP.k), JSON.stringify(mine));
+  }
+  return json(req, env, 200, Object.assign(ratesPayload(user, R), { changed }));
+}
+const stars = (n) => "★".repeat(n) + "☆".repeat(5 - n);
+/** /voti: quello che avete votato in ordine di media, dove manca un voto, link alla pagina del sito. */
+async function cmdVoti(env, chat, name, snap) {
+  const R = await loadRates(env, { chat, name }), tg = (snap && snap.targets) || {};
+  const ids = [...new Set(R.people.flatMap((p) => Object.keys(R.by[p.k])))];
+  const site = conf(env, "SITE_URL").split("#")[0] + "#/voti";
+  const btn = [[["⭐ Apri i voti sul sito", "url:" + site]]];
+  if (!ids.length) return ["⭐ <b>I vostri voti</b>\nAncora nessun voto. Si vota dal sito, da 0 a 5 stelle, su ogni meta e ogni giro: aprilo con il link di /sito.", btn];
+  const rows = ids.map((id) => {
+    const vs = R.people.map((p) => (id in R.by[p.k] ? R.by[p.k][id][0] : null)), got = vs.filter((v) => v != null);
+    return { id, vs, n: got.length, avg: got.reduce((a, b) => a + b, 0) / got.length, name: (tg[id] && tg[id].name) || id.slice(2) };
+  }).sort((a, b) => b.avg - a.avg || a.name.localeCompare(b.name, "it"));
+  const line = (r, i) => `${i + 1}. <b>${esc(r.name)}</b> · ` + R.people.map((p, j) => `${esc(p.name)} ${r.vs[j] == null ? "–" : stars(r.vs[j])}`).join(" · ") +
+    (r.n > 1 ? ` · media ${String(Math.round(r.avg * 10) / 10).replace(".", ",")}` : "");
+  const full = (r) => r.n > 1 && r.n === R.people.length;
+  const both = rows.filter(full), part = rows.filter((r) => !full(r));
+  let text = "⭐ <b>I vostri voti</b>";
+  if (both.length) text += "\n\n<b>Votati da entrambi</b>\n" + both.slice(0, 15).map(line).join("\n") + (both.length > 15 ? `\n… e altri ${both.length - 15}` : "");
+  if (part.length) text += "\n\n<b>Manca un voto</b>\n" + part.slice(0, 10).map(line).join("\n") + (part.length > 10 ? `\n… e altri ${part.length - 10}` : "");
+  return [text, btn];
+}
+
 async function apiPrefs(req, env, cfg) {
   const m = /^Bearer\s+(\S+)$/i.exec(req.headers.get("Authorization") || "");
   const key = m ? m[1] : "";
@@ -259,12 +345,16 @@ export async function handleUpdate(u, env, cfg) {
   let res, bot = null, before = null;
   if (c && (c.cmd === "sito" || (c.cmd === "start" && /^sito\b/i.test(c.arg)))) {
     res = await cmdSito(env, chat, who, c.cmd === "sito" ? c.arg : c.arg.slice(4).trim());
+  } else if (c && c.cmd === "voti") {
+    res = await cmdVoti(env, chat, who, await getSnapshot(env));
   } else {
     const [prefs, snap] = await Promise.all([loadPrefs(env, cfg), getSnapshot(env)]);
     before = JSON.stringify(prefs);
     bot = new Bot(cfg, snap, prefs, { who, today: romeToday(), chatHash: await chatHash(env.TELEGRAM_BOT_TOKEN, chat) });
     res = cb ? bot.onCallback(cb.data) : bot.onText(msg.text);
     if (JSON.stringify(bot.prefs) !== before) await savePrefs(env, bot.prefs); // prima di rispondere: un invio fallito non perde la modifica
+    // /voti vive solo nel Worker (i voti stanno su KV): la riga si aggiunge qui, cosi' bot.js resta allineato a commands.py
+    if (res && c && (c.cmd === "help" || (c.cmd === "start" && !c.arg))) res = [res[0] + "\n/voti - i voti che avete dato a mete e giri", res[1]];
   }
   if (!res) return "skip";
   await tg.send(chat, res[0], res[1]);
@@ -342,6 +432,8 @@ export default {
         if (!env.PREFS || !env.HMAC_SECRET || !env.TELEGRAM_BOT_TOKEN) return json(req, env, 503, { ok: false, error: "not_configured" });
         if (path === "/api/favs" && req.method === "GET") return await apiFavs(req, env, cfg);
         if (path === "/api/fav" && req.method === "POST") return await apiFav(req, env, cfg, ctx);
+        if (path === "/api/rates" && req.method === "GET") return await apiRates(req, env);
+        if (path === "/api/rate" && req.method === "POST") return await apiRate(req, env);
         if (path === "/api/prefs" && req.method === "GET") return await apiPrefs(req, env, cfg);
         return json(req, env, 404, { ok: false, error: "not_found" });
       }
