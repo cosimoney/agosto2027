@@ -3,6 +3,7 @@
    niente undefined/NaN nel markup, tutte le immagini referenziate esistono in img/.
    Preferiti: senza Worker o senza token la stella resta il link Telegram; con il token (Worker finto) stella piena/vuota,
    toggle ottimistico con ritorno indietro se il Worker fallisce, pagina #/preferiti, rotta #/login/<token>.
+   Indirizzo corto #/<alias>: schermata del PIN, errori, blocco per troppi tentativi, accesso, dispositivo già collegato, logout.
    Andamento del prezzo: grafico dello storico su mete e trip, Giorno / Settimana / Mese, serie per città, pochi dati, dato parziale.
    Dati fuori dalla pagina: data.json caricato all'avvio (stato di caricamento, errore e Riprova); nei test arriva da window.__DATA__.
    Foto in piu' larghezze (srcset), badge prezzo basso/tipico/alto, voti di coppia, confronto affiancato, mappa. */
@@ -143,7 +144,7 @@ for(const t of R.trips) nimg += audit("t/" + t, b.App.pageHTML({page:"trip", id:
 audit("crediti", b.App.pageHTML({page:"credits"}));
 audit("404", b.App.pageHTML({page:"dest", id:"XXX"}) + b.App.pageHTML({page:"trip", id:"<script>"}));
 ok(!/<script>/.test(b.App.pageHTML({page:"trip", id:"<script>"})), "escape dell'id nella pagina non trovata");
-ok(b.App.parse("#/d/dps").id === "DPS" && b.App.parse("#/t/sri-lanka").id === "sri-lanka" && b.App.parse("#/boh").page === "home", "parse delle rotte");
+ok(b.App.parse("#/d/dps").id === "DPS" && b.App.parse("#/t/sri-lanka").id === "sri-lanka" && b.App.parse("#/boh/x").page === "home" && b.App.parse("#/Boh").page === "home", "parse delle rotte");
 ok(b.App.parse("#/voti").page === "rates" && b.App.parse("#/mappa").page === "map" && b.App.parse("#/confronto").page === "cmp" && b.App.parse("#/confronto").ids === null
    && b.App.parse("#/confronto/d_DPS,t_x").ids.join() === "d_DPS,t_x", "parse delle rotte voti, mappa, confronto");
 
@@ -255,6 +256,96 @@ const favList = () => ({ok:true, me:"Cosimo", threshold:1000, generated:"2026-11
   ok(!off.ls["agosto2027.token"] && /\/sito/.test(off.els.app.innerHTML), "login senza Worker: nessun token salvato");
   const p1 = b.App.parse("#/preferiti"), p2 = b.App.parse("#/login/aa.bb");
   ok(p1.page === "favs" && p2.page === "login" && p2.token === "aa.bb", "parse delle rotte preferiti e login");
+}
+
+// 10b. indirizzo corto #/<alias> con PIN (Worker: POST /api/pin). Il sito non conosce gli alias: ogni #/<parola> libera chiede il PIN.
+{
+  const on = boot("", {api:true}), P = h => on.App.parse(h);
+  ok(P("#/anna").page === "pin" && P("#/anna").alias === "anna" && P("#/zz").page === "pin" && P("#/abcdefghijkl").page === "pin", "alias: #/<parola> è la schermata del PIN");
+  ok(["#/", "", "#/visitati", "#/trips", "#/voti", "#/mappa", "#/preferiti", "#/crediti", "#/confronto", "#/login", "#/d", "#/t", "#/d/TBS", "#/t/x"].every(h => P(h).page !== "pin"), "alias: nessuna collisione con le rotte esistenti");
+  ok(["#/Anna", "#/a", "#/abcdefghijklm", "#/anna/x", "#/an-na", "#/anna1", "#anna", "#/%61nna"].every(h => P(h).page === "home"), "alias: solo [a-z]{2,12}, un solo segmento, con #/");
+  ok(boot("#/anna", {api:false}).App.S.page === "home", "alias senza Worker: resta la home");
+
+  const calls = [];
+  let answer = () => res(401, {ok:false, error:"bad_pin", left:4});
+  const d = boot("#/anna", {api:true, fetch:(url, init) => { calls.push([url, init]); return Promise.resolve(answer(url)); }});
+  let mk = d.els.app.innerHTML;
+  ok(d.App.S.page === "pin" && calls.length === 0 && /Accesso/.test(d.ctx.document.title), "pin: schermata aperta, nessuna chiamata finché non si scrive il PIN");
+  ok(/<input class="pin-in" id="pin-in"[^>]*inputmode="numeric"[^>]*maxlength="4"[^>]*autocomplete="one-time-code"/.test(mk) && /<form class="pin-form" id="pin-form"/.test(mk) && /<button class="btn" type="submit">Entra<\/button>/.test(mk), "pin: campo numerico di 4 cifre e bottone");
+  ok(/<label class="sr" for="pin-in">/.test(mk) && /id="pin-msg" role="status" aria-live="polite"><\/p>/.test(mk), "pin: etichetta e area messaggi");
+  ok(/Scrivi <b>\/pin<\/b> a @Trip2027_bot/.test(mk) && /t\.me\/Trip2027_bot\?start=pin/.test(mk), "pin: rimando a /pin sul bot");
+  ok(!/anna/i.test(mk.replace(/<a [^>]*>/g, "")), "pin: l'alias non viene scritto nella pagina");
+  audit("pin", mk);
+  await d.App.pinSubmit("12");
+  ok(calls.length === 0 && /Il PIN è di 4 cifre\./.test(d.els.app.innerHTML), "pin: meno di 4 cifre, nessuna chiamata");
+  const sub = d.App.pinSubmit("0000");
+  ok(/Controllo…/.test(d.els.app.innerHTML) && /<input[^>]*id="pin-in"[^>]* disabled>/.test(d.els.app.innerHTML), "pin: stato di attesa");
+  await sub;
+  mk = d.els.app.innerHTML;
+  ok(calls.length === 1 && calls[0][0] === API_TEST + "/api/pin" && calls[0][1].method === "POST" && calls[0][1].body === '{"alias":"anna","pin":"0000"}' && !calls[0][1].headers.Authorization, "pin: POST /api/pin con alias e PIN, senza Bearer");
+  ok(/PIN errato o non ancora impostato\. Restano 4 tentativi prima del blocco\./.test(mk) && !d.ls["agosto2027.token"] && />Entra</.test(mk), "pin errato: messaggio chiaro, nessun token");
+  answer = () => res(401, {ok:false, error:"bad_pin", left:1});
+  await d.App.pinSubmit("0001");
+  ok(/Resta un tentativo prima del blocco\./.test(d.els.app.innerHTML), "pin errato: ultimo tentativo");
+  answer = () => res(429, {ok:false, error:"locked", retry:900});
+  await d.App.pinSubmit("0002");
+  mk = d.els.app.innerHTML;
+  ok(/class="pin-msg lock"[^>]*>Troppi tentativi sbagliati\. Riprova tra 15 minuti\.</.test(mk) && /<input[^>]* disabled>/.test(mk) && /<button class="btn" type="submit" disabled>/.test(mk), "pin bloccato: attesa in minuti, campo disattivato");
+  const n = calls.length;
+  await d.App.pinSubmit("1111");
+  ok(calls.length === n, "pin bloccato: nessuna chiamata durante l'attesa");
+  d.App.PIN.until = Date.now() + 3600 * 1000;
+  ok(/Riprova tra un(&#39;|&#x27;|')ora\./.test(d.App.pinHTML()), "pin bloccato: attesa in ore");
+  d.App.PIN.until = 0;
+  answer = () => res(500, {});
+  await d.App.pinSubmit("1111");
+  ok(/Qualcosa non ha funzionato/.test(d.els.app.innerHTML), "pin: errore del server");
+  answer = () => { throw new Error("rete"); };
+  await d.App.pinSubmit("1111");
+  ok(/Non riesco a contattare il server/.test(d.els.app.innerHTML) && d.App.S.page === "pin", "pin: rete assente");
+  audit("pin errori", d.els.app.innerHTML);
+  // PIN giusto: token e profilo salvati, home con saluto, poi tutto come dopo /sito
+  answer = url => url.endsWith("/api/pin") ? res(200, {ok:true, token:"tok.pin", name:"Anna"}) : url.endsWith("/api/rates") ? res(200, {ok:true, me:"Anna", people:[], rates:{}}) : res(200, favList());
+  await d.App.pinSubmit("4827");
+  ok(d.ls["agosto2027.token"] === "tok.pin" && d.App.FAV.token === "tok.pin" && JSON.parse(d.ls["agosto2027.who"]).alias === "anna", "pin giusto: token e profilo salvati sul dispositivo");
+  ok(d.App.S.page === "home" && d.els.toast.textContent === "Ciao Anna" && d.els.toast.hidden === false, "pin giusto: home con saluto → " + d.els.toast.textContent);
+  ok(!Object.values(d.ls).some(v => /4827/.test(v)), "pin giusto: il PIN non viene salvato");
+  await tick(); await tick();
+  ok(calls.some(c => c[0].endsWith("/api/favs") && c[1].headers.Authorization === "Bearer tok.pin") && d.App.FAV.state === "ok", "pin giusto: i preferiti si leggono con il token ricevuto");
+  // dispositivo già collegato a quell'alias: niente PIN, home e saluto
+  const back = [];
+  const e = boot("#/anna", {api:true, token:"tok.pin", ls:{"agosto2027.who":JSON.stringify({alias:"anna", name:"Anna"})}, fetch:(url, init) => { back.push(url); return Promise.resolve(res(200, favList())); }});
+  ok(e.App.S.page === "home" && e.els.toast.textContent === "Ciao Anna" && !back.some(u => u.endsWith("/api/pin")), "alias già collegato: home con saluto, nessun PIN");
+  // token di un altro profilo (o del link di /sito): per questo alias serve il PIN
+  const f = boot("#/bea", {api:true, token:"tok.pin", ls:{"agosto2027.who":JSON.stringify({alias:"anna", name:"Anna"})}, fetch:() => Promise.resolve(res(200, favList()))});
+  ok(f.App.S.page === "pin" && /id="pin-in"/.test(f.els.app.innerHTML), "alias diverso da quello collegato: chiede il PIN");
+  const g = boot("#/anna", {api:true, token:"tok.sito", fetch:() => Promise.resolve(res(200, favList()))});
+  ok(g.App.S.page === "pin", "token senza alias (link di /sito): chiede il PIN");
+  // scollega: via token e profilo, l'indirizzo corto chiede di nuovo il PIN
+  e.nav("#/preferiti");
+  await tick(); await tick();
+  ok(/data-act="fav-logout"/.test(e.els.app.innerHTML), "logout disponibile nella pagina preferiti");
+  e.listeners.click.forEach(fn => fn({target:{closest:q => q === "[data-act]" ? {dataset:{act:"fav-logout"}} : null}, preventDefault(){}}));
+  ok(!e.ls["agosto2027.token"] && !e.ls["agosto2027.who"], "logout: token e profilo cancellati");
+  e.nav("#/anna");
+  ok(e.App.S.page === "pin", "dopo il logout l'indirizzo corto chiede il PIN");
+  // token scaduto: via anche il profilo
+  const x = boot("#/preferiti", {api:true, token:"tok.old", ls:{"agosto2027.who":JSON.stringify({alias:"anna", name:"Anna"})}, fetch:() => Promise.resolve(res(401, {}))});
+  await tick(); await tick();
+  ok(!x.ls["agosto2027.token"] && !x.ls["agosto2027.who"], "token non più valido: profilo cancellato");
+  // digitando la quarta cifra parte da solo; il form non ricarica la pagina
+  const y = boot("#/anna", {api:true, fetch:(url, init) => { calls.push([url, init]); return Promise.resolve(res(401, {ok:false, error:"bad_pin", left:3})); }});
+  const before = calls.length, inp = {id:"pin-in", value:"12a3"};
+  y.listeners.input.forEach(fn => fn({target:inp}));
+  ok(inp.value === "123" && calls.length === before, "pin: solo cifre, niente invio sotto le 4");
+  inp.value = "1235";
+  y.listeners.input.forEach(fn => fn({target:inp}));
+  await tick(); await tick();
+  ok(calls.length === before + 1 && calls.at(-1)[1].body === '{"alias":"anna","pin":"1235"}', "pin: alla quarta cifra parte la verifica");
+  let prevented = 0;
+  y.els["pin-in"].value = "9";
+  y.listeners.submit.forEach(fn => fn({target:{id:"pin-form"}, preventDefault(){ prevented++; }}));
+  ok(prevented === 1, "pin: il form non ricarica la pagina");
 }
 
 // 11. andamento del prezzo (storico dei giri): grafico su mete e trip, aggregazioni, serie, pochi dati, dato parziale

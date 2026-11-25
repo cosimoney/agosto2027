@@ -1,5 +1,5 @@
 /* Agosto 2027 v2: sito di viaggio a pagine (hash routing). Dati: RAW (build.py + build_trips.py), foto: PH (img/manifest.json).
-   Rotte: #/ (nuove mete) · #/visitati · #/trips · #/d/<IATA> · #/t/<trip.id> · #/preferiti · #/login/<token> · #/crediti
+   Rotte: #/ (nuove mete) · #/visitati · #/trips · #/d/<IATA> · #/t/<trip.id> · #/preferiti · #/login/<token> · #/<alias> (PIN) · #/crediti
           #/voti (voti di coppia) · #/confronto[/id,id,id] (fianco a fianco) · #/mappa
    Preferiti: se API (base del Worker Cloudflare, da bot/config.json "worker_url") e' valorizzata e il dispositivo ha un
    token personale (link #/login/<token> mandato dal bot con /sito), la stella salva subito via Worker; altrimenti apre Telegram. */
@@ -114,6 +114,10 @@ function saveToken(v){
   try { if(v) localStorage.setItem(TOKEN_KEY, v); else localStorage.removeItem(TOKEN_KEY); } catch(e){ /* navigazione privata: il token resta solo in memoria */ }
 }
 const favLive = () => !!(API && FAV.token);
+// Indirizzo corto #/<alias>: chi e' entrato con il PIN su questo dispositivo ({alias, name}). Gli alias li conosce solo il Worker.
+const WHO_KEY = "agosto2027.who";
+function readWho(){ try { const w = JSON.parse(localStorage.getItem(WHO_KEY) || "null"); return w && typeof w.alias === "string" ? w : null; } catch(e){ return null; } }
+function saveWho(w){ try { if(w) localStorage.setItem(WHO_KEY, JSON.stringify(w)); else localStorage.removeItem(WHO_KEY); } catch(e){ /* resta la sessione in memoria */ } FAV.who = w || null; }
 const favOn = id => FAV.map.has(id);
 async function favCall(path, body){
   const r = await fetch(API + path, {method: body ? "POST" : "GET", body: body ? JSON.stringify(body) : undefined,
@@ -123,7 +127,7 @@ async function favCall(path, body){
   return r.json();
 }
 function favApply(j){ FAV.map = new Map((j.favs || []).map(f => [f.id, f])); FAV.me = j.me || ""; FAV.state = "ok"; }
-function favExpired(){ saveToken(""); FAV.map = new Map(); FAV.me = ""; FAV.state = "expired"; rateReset(); }
+function favExpired(){ saveToken(""); saveWho(null); FAV.map = new Map(); FAV.me = ""; FAV.state = "expired"; rateReset(); }
 function favPaint(){
   document.querySelectorAll("[data-act='fav']").forEach(el => {
     const on = favOn(el.dataset.id), l = el.querySelector(".lbl");
@@ -884,6 +888,60 @@ function favsHTML(){
   return head + body + `</main>` + footHTML();
 }
 
+/* ------------------------------------------------------------------ accesso con PIN: #/<alias> (Worker: POST /api/pin) */
+// Il sito non conosce gli alias: ogni #/<parola> che non e' una rotta chiede il PIN e il Worker decide. Risposte: 200 {token, name},
+// 401 PIN errato o non impostato (uguale per alias inesistenti), 429 {retry: secondi} dopo troppi errori.
+const ALIAS_RE = /^[a-z]{2,12}$/, ROUTES = ["d", "t", "visitati", "trips", "crediti", "preferiti", "login", "voti", "mappa", "confronto"];
+const PIN = {alias:"", busy:false, err:"", until:0, t:null};
+const pinWait = () => Math.max(0, Math.ceil((PIN.until - Date.now()) / 1000));
+const pinWaitTxt = s => { const m = Math.round(s / 60); return m >= 90 ? `${Math.round(m / 60)} ore` : m >= 60 ? "un'ora" : m <= 1 ? "un minuto" : `${m} minuti`; };
+function pinHTML(){
+  const w = pinWait(), off = w > 0 || PIN.busy;
+  const msg = w > 0 ? `Troppi tentativi sbagliati. Riprova tra ${pinWaitTxt(w)}.` : PIN.err;
+  return topHTML("nav") + `<main class="wrap cr-head sec pin-page" id="pin"><p class="eyebrow">Accesso</p><h1 class="h2" style="margin:8px 0 14px">Il tuo <i>PIN</i></h1>
+    <p class="sub">Inserisci le 4 cifre per collegare questo dispositivo ai tuoi preferiti e ai tuoi voti.</p>
+    <form class="pin-form" id="pin-form" novalidate>
+      <label class="sr" for="pin-in">PIN di 4 cifre</label>
+      <input class="pin-in" id="pin-in" name="pin" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" placeholder="••••" aria-describedby="pin-msg"${off ? " disabled" : ""}>
+      <button class="btn" type="submit"${off ? " disabled" : ""}>${PIN.busy ? "Controllo…" : "Entra"}</button>
+    </form>
+    <p class="pin-msg${w > 0 ? " lock" : ""}" id="pin-msg" role="status" aria-live="polite">${esc(msg)}</p>
+    <p class="pin-help">PIN non ancora impostato, o dimenticato? Scrivi <b>/pin</b> a @${BOT_USERNAME} per sceglierne uno nuovo. <a href="https://t.me/${BOT_USERNAME}?start=pin" target="_blank" rel="noopener">Apri il bot</a></p>
+  </main>` + footHTML();
+}
+function pinPaint(){
+  if(S.page !== "pin") return;
+  $("app").innerHTML = pinHTML();
+  clearTimeout(PIN.t);
+  const w = pinWait(), el = $("pin-in");
+  if(w > 0) PIN.t = setTimeout(pinPaint, Math.min(w, 30) * 1000 + 300);   // il conto alla rovescia si aggiorna da solo
+  else if(el && el.focus && !PIN.busy) el.focus();
+}
+async function pinSubmit(v){
+  const el = $("pin-in");
+  v = String(v != null ? v : (el && el.value) || "").replace(/\D/g, "");
+  if(PIN.busy || S.page !== "pin" || pinWait() > 0) return;
+  if(v.length !== 4){ PIN.err = "Il PIN è di 4 cifre."; pinPaint(); return; }
+  const alias = S.route.alias;
+  PIN.busy = true; PIN.err = ""; pinPaint();
+  let done = null;
+  try {
+    const r = await fetch(API + "/api/pin", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({alias, pin:v})});
+    let j = null;
+    try { j = await r.json(); } catch(e){ /* risposta non JSON */ }
+    if(r.status === 200 && j && j.ok && j.token) done = j;
+    else if(r.status === 429 && j && j.retry > 0) PIN.until = Date.now() + j.retry * 1000;
+    else if(r.status === 401) PIN.err = `PIN errato o non ancora impostato.${j && j.left > 0 ? ` ${j.left === 1 ? "Resta un tentativo" : `Restano ${j.left} tentativi`} prima del blocco.` : ""}`;
+    else PIN.err = "Qualcosa non ha funzionato. Riprova tra poco.";
+  } catch(e){ PIN.err = "Non riesco a contattare il server. Controlla la connessione e riprova."; }
+  PIN.busy = false;
+  if(done){
+    saveToken(done.token); saveWho({alias, name:String(done.name || "")});
+    FAV.me = String(done.name || ""); FAV.map = new Map(); FAV.state = "loading"; rateReset(); loadFavs(); loadRates();
+    if(S.page === "pin" && S.route.alias === alias) go();   // ora il dispositivo e' collegato: go() porta alla home e saluta
+  } else pinPaint();
+}
+
 /* ------------------------------------------------------------------ badge prezzo: basso / tipico / alto rispetto allo storico */
 // Confronta il prezzo dell'ultimo giro con la mediana dei giorni precedenti (come typical() di bot/alerts.py).
 // Nascosto finche' la voce non ha almeno PB_MIN_DAYS giorni di storico; fascia "tipico" = mediana ± 5% (almeno 10 €).
@@ -1318,18 +1376,29 @@ function parse(hash){
   if(parts[0] === "voti") return {page:"rates"};
   if(parts[0] === "mappa") return {page:"map"};
   if(parts[0] === "confronto") return {page:"cmp", ids:parts[1] ? parts[1].split(",").filter(Boolean) : null};
+  if(API && parts.length === 1 && h === parts[0] && ALIAS_RE.test(h) && !ROUTES.includes(h) && /^#\//.test(String(hash))) return {page:"pin", alias:h};
   return {page:"home", tab:parts[0] === "visitati" ? "vis" : parts[0] === "trips" ? "pop" : "new"};
 }
 function pageHTML(r){
   return r.page === "dest" ? destHTML(r.id) : r.page === "trip" ? tripHTML(r.id) : r.page === "credits" ? creditsHTML() : r.page === "favs" || r.page === "login" ? favsHTML() :
-    r.page === "rates" ? votiHTML() : r.page === "cmp" ? cmpHTML() : r.page === "map" ? mapHTML() : homeHTML();
+    r.page === "rates" ? votiHTML() : r.page === "pin" ? pinHTML() : r.page === "cmp" ? cmpHTML() : r.page === "map" ? mapHTML() : homeHTML();
 }
 function go(){
   let r = parse(location.hash);
   const prev = S.route, app = $("app");
+  let hello = null;
+  if(r.page === "pin"){
+    const w = readWho();
+    if(favLive() && w && w.alias === r.alias){
+      // dispositivo gia' collegato a questo indirizzo: si va alla home, senza chiedere di nuovo il PIN
+      hello = w.name || FAV.me || "";
+      try { history.replaceState(null, "", "#/"); } catch(e){ /* resta l'indirizzo com'e' */ }
+      r = {page:"home", tab:"new"};
+    } else if(PIN.alias !== r.alias){ PIN.alias = r.alias; PIN.err = ""; PIN.until = 0; PIN.busy = false; }
+  }
   if(r.page === "login"){
     // link personale mandato dal bot: si salva il token e lo si toglie subito dalla barra degli indirizzi e dalla cronologia
-    if(API && r.token){ saveToken(r.token); FAV.map = new Map(); FAV.state = "loading"; rateReset(); loadFavs(); loadRates(); }
+    if(API && r.token){ saveToken(r.token); saveWho(null); FAV.map = new Map(); FAV.state = "loading"; rateReset(); loadFavs(); loadRates(); }
     try { history.replaceState(null, "", "#/preferiti"); } catch(e){ /* resta l'indirizzo com'e' */ }
     r = {page:"favs"};
   } else if(r.page === "favs" && favLive() && FAV.state !== "loading") loadFavs();
@@ -1353,10 +1422,12 @@ function go(){
   } else {
     S.page = r.page; S.route = r; S.panel = false;
     app.innerHTML = pageHTML(r);
-    const name = r.page === "dest" ? (DEST[r.id] || {}).city : r.page === "trip" ? (PT[r.id] || {}).name : r.page === "favs" ? "Preferiti" : r.page === "rates" ? "Voti" : r.page === "cmp" ? "Confronto" : r.page === "map" ? "Mappa" : "Crediti foto";
+    const name = r.page === "dest" ? (DEST[r.id] || {}).city : r.page === "trip" ? (PT[r.id] || {}).name : r.page === "favs" ? "Preferiti" : r.page === "rates" ? "Voti" : r.page === "cmp" ? "Confronto" : r.page === "map" ? "Mappa" : r.page === "pin" ? "Accesso" : "Crediti foto";
     document.title = (name ? name + " · " : "") + "Agosto 2027 da Milano";
     window.scrollTo(0, 0);
   }
+  if(r.page === "pin"){ const el = $("pin-in"); if(el && el.focus) el.focus(); }
+  if(hello !== null) toast(hello ? `Ciao ${hello}` : "Ciao! Dispositivo collegato");
   cmpBar();
   onScroll();
 }
@@ -1414,7 +1485,7 @@ function init(){
       if(a === "menu"){ const on = !tn.classList.contains("open"); tn.classList.toggle("open", on); act.setAttribute("aria-expanded", String(on)); return; }
       if(a === "fav" || a === "fav-rm"){ e.preventDefault(); toggleFav(act.dataset.id); return; }
       if(a === "fav-retry"){ FAV.state = "loading"; favPaint(); loadFavs(); return; }
-      if(a === "fav-logout"){ saveToken(""); FAV.map = new Map(); FAV.me = ""; FAV.state = "anon"; rateReset(); favPaint(); ratePaint(); return; }
+      if(a === "fav-logout"){ saveToken(""); saveWho(null); FAV.map = new Map(); FAV.me = ""; FAV.state = "anon"; rateReset(); favPaint(); ratePaint(); return; }
       if(a === "rate"){ e.preventDefault(); const me = rateMe(), v = act.dataset.s === "" ? null : +act.dataset.s; setRate(act.dataset.id, me && v != null && rateOf(act.dataset.id, me.k) === v ? null : v); return; }
       if(a === "rate-retry"){ RATE.state = "loading"; ratePaint(); loadRates(); return; }
       if(a === "cmp"){ e.preventDefault(); cmpToggle(act.dataset.id); return; }
@@ -1450,6 +1521,13 @@ function init(){
     const s = e.target.closest("select[data-k]"); if(s){ setF(s.dataset.k, s.value); return; }
     const v = e.target.closest("select[data-vk]"); if(v){ S.v[v.dataset.vk] = v.value; S.v.n = 30; $("voti-in").innerHTML = votiBody(); }
   });
+  document.addEventListener("submit", e => { if(e.target && e.target.id === "pin-form"){ e.preventDefault(); pinSubmit(); } });
+  document.addEventListener("input", e => {
+    if(e.target.id !== "pin-in") return;
+    const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+    if(v !== e.target.value) e.target.value = v;
+    if(v.length === 4) pinSubmit(v);   // quattro cifre: si prova subito, senza dover toccare "Entra"
+  });
   document.addEventListener("input", e => { if(e.target.id === "q"){ (S.tab === "pop" ? S.p : S.f).q = e.target.value.trim(); updateHome(); } });
   document.addEventListener("keydown", e => {
     if(e.key === "Escape" && S.panel) setPanel(false);
@@ -1458,13 +1536,14 @@ function init(){
   window.addEventListener("hashchange", go);
   window.addEventListener("scroll", onScroll, {passive:true});
   FAV.token = API ? readToken() : "";
+  FAV.who = FAV.token ? readWho() : null;
   FAV.state = !API ? "off" : FAV.token ? "loading" : "anon";
   CMP.ids = cmpRead();
   if(favLive()){ loadFavs(); loadRates(); }
   go();
 }
 const App = {S, parse, pageHTML, homeParts, aggD, aggT, viewD, viewT, go, favUrl, BOT_USERNAME, API, FAV, favsHTML, toggleFav, loadFavs, flightT, histHTML, histRows, histAgg, HIST,
-  RATE, loadRates, setRate, rateBlockIn, rateChipIn, votiHTML, votiList, priceLevel, priceBadge, CMP, cmpToggle, cmpHTML, cmpBarHTML, item, mapHTML, mapBody, mapPoints, mapXY, loadWorld, WORLD, img, srcsetOf};
+  PIN, pinHTML, pinSubmit, readWho, RATE, loadRates, setRate, rateBlockIn, rateChipIn, votiHTML, votiList, priceLevel, priceBadge, CMP, cmpToggle, cmpHTML, cmpBarHTML, item, mapHTML, mapBody, mapPoints, mapXY, loadWorld, WORLD, img, srcsetOf};
 if(typeof window !== "undefined") window.App = App;
 init();
   return App;
