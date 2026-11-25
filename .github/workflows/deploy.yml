@@ -1,5 +1,6 @@
 # Ripubblica il sito dai dati dell'ultimo giro (branch data), senza riscansionare:
-# parte quando cambia la grafica o un catalogo, oppure a mano.
+# parte quando cambia la grafica o un testo, oppure a mano. Se cambiano dests.py / popular_trips.py / origins.py
+# pubblica invece "Scansione mete nuove" (scan-new.yml), che prima cerca i voli delle mete aggiunte.
 name: Pubblica sito
 
 on:
@@ -11,10 +12,7 @@ on:
       - "v2.js"
       - "img/**"
       - "build*.py"
-      - "dests.py"
-      - "origins.py"
       - "itineraries.py"
-      - "popular_trips.py"
       - "pipeline.py"
       - "price_history.py"
       - "bot/config.json"

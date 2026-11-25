@@ -4,6 +4,7 @@
 
   python pipeline.py scan     riscansiona tutto da zero (prezzi nuovi a ogni giro) e scrive scan_meta.json
   python pipeline.py build    build_trips.py, build.py, storico prezzi, build_v2.py -> _site/index.html + _site/img/
+  python pipeline.py fill     solo le query che mancano nei dati dell'ultimo giro (mete/trip appena aggiunti)
   python pipeline.py meta     ricalcola scan_meta.json dai file presenti (dopo un caricamento a mano dei dati)
 
 Dati:
@@ -239,6 +240,80 @@ def write_meta():
     log("scan_meta.json:", meta["queries"], "query,", n_ok, "con voli")
 
 
+# ---------------------------------------------------------------- solo le query nuove
+
+def fill():
+    """Mete o trip appena aggiunti ai cataloghi: si parte dai dati dell'ultimo giro (prev/) e si interrogano solo le
+    query che mancano, con due ricontrolli lenti dei vuoti. La data dei prezzi resta quella del giro: le righe nuove
+    sono piu' fresche, mai piu' vecchie. Nessun controllo anti-blocco sul totale (le righe vecchie restano intatte)."""
+    t0 = time.time()
+    for name in (RAW, TRIPS_RAW, META):
+        src = os.path.join(PREV, name)
+        if not os.path.exists(src):
+            fail("manca %s del giro precedente: lancia prima la scansione completa" % src)
+        shutil.copyfile(src, name)
+    import scan as S, scan_trips as T
+    key = lambda t: "%s|%s|%s|%s|%d" % t
+    prev_raw, prev_trips = load(RAW), load(TRIPS_RAW)
+    a = [c + (2,) for c in S.combos() if key(c + (2,)) not in prev_raw]
+    ta = [k for k in T.tasks(2) if k not in prev_trips]
+    log("query nuove: %d mete, %d trip" % (len(a), len(ta)))
+    if not a and not ta:
+        log("niente di nuovo da cercare"); return
+
+    def rewrite(path, drop):
+        rows = load(path)
+        with open(path, "w", encoding="utf-8") as f:
+            for k, r in rows.items():
+                if k not in drop:
+                    f.write(json.dumps(r, ensure_ascii=False, separators=(",", ":")) + chr(10))
+
+    def dest_round(tasks, label):
+        S.run(tasks, label)
+        for i in (1, 2):                     # ricontrollo dei vuoti: si tolgono e si rifanno con calma
+            done = load(RAW)
+            empty = [t for t in tasks if done.get(key(t), {}).get("st") in ("empty", "error")]
+            if not empty:
+                break
+            rewrite(RAW, {key(t) for t in empty})
+            time.sleep(30)
+            S.run(empty, "%s ricontrollo %d" % (label, i))
+
+    if a:
+        dest_round(a, "nuove A(ms2)")
+        done = load(RAW)
+        b = [t[:4] + (1,) for t in a if done.get(key(t), {}).get("st") == "ok" and key(t[:4] + (1,)) not in done]
+        if b:
+            dest_round(b, "nuove B(ms1)")
+    if ta:
+        T.run(ta, "trip nuovi A(ms2)")
+        T.run(ta, "trip nuovi ricontrollo", workers=2, v=1, slow=True)
+        T.run(ta, "trip nuovi ricontrollo 2", workers=2, v=2, slow=True)
+        done = load(TRIPS_RAW)
+        tb = [k[:-1] + "1" for k in ta if done.get(k, {}).get("st") == "ok" and k[:-1] + "1" not in done]
+        if tb:
+            T.run(tb, "trip nuovi B(ms1)")
+            T.run(tb, "trip nuovi B ricontrollo", workers=2, v=1, slow=True)
+
+    r, t = load(RAW), load(TRIPS_RAW)
+    for path, rows in ((RAW, r), (TRIPS_RAW, t)):
+        rewrite(path, set())                 # una riga per chiave
+    blocked = S.stats.get("blocked", 0) + T.stats.get("blocked", 0)
+    new_keys = [key(x) for x in a] + ta
+    ok_new = sum(1 for k in new_keys if (r.get(k) or t.get(k) or {}).get("st") == "ok")
+    meta = json.load(open(META, encoding="utf-8"))
+    meta.update({"queries": len(r) + len(t),
+                 "ok_total": sum(1 for d in (r, t) for x in d.values() if x.get("st") == "ok"),
+                 "fill": {"generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                          "minutes": round((time.time() - t0) / 60, 1), "new": len(new_keys), "ok_new": ok_new,
+                          "blocked": blocked}})
+    with open(META, "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=1)
+    log("OK-FILL nuove=%d con voli=%d bloccate=%d minuti=%s" % (len(new_keys), ok_new, blocked, meta["fill"]["minutes"]))
+    if blocked > MAX_BLOCKED:
+        fail("Google ha bloccato %d query durante la ricerca delle mete nuove: dati non pubblicati." % blocked)
+
+
 # ---------------------------------------------------------------- build
 
 def build():
@@ -281,6 +356,8 @@ if __name__ == "__main__":
         scan()
     elif stage == "build":
         build()
+    elif stage == "fill":
+        fill()
     elif stage == "meta":
         write_meta()
     else:

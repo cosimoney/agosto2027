@@ -1,0 +1,98 @@
+# Mete o Popular trips appena aggiunti ai cataloghi: cerca SOLO le query che mancano nei dati dell'ultimo giro,
+# poi ripubblica il sito. Niente avvisi Telegram (arrivano col giro giornaliero). Parte da solo quando cambia un
+# catalogo su main, oppure a mano. Se non manca nulla si limita a ripubblicare (come "Pubblica sito").
+name: Scansione mete nuove
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dests.py"
+      - "popular_trips.py"
+      - "origins.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# stesso gruppo della scansione giornaliera e della pubblicazione: mai due giri sui dati insieme
+concurrency:
+  group: scan
+  cancel-in-progress: false
+
+jobs:
+  fill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    environment:
+      name: github-pages
+      url: ${{ steps.pages1.outputs.page_url || steps.pages2.outputs.page_url || steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install --quiet -r requirements.txt
+
+      - name: Dati dell'ultimo giro
+        run: bash .github/fetch_data.sh prev
+
+      - name: Cerca solo le query mancanti
+        env:
+          WORKERS: "3"
+        run: python pipeline.py fill
+
+      - name: Build del sito
+        run: python pipeline.py build
+
+      - name: Bot - snapshot delle offerte
+        run: python bot/snapshot.py --raw raw_v2.jsonl --trips trips_data.json
+
+      - name: Salva i dati (branch data)
+        run: |
+          prev_date="$(python -c "import json;print(json.load(open('scan_meta.json',encoding='utf-8'))['date'])")"
+          bash .github/push_data.sh "Dati del giro del $prev_date + mete nuove $(date -u +%F)"
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+      # deploy-pages a volte non trova subito l'artifact: due tentativi in piu' con una pausa
+      - name: Pubblica su GitHub Pages
+        id: pages1
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+      - name: Pausa prima del secondo tentativo
+        if: steps.pages1.outcome == 'failure'
+        run: sleep 60
+      - name: Pubblica su GitHub Pages (2)
+        id: pages2
+        if: steps.pages1.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+      - name: Pausa prima del terzo tentativo
+        if: steps.pages1.outcome == 'failure' && steps.pages2.outcome == 'failure'
+        run: sleep 120
+      - name: Pubblica su GitHub Pages (3)
+        id: pages
+        if: steps.pages1.outcome == 'failure' && steps.pages2.outcome == 'failure'
+        uses: actions/deploy-pages@v5
+
+      - name: Avvisa l'admin se e' fallito
+        if: failure() || cancelled()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ADMIN_CHAT: ${{ secrets.TELEGRAM_ADMIN_CHAT }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_ADMIN_CHAT" ]; then exit 0; fi
+          REASON="$(head -c 600 fail_reason.txt 2>/dev/null || true)"
+          [ -n "$REASON" ] || REASON="un passo del workflow non e' andato a buon fine."
+          curl -sS -o /dev/null --max-time 30 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_ADMIN_CHAT}" --data-urlencode "disable_web_page_preview=true" \
+            --data-urlencode "text=Ricerca mete nuove fallita: ${REASON} Il sito resta quello di prima. ${RUN_URL}"
