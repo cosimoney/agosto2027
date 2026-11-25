@@ -4,12 +4,15 @@
 //   GET  /api/favs                  elenco dei preferiti con chi e quando     (Bearer: token personale)
 //   POST /api/rate    {id, s}       voto 0-5 di chi chiama su una meta o un trip; s null lo toglie   (Bearer: token personale)
 //   GET  /api/rates                 voti di tutti i profili, con i nomi                          (Bearer: token personale)
+//   POST /api/pin     {alias, pin}  indirizzo corto + PIN di 4 cifre -> {token, name}: lo stesso token di /sito   (nessun Bearer)
 //   GET  /api/prefs                 preferenze complete per bot/alerts.py     (Bearer: PREFS_SECRET)
 //   POST /tg/<WEBHOOK_SECRET>       webhook Telegram (controlla anche l'header X-Telegram-Bot-Api-Secret-Token)
 //
 // Stato su KV (binding PREFS): "prefs" = stessa struttura di bot/state/prefs.json, "auth" = versione dei link per chat,
 // "rates:<chat_hash>" = voti di un profilo {id: [stelle, quando]}: una chiave a testa, cosi' due voti insieme non si pestano.
-// Secret: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_IDS, HMAC_SECRET, PREFS_SECRET, WEBHOOK_SECRET; facoltativo CHAT_NAMES ("id:Nome,id:Nome").
+// "pin:<chat_hash>" = {h: HMAC del PIN, n: nome, at}, "pinlock:<alias>" = {n: errori, lvl, until} con scadenza.
+// Secret: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_IDS, HMAC_SECRET, PREFS_SECRET, WEBHOOK_SECRET; facoltativi CHAT_NAMES ("id:Nome,id:Nome")
+// e ALIASES ("alias:id,alias:id": gli indirizzi corti del sito, mai scritti nel repo).
 // Nei log non finiscono mai chat_id, nomi, token o testi dei messaggi.
 import CONFIG from "../../bot/config.json" with { type: "json" };
 import { Bot, ID_RE, esc, loadConfig, normPrefs, resolveTarget, splitMessage, romeToday } from "./bot.js";
@@ -161,6 +164,10 @@ async function siteLink(env, chat, name, renew) {
   const token = await signToken(env.HMAC_SECRET, { c: chat, v, n: name || "" });
   return conf(env, "SITE_URL").split("#")[0] + "#/login/" + token;
 }
+async function personalToken(env, chat, name) {
+  const auth = await kvJson(env, "auth", {});
+  return signToken(env.HMAC_SECRET, { c: chat, v: Number(auth[String(chat)]) || 1, n: name || "" });
+}
 async function cmdSito(env, chat, name, arg) {
   const renew = /^(nuovo|revoca|reset|rigenera)/i.test(arg || "");
   if (!env.HMAC_SECRET) return ["Il collegamento con il sito non è ancora configurato.", null];
@@ -170,6 +177,105 @@ async function cmdSito(env, chat, name, arg) {
     "Aprilo una volta su ogni dispositivo (telefono, computer): da quel momento la stella sul sito salva subito e trovi la pagina Preferiti.\n" +
     "Il link vale solo per te, non inoltrarlo. Per annullare quelli già creati: <code>/sito nuovo</code>.",
     [[["⭐ Apri il sito con i preferiti", "url:" + link]]]];
+}
+
+// ---------- indirizzo corto + PIN ----------
+// Gli alias stanno solo nel secret ALIASES. Il PIN si sceglie dal bot con /pin: nel KV finisce il suo HMAC (chiave HMAC_SECRET,
+// sale = chat), mai il PIN. Errori: dopo PIN_MAX_FAILS di fila l'alias si blocca per PIN_LOCKS[livello]; il livello cala dopo un giorno tranquillo.
+export const ALIAS_RE = /^[a-z]{2,12}$/;
+const PIN_RE = /^\d{4}$/;
+const PIN_MAX_FAILS = 5;
+const PIN_LOCKS = [15 * 60, 60 * 60, 4 * 3600, 24 * 3600]; // secondi
+const PIN_MEMORY = 24 * 3600;
+const pinKey = (h) => "pin:" + h;
+const lockKey = (alias) => "pinlock:" + alias;
+export function aliasMap(env) {
+  const out = {}, ok = allowedChats(env);
+  for (const p of String(env.ALIASES || "").split(/[,;\s]+/)) {
+    const m = /^([a-z]{2,12})[:=](-?\d+)$/.exec(p);
+    if (m && ok.includes(Number(m[2]))) out[m[1]] = Number(m[2]);
+  }
+  return out;
+}
+export const pinHash = (secret, chat, pin) => hmacHex(secret, `pin-v1:${chat}:${pin}`);
+const weakPin = (p) => /^(\d)\1{3}$/.test(p) || "01234567890".includes(p) || "09876543210".includes(p);
+const aliasOf = (env, chat) => (Object.entries(aliasMap(env)).find(([, c]) => c === chat) || [null])[0];
+const aliasUrl = (env, alias) => conf(env, "SITE_URL").split("#")[0] + "#/" + alias;
+
+// Alias sconosciuti: stesso conteggio ma in memoria, cosi' la risposta e' uguale e nessuno puo' riempire il KV di chiavi inventate.
+const GHOST = new Map();
+// Un tentativo alla volta per alias dentro lo stesso isolate: il contatore non si fa scavalcare da richieste in parallelo.
+const QUEUE = new Map();
+function serial(key, fn) {
+  const run = (QUEUE.get(key) || Promise.resolve()).then(fn, fn);
+  const tail = run.catch(() => {});
+  QUEUE.set(key, tail);
+  tail.then(() => { if (QUEUE.get(key) === tail) QUEUE.delete(key); });
+  return run;
+}
+export const _resetPinMemory = () => { GHOST.clear(); QUEUE.clear(); };
+
+async function pinAttempt(env, alias, pin, now) {
+  const chat = aliasMap(env)[alias], real = chat !== undefined;
+  const rec = (real ? await kvJson(env, lockKey(alias), null) : GHOST.get(alias)) || { n: 0, lvl: 0, until: 0 };
+  if (rec.until > now) return { status: 429, body: { ok: false, error: "locked", retry: Math.ceil((rec.until - now) / 1000) } };
+  // stesso lavoro per alias veri e inventati: una lettura dal KV, un HMAC, un confronto a tempo costante
+  const saved = await kvJson(env, pinKey(await chatHash(env.TELEGRAM_BOT_TOKEN, real ? chat : 0)), null);
+  const good = await sameSecret(await pinHash(env.HMAC_SECRET, real ? chat : 0, pin), (real && saved && saved.h) || "nessun-pin");
+  if (good) {
+    if (rec.n || rec.lvl) await env.PREFS.delete(lockKey(alias));
+    const name = nameOf(env, chat, { first_name: saved.n });
+    return { status: 200, body: { ok: true, token: await personalToken(env, chat, name), name: name || "" } };
+  }
+  rec.n = (Number(rec.n) || 0) + 1;
+  let locked = 0;
+  if (rec.n >= PIN_MAX_FAILS) {
+    locked = PIN_LOCKS[Math.min(Number(rec.lvl) || 0, PIN_LOCKS.length - 1)];
+    rec.lvl = (Number(rec.lvl) || 0) + 1; rec.n = 0; rec.until = now + locked * 1000;
+  }
+  if (real) await env.PREFS.put(lockKey(alias), JSON.stringify(rec), { expirationTtl: locked + PIN_MEMORY });
+  else { if (GHOST.size > 2000) GHOST.clear(); GHOST.set(alias, rec); }
+  if (!locked) return { status: 401, body: { ok: false, error: "bad_pin", left: PIN_MAX_FAILS - rec.n } };
+  return { status: 429, body: { ok: false, error: "locked", retry: locked }, notify: real ? chat : null, locked };
+}
+const lockTxt = (s) => (s >= 3600 ? (s === 3600 ? "un'ora" : `${Math.round(s / 3600)} ore`) : `${Math.round(s / 60)} minuti`);
+async function apiPin(req, env, ctx) {
+  let body = null;
+  try { body = await req.json(); } catch (e) { /* corpo non JSON */ }
+  if (!body || typeof body.alias !== "string" || typeof body.pin !== "string" || !ALIAS_RE.test(body.alias) || !PIN_RE.test(body.pin)) {
+    return json(req, env, 400, { ok: false, error: "bad_request" });
+  }
+  const r = await serial(body.alias, () => pinAttempt(env, body.alias, body.pin, Date.now()));
+  if (r.notify != null) {
+    const p = new Telegram(env.TELEGRAM_BOT_TOKEN).send(r.notify, `🔒 <b>Troppi PIN sbagliati</b> sul tuo indirizzo del sito: l'accesso con il PIN è bloccato per ${lockTxt(r.locked)}.\n` +
+      "I dispositivi già collegati continuano a funzionare. Se eri tu, per sbloccare subito imposta di nuovo il PIN con <code>/pin</code> seguito dalle tue 4 cifre. " +
+      "Se non eri tu non devi fare nulla: senza PIN non si entra.", null)
+      .catch((e) => console.log("avviso blocco PIN non inviato: " + String(e.message).slice(0, 80)));
+    if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p;
+  }
+  return json(req, env, r.status, r.body);
+}
+/** /pin: stato, /pin 1234 imposta, /pin off toglie. -> [testo, bottoni]. Il messaggio con il PIN lo cancella handleUpdate. */
+async function cmdPin(env, chat, name, arg) {
+  if (!env.HMAC_SECRET) return ["Il collegamento con il sito non è ancora configurato.", null];
+  const alias = aliasOf(env, chat), a = String(arg || "").trim().toLowerCase();
+  if (!alias) return ["Per questa chat non c'è ancora un indirizzo corto del sito. Intanto puoi entrare con il link di /sito.", null];
+  const key = pinKey(await chatHash(env.TELEGRAM_BOT_TOKEN, chat)), url = aliasUrl(env, alias), open = [[["🔗 Apri il tuo indirizzo", "url:" + url]]];
+  if (!a) {
+    const has = !!((await kvJson(env, key, null)) || {}).h;
+    return [`🔢 <b>Il tuo indirizzo del sito</b>\n${esc(url)}\nSi apre da qualsiasi dispositivo e chiede un PIN di 4 cifre: niente link da Telegram.\n\n` +
+      (has ? "Il PIN è <b>impostato</b>. Per cambiarlo: <code>/pin 4827</code> (con le tue 4 cifre). Per disattivarlo: <code>/pin off</code>."
+        : "Il PIN <b>non è ancora impostato</b>. Sceglilo così: <code>/pin 4827</code> (con le tue 4 cifre)."), has ? open : null];
+  }
+  if (["off", "no", "via", "togli"].includes(a)) {
+    await env.PREFS.delete(key);
+    return ["🔢 PIN disattivato: dal tuo indirizzo corto non si entra più finché non ne imposti uno nuovo. I dispositivi già collegati restano collegati (per scollegarli: <code>/sito nuovo</code>).", null];
+  }
+  if (!PIN_RE.test(a)) return ["Il PIN è di 4 cifre, per esempio <code>/pin 4827</code>. Per disattivarlo: <code>/pin off</code>.", null];
+  if (weakPin(a)) return ["Questo PIN è troppo facile da indovinare (cifre uguali o in fila). Scegline un altro.", null];
+  await env.PREFS.put(key, JSON.stringify({ h: await pinHash(env.HMAC_SECRET, chat, a), n: name || "", at: new Date().toISOString() }));
+  await env.PREFS.delete(lockKey(alias)); // chi imposta il PIN dal bot e' il proprietario: via anche un eventuale blocco
+  return [`🔢 <b>PIN salvato.</b> Da ora entri da ${esc(url)} con le tue 4 cifre, da qualsiasi dispositivo. Non dirlo a nessuno.`, open];
 }
 
 /** Bearer del sito -> {chat, name} oppure null (firma errata, link revocato, chat non piu' autorizzata). */
@@ -345,6 +451,14 @@ export async function handleUpdate(u, env, cfg) {
   let res, bot = null, before = null;
   if (c && (c.cmd === "sito" || (c.cmd === "start" && /^sito\b/i.test(c.arg)))) {
     res = await cmdSito(env, chat, who, c.cmd === "sito" ? c.arg : c.arg.slice(4).trim());
+  } else if (c && (c.cmd === "pin" || (c.cmd === "start" && /^pin\b/i.test(c.arg)))) {
+    const arg = c.cmd === "pin" ? c.arg : c.arg.slice(3).trim();
+    res = await cmdPin(env, chat, who, arg);
+    if (/\d/.test(arg)) { // il messaggio contiene (o prova a contenere) un PIN: via dalla chat
+      let gone = false;
+      try { if (msg.message_id != null) { await tg.call("deleteMessage", { chat_id: chat, message_id: msg.message_id }); gone = true; } } catch (e) { /* resta in chat */ }
+      res = [res[0] + (gone ? "\nHo cancellato il tuo messaggio, così il PIN non resta in chat." : "\nCancella dalla chat il messaggio con il PIN."), res[1]];
+    }
   } else if (c && c.cmd === "voti") {
     res = await cmdVoti(env, chat, who, await getSnapshot(env));
   } else {
@@ -354,7 +468,7 @@ export async function handleUpdate(u, env, cfg) {
     res = cb ? bot.onCallback(cb.data) : bot.onText(msg.text);
     if (JSON.stringify(bot.prefs) !== before) await savePrefs(env, bot.prefs); // prima di rispondere: un invio fallito non perde la modifica
     // /voti vive solo nel Worker (i voti stanno su KV): la riga si aggiunge qui, cosi' bot.js resta allineato a commands.py
-    if (res && c && (c.cmd === "help" || (c.cmd === "start" && !c.arg))) res = [res[0] + "\n/voti - i voti che avete dato a mete e giri", res[1]];
+    if (res && c && (c.cmd === "help" || (c.cmd === "start" && !c.arg))) res = [res[0] + "\n/voti - i voti che avete dato a mete e giri\n/pin - il tuo indirizzo corto del sito e il PIN di 4 cifre per entrarci", res[1]];
   }
   if (!res) return "skip";
   await tg.send(chat, res[0], res[1]);
@@ -434,6 +548,7 @@ export default {
         if (path === "/api/fav" && req.method === "POST") return await apiFav(req, env, cfg, ctx);
         if (path === "/api/rates" && req.method === "GET") return await apiRates(req, env);
         if (path === "/api/rate" && req.method === "POST") return await apiRate(req, env);
+        if (path === "/api/pin" && req.method === "POST") return await apiPin(req, env, ctx);
         if (path === "/api/prefs" && req.method === "GET") return await apiPrefs(req, env, cfg);
         return json(req, env, 404, { ok: false, error: "not_found" });
       }

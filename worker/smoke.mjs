@@ -14,7 +14,8 @@ const ok = (c, msg, extra = "") => { console.log(`  [${c ? "ok" : "FALLITO"}] ${
 const get = (path, headers = {}) => fetch(U + path, { headers });
 const post = (path, body, headers = {}) => fetch(U + path, { method: "POST", headers: Object.assign({ "Content-Type": "application/json" }, headers), body: JSON.stringify(body) });
 
-if (!U || !chats.includes(chat)) { console.error("servono WORKER_URL e una TEST_CHAT_ID tra le chat autorizzate"); process.exit(2); }
+// SMOKE_PUBLIC=1: solo le prove che non hanno bisogno di secret (il Worker risponde, CORS, errori di /api/pin)
+if (!U || (!env.SMOKE_PUBLIC && !chats.includes(chat))) { console.error("servono WORKER_URL e una TEST_CHAT_ID tra le chat autorizzate"); process.exit(2); }
 
 let r = await get("/");
 ok(r.status === 200, "il Worker risponde");
@@ -30,6 +31,18 @@ for (const [name, key] of [["PREFS_SECRET", env.PREFS_SECRET], ["chiave derivata
   const p = r.status === 200 ? await r.json() : null;
   ok(p && typeof p.favorites === "object" && typeof p.threshold === "number", `/api/prefs con ${name}`, String(r.status));
 }
+
+// indirizzo corto con PIN: solo gli errori, con un alias inventato (i contatori dei profili veri non si toccano)
+const ghost = "zz" + Array.from({ length: 8 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join("");
+r = await post("/api/pin", { alias: ghost, pin: "12" }, { Origin: ORIGIN });
+ok(r.status === 400, "/api/pin: richiesta malformata rifiutata", String(r.status));
+r = await post("/api/pin", { alias: ghost, pin: "0000" }, { Origin: ORIGIN });
+let pj = r.status === 401 ? await r.json() : {};
+ok(r.status === 401 && pj.error === "bad_pin" && !pj.token && r.headers.get("access-control-allow-origin") === ORIGIN, "/api/pin: PIN errato o alias inesistente, 401 uniforme e CORS per il sito", String(r.status));
+r = await post("/api/pin", { alias: ghost, pin: "0000" }, { Origin: "https://example.org" });
+ok(!r.headers.get("access-control-allow-origin"), "/api/pin: nessun CORS per altri siti");
+r = await get("/api/pin");
+ok(r.status === 404, "/api/pin: solo POST", String(r.status));
 
 if (env.HMAC_SECRET) {
   const auth = { Authorization: "Bearer " + (await signToken(env.HMAC_SECRET, { c: chat, v: 1, n: "" })), Origin: ORIGIN };

@@ -1,7 +1,7 @@
 // Test del Worker senza rete: KV finto, fetch finto (Telegram e snapshot), update Telegram finti.  node --test test/
 import test from "node:test";
 import assert from "node:assert/strict";
-import worker, { signToken, verifyToken, chatHash, derivedPrefsKey, _resetSnapshotCache } from "../src/index.js";
+import worker, { signToken, verifyToken, chatHash, derivedPrefsKey, pinHash, aliasMap, _resetSnapshotCache, _resetPinMemory } from "../src/index.js";
 
 const ME = 111111111, LAVI = 9222222222, STRANGER = 999999999;
 const ORIGIN = "https://cosimoney.github.io";
@@ -23,10 +23,13 @@ const SNAPSHOT = {
 
 function setup(extraEnv = {}) {
   _resetSnapshotCache();
-  const kv = new Map(), sent = [], calls = [];
+  _resetPinMemory();
+  const kv = new Map(), ttl = new Map(), sent = [], calls = [];
   const env = Object.assign({
-    PREFS: { get: async (k, type) => (kv.has(k) ? (type === "json" ? JSON.parse(kv.get(k)) : kv.get(k)) : null), put: async (k, v) => { kv.set(k, v); } },
+    PREFS: { get: async (k, type) => (kv.has(k) ? (type === "json" ? JSON.parse(kv.get(k)) : kv.get(k)) : null), put: async (k, v, o) => { kv.set(k, v); ttl.set(k, o && o.expirationTtl); },
+      delete: async (k) => { kv.delete(k); } },
     TELEGRAM_BOT_TOKEN: "000000:TEST", TELEGRAM_CHAT_IDS: `${ME},${LAVI}`, CHAT_NAMES: `${ME}:Cosimo,${LAVI}:Lavi`,
+    ALIASES: `uno:${ME},due:${LAVI}`,
     HMAC_SECRET: "hmac-test-secret", PREFS_SECRET: "prefs-test-secret", WEBHOOK_SECRET: "hook-test-secret",
   }, extraEnv);
   globalThis.fetch = async (url, init) => {
@@ -49,7 +52,9 @@ function setup(extraEnv = {}) {
   const text = (chat, t, name = "Tg") => hook({ update_id: 1, message: { chat: { id: chat }, from: { first_name: name }, text: t } });
   const press = (chat, data) => hook({ update_id: 2, callback_query: { id: "cb1", data, from: { first_name: "Tg" }, message: { chat: { id: chat } } } });
   const prefs = () => JSON.parse(kv.get("prefs") || "{}");
-  return { env, kv, sent, calls, call, api, hook, text, press, prefs, token: (chat, v = 1, n = "") => signToken(env.HMAC_SECRET, { c: chat, v, n }) };
+  const pin = (alias, p, headers = {}) => call("/api/pin", { method: "POST", headers: Object.assign({ Origin: ORIGIN, "Content-Type": "application/json" }, headers),
+    body: JSON.stringify({ alias, pin: p }) });
+  return { env, kv, ttl, pin, sent, calls, call, api, hook, text, press, prefs, token: (chat, v = 1, n = "") => signToken(env.HMAC_SECRET, { c: chat, v, n }) };
 }
 
 test("token: firma, verifica, manomissione", async () => {
@@ -354,4 +359,146 @@ test("webhook: /voti e riga in /help", async () => {
   assert.match(t, /<b>Manca un voto<\/b>\n1\. <b>Erevan<\/b> · Cosimo ★★☆☆☆ · Lavi –\n2\. <b>Georgia e Armenia<\/b> · Cosimo – · Lavi ☆☆☆☆☆/);
   await s.text(ME, "/help");
   assert.match(s.sent[2].text, /\/voti - /);
+});
+
+test("/pin nel bot: stato, imposta, rifiuta i PIN facili, off; nel KV solo l'hash", async () => {
+  const s = setup();
+  const msg = (chat, t, id = 77) => s.hook({ update_id: 1, message: { message_id: id, chat: { id: chat }, from: { first_name: "Tg" }, text: t } });
+  await msg(ME, "/pin");
+  assert.match(s.sent[0].text, /agosto2027\/#\/uno/);
+  assert.match(s.sent[0].text, /non è ancora impostato/);
+  assert.equal(s.kv.size, 0);
+  for (const bad of ["/pin 12", "/pin 12345", "/pin abcd", "/pin 1111", "/pin 1234", "/pin 9876", "/pin 0000"]) await msg(ME, bad);
+  assert.equal(s.kv.size, 0, "nessun PIN non valido o banale salvato");
+  assert.match(s.sent.at(-1).text, /troppo facile/);
+  assert.ok(s.calls.some(([m, b]) => m === "deleteMessage" && b.chat_id === ME && b.message_id === 77), "il messaggio con il PIN viene cancellato");
+  await msg(ME, "/pin 4827");
+  assert.match(s.sent.at(-1).text, /PIN salvato/);
+  assert.match(s.sent.at(-1).text, /Ho cancellato il tuo messaggio/);
+  assert.equal(s.sent.at(-1).reply_markup.inline_keyboard[0][0].url, "https://cosimoney.github.io/agosto2027/#/uno");
+  const key = "pin:" + (await chatHash(s.env.TELEGRAM_BOT_TOKEN, ME)), rec = JSON.parse(s.kv.get(key));
+  assert.equal(rec.h, await pinHash(s.env.HMAC_SECRET, ME, "4827"));
+  assert.notEqual(rec.h, await pinHash(s.env.HMAC_SECRET, LAVI, "4827"), "il sale e' la chat: stesso PIN, hash diverso");
+  assert.ok(![...s.kv.values()].some((v) => v.includes("4827")) && !s.sent.some((m) => /salvato/.test(m.text) && m.text.includes("4827")), "il PIN non resta in chiaro");
+  assert.ok(![...s.kv.keys()].some((k) => k.includes(String(ME))), "nessun chat_id nelle chiavi");
+  await msg(ME, "/pin");
+  assert.match(s.sent.at(-1).text, /Il PIN è <b>impostato<\/b>/);
+  await msg(ME, "/start pin");
+  assert.match(s.sent.at(-1).text, /Il PIN è <b>impostato<\/b>/);
+  await msg(ME, "/pin off");
+  assert.match(s.sent.at(-1).text, /PIN disattivato/);
+  assert.ok(!s.kv.has(key));
+  assert.equal((await s.pin("uno", "4827")).status, 401, "dopo /pin off non si entra");
+  await msg(ME, "/help");
+  assert.match(s.sent.at(-1).text, /\/pin - /);
+  // chat senza alias, chat non autorizzata
+  const s2 = setup({ ALIASES: `uno:${ME}` });
+  await s2.text(LAVI, "/pin 4827");
+  assert.match(s2.sent[0].text, /non c'è ancora un indirizzo corto/);
+  assert.equal(s2.kv.size, 0);
+  await s2.text(STRANGER, "/pin 4827");
+  assert.equal(s2.sent.length, 1);
+  assert.deepEqual(aliasMap({ ALIASES: `uno:${ME},x:1,Bad:2,tre:${STRANGER}`, TELEGRAM_CHAT_IDS: `${ME}` }), { uno: ME }, "alias solo per chat autorizzate e nomi validi");
+});
+
+test("/api/pin: PIN giusto -> stesso token di /sito; errori uniformi; CORS", async () => {
+  const s = setup();
+  await s.text(ME, "/pin 4827");
+  await s.text(LAVI, "/pin 5310", "Lavinia");
+  let r = await s.pin("uno", "4827"), j = await r.json();
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get("access-control-allow-origin"), ORIGIN);
+  assert.equal(r.headers.get("cache-control"), "no-store");
+  assert.deepEqual(Object.keys(j).sort(), ["name", "ok", "token"]);
+  assert.equal(j.name, "Cosimo");
+  assert.equal((await verifyToken(s.env.HMAC_SECRET, j.token)).c, ME);
+  assert.equal((await (await s.api("/api/favs", j.token)).json()).me, "Cosimo", "il token vale per le altre API");
+  await s.text(ME, "/sito");
+  assert.equal(s.sent.at(-1).reply_markup.inline_keyboard[0][0].url.split("#/login/")[1], j.token, "identico al token del link di /sito");
+  assert.equal((await (await s.pin("due", "5310")).json()).name, "Lavi");
+  assert.equal((await s.pin("due", "4827")).status, 401, "il PIN di un altro profilo non vale");
+  // dopo /sito nuovo il PIN da' il token nuovo, quello vecchio e' revocato
+  await s.text(ME, "/sito nuovo");
+  const j2 = await (await s.pin("uno", "4827")).json();
+  assert.notEqual(j2.token, j.token);
+  assert.equal((await s.api("/api/favs", j.token)).status, 401);
+  assert.equal((await s.api("/api/favs", j2.token)).status, 200);
+  // senza CHAT_NAMES vale il nome Telegram di chi ha impostato il PIN
+  const s4 = setup({ CHAT_NAMES: "" });
+  await s4.text(ME, "/pin 4827", "Mimmo");
+  assert.equal((await (await s4.pin("uno", "4827")).json()).name, "Mimmo");
+  // risposta identica per: PIN errato, alias inesistente, alias vero senza PIN
+  const s3 = setup();
+  await s3.text(ME, "/pin 4827");
+  const out = [];
+  for (const [a, p] of [["uno", "0001"], ["boh", "4827"], ["due", "4827"]]) { r = await s3.pin(a, p); out.push([r.status, await r.text()]); }
+  assert.deepEqual(out[0], [401, JSON.stringify({ ok: false, error: "bad_pin", left: 4 })]);
+  assert.deepEqual(out[1], out[0], "alias inesistente: stessa risposta");
+  assert.deepEqual(out[2], out[0], "alias senza PIN: stessa risposta");
+  assert.ok(![...s3.kv.keys()].some((k) => k.includes("boh")), "gli alias inventati non scrivono nel KV");
+  // richieste malformate: 400 e nessun tentativo contato
+  for (const body of ["x", "{}", JSON.stringify({ alias: "uno" }), JSON.stringify({ alias: "uno", pin: 4827 }), JSON.stringify({ alias: "UNO", pin: "4827" }),
+    JSON.stringify({ alias: "uno", pin: "48270" }), JSON.stringify({ alias: "u", pin: "4827" }), JSON.stringify({ alias: "uno/../x", pin: "4827" })]) {
+    assert.equal((await s3.call("/api/pin", { method: "POST", body })).status, 400, body);
+  }
+  assert.equal(JSON.parse(s3.kv.get("pinlock:uno")).n, 1);
+  assert.equal((await s3.call("/api/pin")).status, 404, "solo POST");
+  r = await s3.pin("uno", "4827", { Origin: "https://example.org" });
+  assert.equal(r.headers.get("access-control-allow-origin"), null);
+  r = await s3.call("/api/pin", { method: "OPTIONS", headers: { Origin: ORIGIN } });
+  assert.equal(r.status, 204);
+  assert.equal((await setup({ HMAC_SECRET: "" }).pin("uno", "4827")).status, 503);
+});
+
+test("/api/pin: blocco dopo 5 errori, crescente, avviso Telegram, sblocco", async () => {
+  const realNow = Date.now;
+  let now = 1_800_000_000_000;
+  Date.now = () => now;
+  try {
+    const s = setup();
+    await s.text(ME, "/pin 4827");
+    const n0 = s.sent.length, st = [];
+    for (let i = 0; i < 4; i++) { const r = await s.pin("uno", "000" + i); st.push([r.status, (await r.json()).left]); }
+    assert.deepEqual(st, [[401, 4], [401, 3], [401, 2], [401, 1]]);
+    assert.equal(s.sent.length, n0, "nessun avviso prima del blocco");
+    let r = await s.pin("uno", "0009"), j = await r.json();
+    assert.deepEqual([r.status, j], [429, { ok: false, error: "locked", retry: 900 }]);
+    assert.equal(s.sent.length, n0 + 1);
+    assert.equal(s.sent.at(-1).chat_id, ME);
+    assert.match(s.sent.at(-1).text, /Troppi PIN sbagliati.*bloccato per 15 minuti/s);
+    assert.equal(s.ttl.get("pinlock:uno"), 900 + 86400, "il contatore scade da solo");
+    now += 60_000;
+    r = await s.pin("uno", "4827"); j = await r.json();
+    assert.deepEqual([r.status, j], [429, { ok: false, error: "locked", retry: 840 }], "durante il blocco anche il PIN giusto e' rifiutato");
+    assert.equal(s.sent.length, n0 + 1, "un solo avviso per blocco");
+    assert.equal((await s.pin("due", "0000")).status, 401, "il blocco riguarda solo quell'alias");
+    now += 15 * 60_000;
+    for (let i = 0; i < 4; i++) assert.equal((await s.pin("uno", "000" + i)).status, 401);
+    r = await s.pin("uno", "0009"); j = await r.json();
+    assert.equal(j.retry, 3600, "secondo blocco: un'ora");
+    assert.match(s.sent.at(-1).text, /bloccato per un'ora/);
+    // il proprietario si sblocca dal bot reimpostando il PIN
+    await s.text(ME, "/pin 4827");
+    assert.ok(!s.kv.has("pinlock:uno"));
+    assert.equal((await s.pin("uno", "4827")).status, 200);
+    // un accesso riuscito azzera gli errori
+    await s.pin("uno", "0001");
+    assert.ok(s.kv.has("pinlock:uno"));
+    await s.pin("uno", "4827");
+    assert.ok(!s.kv.has("pinlock:uno"));
+    // alias inventato: stesso comportamento visto da fuori, nessuna scrittura e nessun messaggio
+    const before = s.sent.length, g = [];
+    for (let i = 0; i < 6; i++) { r = await s.pin("fantasma", "000" + i); g.push(r.status); }
+    assert.deepEqual(g, [401, 401, 401, 401, 429, 429]);
+    assert.deepEqual(await r.json(), { ok: false, error: "locked", retry: 900 });
+    assert.equal(s.sent.length, before);
+    assert.ok(![...s.kv.keys()].some((k) => k.includes("fantasma")));
+    // richieste in parallelo: il contatore non si fa scavalcare
+    const s2 = setup();
+    await s2.text(ME, "/pin 4827");
+    const par = await Promise.all(Array.from({ length: 12 }, (_, i) => s2.pin("uno", String(1000 + i * 7))));
+    assert.equal(par.filter((x) => x.status === 401).length, 4);
+    assert.equal(par.filter((x) => x.status === 429).length, 8);
+    assert.equal(s2.sent.filter((m) => /Troppi PIN/.test(m.text)).length, 1);
+  } finally { Date.now = realNow; }
 });
