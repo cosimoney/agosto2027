@@ -41,10 +41,10 @@ HELP = """<b>Comandi</b>
 Le mete si indicano con codice aeroporto, nome o ID (d_TBS destinazione, t_georgia-armenia giro, w_BCN weekend).
 I prezzi sono sempre A/R <b>a persona</b>; tra parentesi o dopo il punto trovi la coppia."""
 
-MENU = [("top", "Le 5 mete migliori sotto soglia"), ("meta", "Miglior prezzo e date di una meta"), ("preferiti", "I tuoi preferiti"),
+MENU = [("top", "Le 5 mete migliori sotto soglia"), ("meta", "Miglior prezzo e date di una meta"), ("preferiti", "I tuoi preferiti"), ("voti", "Voti di Cosimo e Lavi a confronto"),
         ("aggiungi", "Aggiungi un preferito"), ("rimuovi", "Rimuovi un preferito"), ("soglia", "Imposta la soglia in euro a persona"),
         ("silenzia", "Silenzia una meta per 7 giorni"), ("digest", "Frequenza del riepilogo"),
-        ("pausa", "Sospendi gli avvisi"), ("riprendi", "Riattiva gli avvisi"), ("sito", "Link personale per i preferiti sul sito"),
+        ("pausa", "Sospendi gli avvisi"), ("riprendi", "Riattiva gli avvisi"), ("sito", "Link personale per i preferiti sul sito"), ("pin", "PIN per entrare dal sito con l'indirizzo corto"),
         ("help", "Elenco comandi")]
 
 
