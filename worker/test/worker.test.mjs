@@ -373,6 +373,9 @@ test("webhook: /voti e riga in /help", async () => {
   assert.match(t, /Totale a persona = voli \+ voli interni \+ a terra/);
   assert.deepEqual([tripCost(SNAPSHOT, "t_peru").voli, tripCost(SNAPSHOT, "t_peru").lo, tripCost(SNAPSHOT, "t_peru").hi], [1450, 1450 + 180 + 1500, 1450 + 180 + 2100]);
   assert.equal(tripCost(SNAPSHOT, "t_non-esiste").text, "voli n.d.");
+  // snapshot senza i costi del giro (scritto prima di questa modifica): si usa la tabella di ripiego del Worker
+  const old = { targets: { "t_georgia-armenia": { name: "Georgia e Armenia" } }, offers: [offer("t_georgia-armenia", "MXP", "2027-08-07", "2027-08-18", 410)] };
+  assert.match(tripCost(old, "t_georgia-armenia").text, /^voli 410 € pp da MXP · totale [\d.]+ €–[\d.]+ € pp · \d+ notti$/);
   await s.text(ME, "/help");
   assert.match(s.sent[3].text, /\/voti - i voti che avete dato ai giri completi/);
 });

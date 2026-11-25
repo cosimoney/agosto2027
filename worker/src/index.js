@@ -15,6 +15,9 @@
 // e ALIASES ("alias:id,alias:id": gli indirizzi corti del sito, mai scritti nel repo).
 // Nei log non finiscono mai chat_id, nomi, token o testi dei messaggi.
 import CONFIG from "../../bot/config.json" with { type: "json" };
+// Costi dei giri [a terra min, a terra max, voli interni, notti] per id: ripiego per /voti quando lo snapshot non li porta ancora
+// (snapshot.py li scrive in targets[id].land / itot / nights, e quelli vincono sempre). Si rigenera con: python worker/trip_costs.py
+import TRIP_COSTS from "./trip_costs.json" with { type: "json" };
 import { Bot, ID_RE, esc, euro, loadConfig, normPrefs, resolveTarget, splitMessage, romeToday } from "./bot.js";
 
 const DEFAULTS = {
@@ -407,7 +410,9 @@ async function apiRate(req, env) {
 const stars = (n) => "★".repeat(n) + "☆".repeat(5 - n);
 /** Costo di un giro dallo snapshot: voli pp migliori (al massimo 1 scalo, come sul sito) e totale pp = voli + interni + a terra. */
 export function tripCost(snap, id) {
-  const t = ((snap && snap.targets) || {})[id] || {};
+  let t = ((snap && snap.targets) || {})[id] || {};
+  const fb = TRIP_COSTS[id];
+  if (!(Array.isArray(t.land) && t.land.length === 2) && fb) t = Object.assign({}, t, { land: [fb[0], fb[1]], itot: fb[2], nights: t.nights || fb[3] });
   let fl = null;
   for (const o of (snap && snap.offers) || []) {
     if (o.target !== id) continue;
