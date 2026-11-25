@@ -713,6 +713,53 @@ const ratesBody = extra => ({ok:true, me:"Anna", people:[{k:KA, name:"Anna", me:
   ok(/href="#\/mappa"/.test(boot("", {api:false}).els.app.innerHTML.match(/<nav id="topnav"[\s\S]*?<\/nav>/)[0]), "menu: voce Mappa anche senza Worker");
 }
 
+// card di volo: righe ANDATA e RITORNO con data, orari, aeroporti, tratte complete, scali con durata; voli interni a parte
+{
+  const esc0 = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const D = JSON.parse(JSON.stringify(DATA0)), code = D.raw.dests.find(x => x.g !== "sconsigliato" && x.tab === "new").code;
+  const city = String(D.raw.dests.find(x => x.code === code).city).replace(/\s*\(.*\)\s*$/, "");
+  D.raw.itin = {rows:[
+    [["MXP", "MAD", "06:30", "08:55", 0, 0, 145, "IB", "804"], ["MAD", code, "12:10", "19:55", 0, 0, 765, "IB", "107"]],
+    [[code, "BCN", "11:40", "05:15", 0, 1, 755, "IB", "2602"], ["BCN", "MXP", "06:50", "08:25", 1, 1, 95, "VY", "6040"]],
+    [["LIN", "QQQ", "10:00", "12:00", 0, 0, 120], ["QQQ", code, "13:30", "01:10", 0, 1, 700]]],
+    al:{IB:"Iberia", VY:"Vueling"}, ap:{MAD:"Madrid", BCN:"Barcellona"}};
+  const out = [851, "Iberia", 1105, 1, "06:30", "19:55", 0, "MAD", "MXP", code], back = [851, "Iberia + Vueling", 945, 1, "11:40", "08:25", 1, "BCN", code, "MXP"];
+  const mk = (o, a) => ({o, d:code, dep:"2027-08-14", n:11, a:[a], b:null, x:null});
+  D.raw.combos = D.raw.combos.filter(c => c.d !== code).concat([
+    mk("MXP", out.concat([back.concat([1, 1]), 0, 0])),                                                    // ritorno dello stesso biglietto
+    mk("FCO", [900, "Iberia", 1105, 1, "07:00", "20:00", 0, "MAD", "FCO", code, back.concat([1, 2]), 0, -1]), // ritorno indicativo, andata senza tratte
+    mk("LIN", [950, "Test Air", 900, 1, "10:00", "01:10", 1, "QQQ", "LIN", code, 0, 0, 2]),                   // ritorno non ancora letto, riga senza numeri di volo
+    mk("PSA", [990, "Ryanair", 200, 0, "09:00", "12:20", 0, "", "PSA", code])]);                           // dati vecchi: solo i 10 campi
+  const e = boot("#/d/" + code, {dataObj:D});
+  const pg = e.App.pageHTML({page:"dest", id:code}), cards = pg.split('<div class="fl">').slice(1);
+  const card = re => cards.find(x => re.test(x)) || "";
+  const a = card(/pp num">851 €/), b = card(/pp num">900 €/), c = card(/pp num">950 €/), d = card(/pp num">990 €/);
+  ok(cards.length === 4 && !/undefined|NaN/.test(cards.join("")), "card di volo: quattro opzioni senza undefined/NaN");
+  ok(/aria-label="Andata sab 14 ago"/.test(a) && /lg-k">Andata<\/span><span class="lg-d">sab 14 ago/.test(a) && /<b>06:30<\/b> <span class="iata">MXP<\/span>/.test(a) && /<b>19:55<\/b> <span class="iata">/.test(a), "card di volo: riga ANDATA con data, orari e aeroporti");
+  ok(/lg-k">Ritorno<\/span><span class="lg-d">mer 25 ago<\/span><span class="real">stesso biglietto A\/R/.test(a) && /<b>11:40<\/b>/.test(a) && /<b>08:25<\/b><sup>\+1<\/sup> <span class="iata">MXP/.test(a) && /arrivo gio 26 ago/.test(a), "card di volo: riga RITORNO con orari, +1 e data di arrivo");
+  ok(a.includes(`Milano Malpensa → Madrid → ${city}`) && a.includes(`${city} → Barcellona → Milano Malpensa`), "card di volo: tratte complete con i nomi delle città");
+  ok(/Iberia <span class="fn">IB 804<\/span> · 2h 25m/.test(a) && /Vueling <span class="fn">VY 6040<\/span>/.test(a) && (a.match(/<li class="sg">/g) || []).length === 4, "card di volo: ogni tratta con compagnia, numero di volo e durata");
+  ok(/Scalo a Madrid <span class="iata">MAD<\/span> · <b class="num">3h 15m<\/b>/.test(a) && /Scalo a Barcellona <span class="iata">BCN<\/span> · <b class="num">1h 35m<\/b>/.test(a), "card di volo: scalo con città e durata (anche a cavallo della mezzanotte)");
+  ok(a.indexOf('lg-k">Andata') < a.indexOf('lg-k">Ritorno') && !/indicativo/.test(a), "card di volo: andata prima del ritorno, niente «indicativo» sul ritorno vero");
+  ok(/<span class="est">indicativo<\/span>/.test(b) && /Ritorno indicativo: il più economico del giorno\. Sul biglietto A\/R potrebbe cambiare\./.test(b) && /Roma Fiumicino → Madrid → /.test(b), "card di volo: ritorno indicativo dichiarato; senza tratte il percorso viene dagli scali");
+  ok(/class="lg lg-na"/.test(c) && /orari non ancora letti/.test(c) && /Scalo a QQQ <span class="iata">QQQ<\/span> · <b class="num">1h 30m<\/b>/.test(c) && !/class="fn"/.test(c), "card di volo: ritorno non letto dichiarato; righe senza numero di volo");
+  ok(/Pisa → /.test(d) && /Ryanair · diretto · 3h 20m/.test(d) && !/class="sgs"/.test(d) && /class="lg lg-na"/.test(d), "card di volo: dati con i soli 10 campi (diretto, nessun elenco di tratte)");
+  // popular trip: A/R con ritorno letto + voli interni in un blocco a parte
+  const T = D.raw.trips_popular, t = T.trips.find(x => x.best && x.best.kind === "rt" && x.air.some(y => y.k === "rt" && y.add.length));
+  if(t){
+    const ai = t.air.findIndex(y => y.k === "rt" && y.add.length), air = t.air[ai], x = air.add.reduce((s, y) => s + y[1], 0), n0 = T.legs.length, i0 = (T.itin = T.itin || {rows:[], al:{}, ap:{}}).rows.length;
+    T.itin.rows.push([["MXP", "MAD", "06:30", "08:55", 0, 0, 145, "IB", "804"], ["MAD", air.a, "12:10", "19:55", 0, 0, 765, "IB", "107"]], [[air.a, "MAD", "13:00", "05:00", 0, 1, 720, "IB", "108"], ["MAD", "MXP", "07:10", "09:20", 1, 1, 130, "IB", "805"]]);
+    Object.assign(T.itin.al, {IB:"Iberia"}); Object.assign(T.itin.ap, {MAD:"Madrid"});
+    T.legs.push([700, "Iberia", 1105, 1, "06:30", "19:55", 0, "MAD", "MXP", air.a, "2027-08-14", i0], [700, "Iberia", 980, 1, "13:00", "09:20", 1, "MAD", air.a, "MXP", "2027-08-25", i0 + 1]);
+    t.cells = [{dep:"2027-08-14", n:11, o:"MXP", a:[[ai, 700, x, n0, -1, n0 + 1, 2]], b:null, x:null}];
+    const tp = boot("#/t/" + t.id, {dataObj:D}).App.pageHTML({page:"trip", id:t.id}), tc = tp.split('<div class="fl">')[1] || "";
+    ok(/<b>Voli internazionali<\/b><span class="real">A\/R · prezzo reale Google/.test(tc) && /lg-k">Andata<\/span><span class="lg-d">sab 14 ago/.test(tc) && /lg-k">Ritorno<\/span><span class="lg-d">mer 25 ago<\/span><span class="est">indicativo/.test(tc), "trip: card A/R con ANDATA e RITORNO → " + t.id);
+    ok(/<b>13:00<\/b>/.test(tc) && /<b>09:20<\/b><sup>\+1<\/sup>/.test(tc) && /Scalo a Madrid <span class="iata">MAD<\/span> · <b class="num">2h 10m<\/b>/.test(tc) && /Iberia <span class="fn">IB 805<\/span>/.test(tc), "trip: orari, scalo e numero di volo del ritorno");
+    const int = (tc.match(/<div class="lg lg-int"[\s\S]*?<\/div><\/div>/) || [""])[0];
+    ok(/lg-k">(Voli|Tratte) interni?e?<\/span><span class="est">stima<\/span>/.test(int) && int.includes(esc0(air.add[0][0])) && tc.indexOf("lg-int") > tc.indexOf('lg-k">Ritorno') && !/lg-k">(Andata|Ritorno)/.test(int), "trip: voli interni stimati in un blocco a parte, dopo i voli internazionali");
+  } else ok(false, "trip: nessun trip A/R con tratte interne nei dati per il test delle card");
+}
+
 // stime (somma di due solo andata, combos con e:1): sempre dichiarate su card, pagina meta, confronto e storico
 {
   const D = JSON.parse(JSON.stringify(DATA0)), code = D.raw.dests.find(x => x.g !== "sconsigliato" && x.tab === "new").code;
@@ -722,7 +769,7 @@ const ratesBody = extra => ({ok:true, me:"Anna", people:[{k:KA, name:"Anna", me:
   D.raw.hist = {days:["2026-11-25"], runs:[["actions", 0, 1]], e:[[987, "MXP", "2027-08-08", 11, 1, 0, 0, 1]], t:{["d_" + code]:[[0, 0, -1, -1, 0]]}};
   const e = boot("#/d/" + code, {dataObj:D});
   const pg = e.App.pageHTML({page:"dest", id:code});
-  ok(/a persona · stima/.test(pg) && /stima: somma di due solo andata/.test(pg) && /Andata 534 €/.test(pg) && /Ritorno 453 €/.test(pg) && /Le celle segnate «stima» non sono un A\/R/.test(pg) && /· stima<\/small>/.test(pg), "stima: pagina meta con le due tratte, i due prezzi e la dichiarazione");
+  ok(/a persona · stima/.test(pg) && /stima: somma di due solo andata/.test(pg) && /lg-k">Andata<\/span><span class="lg-d">dom 8 ago<\/span><span class="lg-p num">534 €/.test(pg) && /lg-k">Ritorno<\/span><span class="lg-d">gio 19 ago<\/span><span class="lg-p num">453 €/.test(pg) && /Le celle segnate «stima» non sono un A\/R/.test(pg) && /· stima<\/small>/.test(pg), "stima: pagina meta con le due tratte, i due prezzi e la dichiarazione");
   ok(/hdot[^"]* est"/.test(pg) && /Punto quadrato = stima/.test(pg), "stima: punto dello storico segnato");
   ok(!/undefined|NaN/.test(pg), "stima: niente undefined/NaN");
   ok(e.App.viewD(code, "all", 1).cheap.c.e === 1 && e.App.viewD(code, "all", 1).min === 987, "stima: entra nel minimo della meta con il suo segno");

@@ -271,6 +271,7 @@ function pview(t, op, two, ref){
   const a = t.air[op[0]], fl = op[1], extra = op[2], out = L[op[3]], back = op[4] >= 0 ? L[op[4]] : null;
   const interni = t.itot + extra;
   const v = {op, a, two:!!two, voli:fl, extra, interni, out, back, lo:fl + interni + t.land[0], hi:fl + interni + t.land[1], tot:Math.round(fl + interni + mid(t))};
+  if(op[5] != null && op[5] >= 0 && L[op[5]]){ v.ret = L[op[5]]; v.rk = op[6]; }   // A/R: ritorno letto (1 = stesso biglietto, 2 = indicativo)
   if(two && ref){ v.save = (ref.voli + ref.extra) - (fl + extra); v.pct = Math.round(100 * v.save / (ref.voli + ref.extra)); }
   return v;
 }
@@ -769,28 +770,20 @@ function voliD(code){
   let fl = "";
   const cs = (BYD[code] || []).filter(c => c.dep === dep && c.n === +n && oMatch(c.o, S.f.origin)).sort((x, y) => oRank(x.o) - oRank(y.o));
   for(const c of cs) for(const o of options(c, S.f.stops)){
-    const f = o.f;
-    if(c.e && f[10]){   // stima: due biglietti solo andata, si mostrano tutte e due le tratte
-      const r = f[10], leg = x => `${esc(x[4])} → ${esc(x[5])}${x[6] ? `<sup>+${x[6]}</sup>` : ""} ${esc(x[9])}`;
-      const via = x => { const k = x[7] ? x[7].split("·").length : 0; return k === 0 ? "diretto" : `${k} ${k === 1 ? "scalo" : "scali"} · ${esc(x[7])}`; };
-      fl += `<div class="fl"><div class="fl-l">
-      <div class="fl-t"><span class="apt${c.o === "LIN" ? " lin" : ""}">${esc(f[8])}</span>${leg(f)}</div>
-      <div class="fl-m">Andata ${eur(f[11])} · ${esc(f[1])} · ${via(f)} · ${hm(f[2])}</div>
-      <div class="fl-t" style="margin-top:8px"><span class="apt">${esc(r[8])}</span>${leg(r)}</div>
-      <div class="fl-m">Ritorno ${eur(r[0])} · ${esc(r[1])} · ${via(r)} · ${hm(r[2])} · punteggio ${scoreOf(f, d)}/100</div>
-      <div class="bs">${c.o === "LIN" ? `<span class="b ok">da Linate</span>` : ""}${estBadge(c)}${twoBadge(o)}</div>
-    </div><div class="fl-r"><div class="pp num">${eur(f[0])} <small>PP</small></div><div class="cp num">coppia ${eur(f[0] * 2)}</div><a href="${gfUrl([[dep, c.o, code]], 2)}" target="_blank" rel="noopener">Andata ↗</a> <a href="${gfUrl([[ret, code, c.o]], 2)}" target="_blank" rel="noopener">Ritorno ↗</a></div></div>`;
-      continue;
-    }
-    fl += `<div class="fl"><div class="fl-l">
-      <div class="fl-t"><span class="apt${c.o === "LIN" ? " lin" : ""}">${esc(f[8])}</span>${esc(f[4])} → ${esc(f[5])}${f[6] ? `<sup>+${f[6]}</sup>` : ""} ${esc(f[9])}</div>
-      <div class="fl-m">${esc(f[1])} · ${stopsTxt(f)} · ${hm(f[2])} all'andata · punteggio ${scoreOf(f, d)}/100</div>
-      ${o.two || c.o === "LIN" ? `<div class="bs">${c.o === "LIN" ? `<span class="b ok">da Linate</span>` : ""}${twoBadge(o)}</div>` : ""}
-    </div><div class="fl-r"><div class="pp num">${eur(f[0])} <small>PP</small></div><div class="cp num">coppia ${eur(f[0] * 2)}</div><a href="${gfD(c.o, code, dep, ret)}" target="_blank" rel="noopener">Google Flights ↗</a></div></div>`;
+    const f = o.f, est = !!(c.e && f[10]), r = f[10] || null;
+    const legs = legBlock("Andata", f, ITD.rows[f[12]], ITD, {date:dep, price:est ? f[11] : null}) +
+      (r ? legBlock("Ritorno", r, ITD.rows[r[10]], ITD, {date:ret, price:est ? r[0] : null, tag:est ? "" : retTag(r[11]), note:est ? "" : retNote(r[11])}) : retNA(ret, apCity(code, ITD)));
+    const links = est ? `<a href="${gfUrl([[dep, c.o, code]], 2)}" target="_blank" rel="noopener">Andata ↗</a> <a href="${gfUrl([[ret, code, c.o]], 2)}" target="_blank" rel="noopener">Ritorno ↗</a>`
+      : `<a href="${gfD(c.o, code, dep, ret)}" target="_blank" rel="noopener">Google Flights ↗</a>`;
+    fl += `<div class="fl"><div class="fl-l legs">
+      <div class="lg-sec"><b>${est ? "Due biglietti solo andata" : "Biglietto A/R"}</b>${est ? estBadge(c) : `<span class="real">prezzo reale Google</span>`}${c.o === "LIN" ? `<span class="b ok">da Linate</span>` : ""}${twoBadge(o)}</div>
+      ${legs}
+      <div class="fl-m">Punteggio ${scoreOf(f, d)}/100</div>
+    </div><div class="fl-r"><div class="pp num">${eur(f[0])} <small>PP</small></div><div class="cp num">coppia ${eur(f[0] * 2)}</div>${links}</div></div>`;
   }
   return head + ctl + `<div class="v-cols"><div><h3 class="h3">Andata × durata</h3>${mx}<p class="note" style="margin-top:10px">Prezzo A/R per persona più basso della combinazione, con l'aeroporto sotto. Più intenso = più economico, il punto giallo segna il minimo. Tocca una cella per i voli.</p></div>
     <div><h3 class="h3">${fmtD(dep)} → ${fmtD(ret)} · ${n} giorni</h3>${fl}
-    <p class="note">Orari, scali e durata si riferiscono all'andata; il prezzo è il totale A/R per persona con il ritorno più economico entro lo stesso limite di scali (il ritorno si sceglie su Google Flights).${Object.values(a.cellBest).some(x => x.c.e) ? ` <b>Le celle segnate «stima» non sono un A/R</b>: su questa rotta Google Flights non lo restituisce, quindi il prezzo è la somma del miglior solo andata e del miglior ritorno (due biglietti separati, stessa regola scali per ciascuna tratta). L'A/R vero di solito costa meno.` : ""}</p>
+    <p class="note">Il prezzo è il totale A/R per persona. Il ritorno «stesso biglietto A/R» è quello che Google abbina a quell'andata allo stesso prezzo; «indicativo» è il volo più economico di quel giorno e sul biglietto A/R potrebbe cambiare. Dove gli orari del ritorno mancano arrivano nei prossimi giri. Punteggio: prezzo, comodità dell'andata e clima.${Object.values(a.cellBest).some(x => x.c.e) ? ` <b>Le celle segnate «stima» non sono un A/R</b>: su questa rotta Google Flights non lo restituisce, quindi il prezzo è la somma del miglior solo andata e del miglior ritorno (due biglietti separati, stessa regola scali per ciascuna tratta). L'A/R vero di solito costa meno.` : ""}</p>
     <p style="margin-top:16px"><a class="btn sun" href="${gfD(a.cellBest[S.cell].c.o, code, dep, ret)}" target="_blank" rel="noopener">Apri su Google Flights ↗</a></p></div></div>`;
 }
 function destHTML(code){
@@ -835,24 +828,71 @@ function destHTML(code){
   </main>` + footHTML();
 }
 
-/* ------------------------------------------------------------------ pagina popular trip */
-function legHTML(f, lbl){
-  return `<div><div class="fl-t"><span class="apt${f[8] === "LIN" || f[9] === "LIN" ? " lin" : ""}">${esc(f[8])}</span>${esc(f[4])} → ${esc(f[5])}${f[6] ? `<sup>+${f[6]}</sup>` : ""} ${esc(f[9])}</div>
-    <div class="fl-m">${lbl} ${fmtD(f[10])} · ${esc(f[1])} · ${stopsTxt(f)} · ${hm(f[2])}</div></div>`;
+/* ------------------------------------------------------------------ voli: andata e ritorno, tratte complete */
+// tratte di un volo = [[da, a, partenza, arrivo, giorni+ partenza, giorni+ arrivo, minuti, sigla compagnia, numero], ...]
+// (returns.Itin in returns.py; sigla e numero mancano nelle righe lette prima che il parser li estraesse)
+const NOIT = {rows:[], al:{}, ap:{}};
+const ITD = RAW.itin || NOIT, ITP = POP.itin || NOIT;
+const APT = Object.fromEntries((META.origins || []).map(o => [o.code, o.group === "PSA" ? o.city : `${o.city} ${o.apt}`]));
+const apCity = (c, T) => APT[c] || (POP.city || {})[c] || (DEST[c] && String(DEST[c].city).replace(/\s*\(.*\)\s*$/, "")) || ((T || NOIT).ap || {})[c] || c;
+const plusD = n => n ? `<sup>+${n}</sup>` : "";
+const mins = t => { const [h, m] = String(t).split(":").map(Number); return h * 60 + m; };
+// durata dello scalo fra due tratte: orari locali dello stesso aeroporto, quindi basta la differenza
+const layMin = (p, s) => (s[4] - p[5]) * 1440 + mins(s[2]) - mins(p[3]);
+function segsHTML(segs, T){
+  if(!segs || segs.length < 2) return "";
+  let h = "";
+  segs.forEach((s, i) => {
+    if(i){
+      const p = segs[i - 1], w = layMin(p, s);
+      h += `<li class="ly">${p[1] !== s[0] ? `Cambio di aeroporto a ${esc(apCity(p[1], T))}: <span class="iata">${esc(p[1])}</span> → <span class="iata">${esc(s[0])}</span>` : `Scalo a ${esc(apCity(s[0], T))} <span class="iata">${esc(s[0])}</span>`}${w > 0 && w < 2880 ? ` · <b class="num">${hm(w)}</b>` : ""}</li>`;
+    }
+    const al = s[7] ? ((T.al || {})[s[7]] || s[7]) : "";
+    h += `<li class="sg"><div class="sg-t num">${esc(s[2])}${plusD(s[4])} <span class="iata">${esc(s[0])}</span> → ${esc(s[3])}${plusD(s[5])} <span class="iata">${esc(s[1])}</span></div>
+      <div class="sg-m">${esc(apCity(s[0], T))} → ${esc(apCity(s[1], T))}${al ? ` · ${esc(al)} <span class="fn">${esc(s[7])} ${esc(s[8])}</span>` : ""}${s[6] ? ` · ${hm(s[6])}` : ""}</div></li>`;
+  });
+  return `<ol class="sgs" aria-label="Tratte e scali">${h}</ol>`;
 }
+// kind = "Andata" | "Ritorno"; f = volo [prezzo, compagnie, minuti, scali, partenza, arrivo, giorni+, scali via, da, a];
+// segs = tratte (o niente); o = {date, price: prezzo della sola tratta, tag: etichetta, note}
+function legBlock(kind, f, segs, T, o){
+  const route = segs && segs.length ? [segs[0][0], ...segs.map(s => s[1])] : [f[8], ...(f[7] ? String(f[7]).split("·") : []), f[9]];
+  const direct = f[3] === 0;
+  const fn = direct && segs && segs[0] && segs[0][7] ? ` <span class="fn">${esc(segs[0][7])} ${esc(segs[0][8])}</span>` : "";
+  return `<div class="lg" role="group" aria-label="${kind} ${fmtD(o.date)}">
+    <div class="lg-h"><span class="lg-k">${kind}</span><span class="lg-d">${fmtD(o.date)}</span>${o.tag || ""}${o.price != null ? `<span class="lg-p num">${eur(o.price)}</span>` : ""}</div>
+    <div class="lg-t num"><span><b>${esc(f[4])}</b> <span class="iata${f[8] === "LIN" ? " lin" : ""}">${esc(f[8])}</span></span><span class="lg-a" aria-hidden="true">→</span><span><b>${esc(f[5])}</b>${plusD(f[6])} <span class="iata${f[9] === "LIN" ? " lin" : ""}">${esc(f[9])}</span></span></div>
+    <div class="lg-r">${route.map(c => esc(apCity(c, T))).join(" → ")}</div>
+    <div class="lg-m">${esc(f[1])}${fn} · ${direct ? "diretto" : `${f[3]} ${f[3] === 1 ? "scalo" : "scali"}`} · ${hm(f[2])}${direct ? "" : " in tutto"}${f[6] ? ` · arrivo ${fmtD(addD(o.date, f[6]))}` : ""}</div>
+    ${segsHTML(segs, T)}${o.note ? `<div class="lg-n">${o.note}</div>` : ""}</div>`;
+}
+// ritorno di un A/R: 1 = quello dello stesso biglietto (pagina di Google con l'andata scelta, stesso prezzo), 2 = indicativo
+const retTag = k => k === 1 ? `<span class="real">stesso biglietto A/R</span>` : `<span class="est">indicativo</span>`;
+const retNote = k => k === 1 ? "" : "Ritorno indicativo: il più economico del giorno. Sul biglietto A/R potrebbe cambiare.";
+const retNA = (ret, from) => `<div class="lg lg-na" role="group" aria-label="Ritorno ${fmtD(ret)}">
+    <div class="lg-h"><span class="lg-k">Ritorno</span><span class="lg-d">${fmtD(ret)}</span></div>
+    <div class="lg-m">Da ${esc(from)}: orari non ancora letti. Il prezzo è già il totale A/R; gli orari del ritorno arrivano un po' a ogni giro, dalle combinazioni più economiche. Intanto si vedono su Google Flights.</div></div>`;
+
+/* ------------------------------------------------------------------ pagina popular trip */
 function optHTML(t, c, v){
-  const ret = addD(c.dep, c.n);
+  const ret = addD(c.dep, c.n), ow = v.a.k === "ow", it = f => ITP.rows[f[11]];
   let legs, link, lt;
-  if(v.a.k === "ow"){
-    legs = legHTML(v.out, `andata · ${eur(v.out[0])}`) + legHTML(v.back, `ritorno · ${eur(v.back[0])}`);
+  if(ow){
+    legs = legBlock("Andata", v.out, it(v.out), ITP, {date:v.out[10], price:v.out[0]}) + legBlock("Ritorno", v.back, it(v.back), ITP, {date:v.back[10], price:v.back[0]});
     link = gfUrl([[c.dep, v.out[8], v.a.a], [ret, v.a.b, v.back[9]]], 3); lt = "Google Flights multi-city ↗";
   } else {
-    legs = legHTML(v.out, "andata") + `<div class="fl-m">ritorno ${fmtD(ret)} da ${esc(cityOf(v.a.a))}: il più economico entro lo stesso limite di scali, da scegliere su Google Flights</div>`;
+    legs = legBlock("Andata", v.out, it(v.out), ITP, {date:c.dep}) +
+      (v.ret ? legBlock("Ritorno", v.ret, it(v.ret), ITP, {date:ret, tag:retTag(v.rk), note:retNote(v.rk)}) : retNA(ret, cityOf(v.a.a)));
     link = gfUrl([[c.dep, c.o, v.a.a], [ret, v.a.a, c.o]], 1); lt = "Google Flights A/R ↗";
   }
-  const add = v.extra ? `<div class="fl-m"><span class="est">stima</span> + ${v.a.add.map(e => `${esc(e[0])} ~${eur(e[1])}`).join(" + ")} pp${v.a.note ? " · " + esc(v.a.note) : ""}</div>` : (v.a.note ? `<div class="fl-m">${esc(v.a.note)}</div>` : "");
-  return `<div class="fl"><div class="fl-l">${legs}${add}
-      <div class="bs">${v.a.k === "ow" ? `<span class="est">somma di 2 solo-andata · stima</span>` : `<span class="real">A/R · prezzo reale Google</span>`}${ptwoBadge(v)}</div>
+  const land = v.extra && v.a.add.every(e => /terra|treno|bus|traghett|auto\b/i.test(e[0]));
+  const add = v.extra ? `<div class="lg lg-int" role="group" aria-label="${land ? "Tratte interne" : "Voli interni"}, stima">
+      <div class="lg-h"><span class="lg-k">${land ? "Tratte interne" : "Voli interni"}</span><span class="est">stima</span>${v.a.add.length > 1 ? `<span class="lg-p num">~${eur(v.extra)}</span>` : ""}</div>
+      <ul class="ints">${v.a.add.map(e => `<li><span>${esc(e[0])}</span><b class="num">~${eur(e[1])}</b></li>`).join("")}</ul>
+      <div class="lg-m">${v.a.note ? esc(String(v.a.note).replace(/[.\s]+$/, "")) + ". " : ""}Per persona, fuori dal prezzo dei voli internazionali: entrano nel totale stimato.</div></div>` : (v.a.note ? `<div class="fl-m">${esc(v.a.note)}</div>` : "");
+  return `<div class="fl"><div class="fl-l legs">
+      <div class="lg-sec"><b>Voli internazionali</b>${ow ? `<span class="est">somma di 2 solo-andata · stima</span>` : `<span class="real">A/R · prezzo reale Google</span>`}${ptwoBadge(v)}</div>
+      ${legs}${add}
     </div><div class="fl-r"><div class="pp num">${eur(v.voli)} <small>PP VOLI</small></div><div class="cp num">coppia ${eur(v.voli * 2)}</div><div class="cp num">totale stimato ${eur(v.tot)} pp</div><a href="${link}" target="_blank" rel="noopener">${lt}</a></div></div>`;
 }
 function voliT(id){
@@ -881,7 +921,7 @@ function voliT(id){
   return head + ctl + `<div class="v-cols"><div><h3 class="h3">Costo stimato · ${fmtD(dep)}, ${n} giorni</h3>${cost}
       <h3 class="h3" style="margin-top:30px">Andata × durata · voli</h3>${mx}<p class="note" style="margin-top:10px">Voli internazionali per persona nella combinazione più economica; sotto, aeroporto e modo di volare («+N» = tratta extra stimata per chiudere il giro, in euro). Tocca una cella per i voli.</p></div>
     <div><h3 class="h3">${fmtD(dep)} → ${fmtD(ret)} · ${n} giorni</h3>${fl}
-      <p class="note">Negli open-jaw il prezzo è la somma di due biglietti solo-andata letti su Google Flights: è una stima prudente, il biglietto multi-city unico di solito costa meno sul lungo raggio. Negli A/R orari e scali sono quelli dell'andata.</p></div></div>`;
+      <p class="note">Negli open-jaw il prezzo è la somma di due biglietti solo-andata letti su Google Flights: è una stima prudente, il biglietto multi-city unico di solito costa meno sul lungo raggio. Negli A/R il ritorno «stesso biglietto A/R» è quello che Google abbina a quell'andata allo stesso prezzo; «indicativo» è il volo più economico di quel giorno e sul biglietto potrebbe cambiare.</p></div></div>`;
 }
 function tripHTML(id){
   const t = PT[id];

@@ -342,6 +342,40 @@ table.mx th.r{text-align:left;width:84px;white-space:nowrap;letter-spacing:.02em
 .fl-r a{font-size:13.5px;font-weight:700}
 .apt{display:inline-block;font-family:var(--f-display);font-size:15px;font-weight:800;letter-spacing:.06em;border-radius:6px;padding:0 7px;border:1px solid var(--line);color:var(--ink-2);margin-right:8px;vertical-align:1px}
 .apt.lin{border-color:var(--lagoon);color:var(--lagoon)}
+/* card di volo: una riga ANDATA e una RITORNO con la stessa struttura, tratte e scali sotto, voli interni a parte */
+.fl-l.legs{gap:0;flex:1 1 300px}
+.lg-sec{display:flex;flex-wrap:wrap;align-items:center;gap:5px 8px;font-size:13px;padding-bottom:10px}
+.lg-sec b{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.lg{display:grid;gap:3px;min-width:0;padding:11px 0;border-top:1px solid var(--line)}
+.lg-h{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.lg-k{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);min-width:66px}
+.lg-d{font-size:13.5px;font-weight:700;color:var(--ink-2)}
+.lg-p{margin-left:auto;font-size:13.5px;font-weight:700}
+.lg-t{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 10px;font-size:20px;line-height:1.3}
+.lg-t b{font-weight:800}
+.lg-t .iata{font-size:13px;color:var(--ink-2)}
+.lg-t .iata.lin{color:var(--lagoon)}
+.lg-t sup,.sg-t sup{font-size:.62em;font-weight:700;color:var(--warn);margin-left:1px}
+.lg-a{color:var(--ink-2);font-weight:400}
+.lg-r{font-size:14.5px;font-weight:700;overflow-wrap:anywhere}
+.lg-m,.lg-n{font-size:13.5px;color:var(--ink-2);overflow-wrap:anywhere}
+.lg-n{font-size:12.5px}
+.fn{white-space:nowrap;font-variant-numeric:tabular-nums}
+.sgs{list-style:none;margin:7px 0 2px;padding:0 0 0 12px;border-left:2px solid var(--line);display:grid;gap:7px}
+.sg{display:grid;gap:1px;min-width:0}
+.sg-t{font-size:14px;font-weight:700}
+.sg-t .iata{font-size:12px;color:var(--ink-2)}
+.sg-m{font-size:13px;color:var(--ink-2);overflow-wrap:anywhere}
+.ly{font-size:12.5px;color:var(--ink-2);padding:3px 8px;border-radius:6px;background:var(--paper);border:1px solid var(--line);justify-self:start;max-width:100%}
+.ly b{color:var(--ink)}
+.lg-na .lg-k{color:var(--ink-2)}
+.lg-int{background:var(--warn-bg);border:1px dashed var(--warn);border-radius:10px;padding:10px 12px;margin-top:4px}
+.ints{list-style:none;margin:2px 0;padding:0;display:grid;gap:3px;font-size:14px}
+.ints li{display:flex;justify-content:space-between;gap:12px}
+.ints li span{min-width:0;overflow-wrap:anywhere}
+.ints li b{white-space:nowrap}
+.fl-l.legs>.fl-m{padding-top:8px;border-top:1px solid var(--line)}
+@media (max-width:520px){.fl{padding:13px 13px}.lg-t{font-size:19px}.fl-r{width:100%;border-top:1px solid var(--line);padding-top:10px}}
 .est{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);background:var(--warn-bg);border-radius:4px;padding:1px 6px}
 .real{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--lagoon);background:var(--lagoon-bg);border-radius:4px;padding:1px 6px}
 .more{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(14px,1.8vw,26px)}
