@@ -26,9 +26,10 @@ permissions:
   pages: write
   id-token: write
 
-# stesso gruppo della scansione: se un giro e' in corso si aspetta che finisca, cosi' non si ripubblicano dati vecchi sopra i nuovi
+# gruppo a parte: una modifica alla grafica si pubblica subito anche mentre gira una scansione (con i dati dell'ultimo giro
+# salvato); la scansione a fine giro ripubblica comunque con i dati nuovi, quindi niente dati vecchi sopra i nuovi a lungo
 concurrency:
-  group: scan
+  group: pages
   cancel-in-progress: false
 
 jobs:
