@@ -304,7 +304,7 @@ P("rio", ["Rio de Janeiro Sugarloaf", "Rio de Janeiro Corcovado view"], "Rio de 
 P("ilha-grande", ["Ilha Grande Lopes Mendes", "Ilha Grande"], "Ilha Grande", "Ilha Grande")
 P("paraty", ["Paraty historic centre", "Paraty"], "Paraty", "Paraty")
 P("ouro-preto", ["Ouro Preto"], "Ouro Preto", "Ouro Preto", "Tiradentes")
-P("pantanal", ["Jaguar Pantanal", "Pantanal"], "Pantanal", "Porto Jofre", "Transpantaneira")
+P("pantanal", ["Jaguar Pantanal", "Pantanal"], "Pantanal", "Porto Jofre", "Transpantaneira", "Fazenda San Francisco")
 P("salvador", ["Pelourinho Salvador", "Salvador Bahia"], "Pelourinho, Salvador", "Salvador")
 P("lencois", ["Lençóis Maranhenses"], "Lençóis Maranhenses", "Barreirinhas", "Atins", "Santo Amaro")
 P("jericoacoara", ["Jericoacoara", "Pedra Furada Jericoacoara"], "Jericoacoara", "Jericoacoara")
@@ -317,7 +317,7 @@ P("sand-dunes", ["Great Sand Dunes National Park"], "Great Sand Dunes", "Great S
 P("mesa-verde", ["Mesa Verde Cliff Palace"], "Mesa Verde", "Mesa Verde")
 P("ouray", ["Million Dollar Highway", "Ouray Colorado"], "Million Dollar Highway", "Ouray")
 P("telluride", ["Telluride Colorado"], "Telluride", "Telluride")
-P("bryce", ["Bryce Canyon", "Arches National Park Delicate Arch"], "Bryce Canyon, Utah", "Salt Lake")
+P("bryce", ["Bryce Canyon", "Arches National Park Delicate Arch"], "Bryce Canyon, Utah", "Salt Lake", "Bryce")
 P("mono-lake", ["Mono Lake tufa"], "Mono Lake", "Mono Lake")
 P("yosemite", ["Yosemite Valley Tunnel View", "Yosemite Valley"], "Yosemite Valley", "Yosemite")
 P("mammoth", ["Minarets Sierra Nevada", "Mammoth Lakes"], "Mammoth Lakes", "Mammoth", "June Lake")
@@ -409,6 +409,18 @@ P("orkney", ["Ring of Brodgar", "Skara Brae"], "Orcadi", "Orcadi")
 P("ullapool", ["Ullapool", "Stac Pollaidh"], "Ullapool", "Ullapool", "Durness")
 P("uluru", ["Uluru", "Kata Tjuta"], "Uluru", "Uluru", "Kings Canyon", "Alice Springs")
 P("gibb-river", ["Bell Gorge", "Windjana Gorge", "Gibb River Road"], "Kimberley, Gibb River Road", "Bell Gorge", "Windjana", "Manning Gorge", "Broome", "Dampier")
+# ---------------------------------------------------------------- Aggiunte del 25 novembre 2026 (Stati Uniti)
+P("zion", ["Zion Canyon Angels Landing", "Zion Canyon", "Zion National Park"], "Zion Canyon", "Zion")
+P("capitol-reef", ["Capitol Reef National Park", "Waterpocket Fold"], "Capitol Reef", "Capitol Reef", "Torrey")
+P("arches", ["Delicate Arch", "Arches National Park"], "Delicate Arch, Arches", "Moab")
+P("monument-valley", ["Monument Valley"], "Monument Valley", "Monument Valley")
+P("horseshoe-bend", ["Horseshoe Bend Arizona", "Horseshoe Bend Colorado River"], "Horseshoe Bend, Page", "Page")
+P("grand-canyon", ["Grand Canyon South Rim", "Grand Canyon Mather Point"], "Grand Canyon, South Rim", "Grand Canyon")
+P("las-vegas", ["Las Vegas Strip", "Las Vegas skyline"], "Las Vegas", "Las Vegas")
+P("san-francisco", ["Golden Gate Bridge", "San Francisco skyline"], "San Francisco", "San Francisco")
+P("sequoia", ["Giant Forest Sequoia National Park", "General Sherman tree", "Sequoia National Park"], "Giant Forest, Sequoia", "Sequoia")
+P("kings-canyon", ["Kings Canyon National Park", "Zumwalt Meadow"], "Kings Canyon, California", "Kings Canyon (Grant Grove)")
+P("kenai-fjords", ["Aialik Glacier", "Holgate Glacier", "Kenai Fjords National Park glacier"], "Ghiacciaio nei Kenai Fjords")
 
 COVER = {
  "DPS": "bali", "LOP": "rinjani", "CMB": "sigiriya", "KUL": "kuala-lumpur", "BKI": "kinabalu", "UBN": "mongolia", "FRU": "song-kul",
@@ -497,9 +509,11 @@ POPCOVER.update({"zimbabwe-hwange-mana": "hwange", "sudafrica-namaqualand-kgalag
                  "canada-great-bear": "great-bear", "canada-churchill": "churchill", "canada-yukon": "tombstone", "glacier-waterton": "glacier-np",
                  "sumatra-nord": "bukit-lawang", "bali-sumba-komodo": "sumba", "borneo-tanjung-puting-giava": "tanjung-puting", "ladakh-zanskar": "zanskar",
                  "sarawak-mulu": "mulu", "islanda-groenlandia-est": "tasiilaq", "scozia-ebridi": "luskentyre"})
+POPCOVER.update({"usa-grand-circle": "monument-valley", "usa-california-utah": "zion", "usa-sierra-nevada": "sequoia", "alaska-kenai-denali": "kenai-fjords"})
 # correzioni dopo la revisione visiva: SKIP[k] = quanti candidati validi saltare; FILE[k] = titolo esatto su Commons
 SKIP = {}
-FILE = {"maputo": "File:60 Skyline (36931644911).jpg"}
+FILE = {"maputo": "File:60 Skyline (36931644911).jpg", "sequoia": "File:General Sherman Tree Roman Tokman.jpg",
+        "kenai-fjords": "File:By ovedc - Aialik Glacier - 05.jpg"}
 try:
     from photos_fix import SKIP as _S, FILE as _F   # opzionale, vedi photos_fix.py
     SKIP.update(_S); FILE.update(_F)
