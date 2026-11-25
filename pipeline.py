@@ -11,6 +11,7 @@
 
 Dati:
   raw_v2.jsonl, trips_raw_v2.jsonl   risultati del giro in corso (una riga per query, riprendibili)
+  returns_v2.jsonl                   orari del ritorno degli A/R mostrati (returns.py)
   prev/                              gli stessi file del giro precedente, scaricati dal branch "data"
   scan_meta.json                     riepilogo del giro: conteggi, durata, query non rifatte ("stale")
   bot/state/price_history.json       storico del prezzo piu' basso per meta e trip (price_history.py): sta su main, lo
@@ -23,6 +24,13 @@ dove arriva sostituisce la stima (resta anche per i 4 giri dopo se quel giorno n
 EST_BUDGET_MIN (default 75 minuti, o un terzo di SCAN_BUDGET_MIN nelle prove corte), ridotto se il giro e' gia' lungo (TOTAL_BUDGET_MIN, default 235 in tutto). Le
 chiavi non rifatte in tempo restano quelle del giro prima e vanno per prime al giro dopo. EST_BUDGET_MIN=0 le spegne.
 Lo stesso ripiego e' acceso nel ricontrollo dei vuoti dei popular trips (fase C e verify_trips.py).
+
+Ritorni (returns.py): la pagina di un A/R elenca solo le andate. Dopo la scansione (e dopo fill / retry), prima del build,
+si legge il ritorno delle opzioni mostrate dal sito: la pagina dello stesso A/R con l'andata gia' scelta, e come ripiego il
+solo andata di quel giorno. Solo pagine html, mai GetShoppingResults. Prima l'opzione migliore di ogni meta e trip per
+citta' di partenza, poi le altre celle; tetto RET_MAX richieste (default 300) e RET_BUDGET_MIN minuti (default 20, 0 = spento).
+Le righe stanno in returns_v2.jsonl (branch "data") e restano valide finche' andata e prezzo non cambiano. Un blocco o un
+errore qui non fa mai fallire il giro: il sito esce con i ritorni che c'erano.
 
 Tempo: la fase A di ogni scansione ha un tetto (SCAN_BUDGET_MIN, default 240 minuti in tutto). Se il tetto scatta,
 le query non rifatte vengono riprese dal giro precedente, segnate come "stale" e rifatte per prime al giro dopo
@@ -42,6 +50,7 @@ from datetime import datetime, timezone
 ROOT = os.path.dirname(os.path.abspath(__file__))
 os.chdir(ROOT); sys.path.insert(0, ROOT)
 RAW, TRIPS_RAW, META, PREV = "raw_v2.jsonl", "trips_raw_v2.jsonl", "scan_meta.json", "prev"
+RETURNS = "returns_v2.jsonl"
 BUDGET = float(os.environ.get("SCAN_BUDGET_MIN") or 240) * 60
 VERIFY_BUDGET = float(os.environ.get("VERIFY_BUDGET_MIN") or 150) * 60   # meta' ai trip (C + verify_trips.py), meta' a verify.py
 EST_BUDGET = float(os.environ.get("EST_BUDGET_MIN") or min(75, BUDGET / 180))              # minuti per le stime (solo andata + A/R vero delle celle migliori)
@@ -149,9 +158,28 @@ def estimates(t0, prev_raw, prev_trips, first=()):
     return res, stale
 
 
+def returns_step(bump):
+    """Orari del ritorno degli A/R (returns.py) sulle opzioni mostrate dal sito. -> riepilogo per scan_meta.json.
+    bump = True nel giro completo (le righe del giro prima invecchiano di uno). Non fa mai fallire il giro."""
+    if (os.environ.get("RET_BUDGET_MIN") or "").strip() in ("0", "0.0"):
+        return {"off": True}
+    try:
+        import returns
+        assert returns.RET == RETURNS, "nome del file dei ritorni cambiato: %s" % returns.RET
+        return returns.run(prev=os.path.join(PREV, RETURNS), bump=bump)
+    except (Exception, SystemExit) as e:
+        log("ATTENZIONE: ritorni non aggiornati (%s: %s)" % (type(e).__name__, str(e)[:200]))
+        try:        # restano quelli del giro prima
+            if not os.path.exists(RETURNS) and os.path.exists(os.path.join(PREV, RETURNS)):
+                shutil.copyfile(os.path.join(PREV, RETURNS), RETURNS)
+        except OSError:
+            pass
+        return {"error": type(e).__name__}
+
+
 def scan():
     t0 = time.time()
-    for p in (RAW, TRIPS_RAW, META, "fail_reason.txt"):
+    for p in (RAW, TRIPS_RAW, RETURNS, META, "fail_reason.txt"):
         if os.path.exists(p):
             os.remove(p)                      # da zero a ogni giro
     prev_raw, prev_trips = load(os.path.join(PREV, RAW)), load(os.path.join(PREV, TRIPS_RAW))
@@ -281,6 +309,8 @@ def scan():
              "Google sta probabilmente bloccando il runner. Niente pubblicazione, niente avvisi." % (ok_now, ok_prev, n_fresh, blocked))
     elif ok_prev < 50 and ok_now < min(MIN_OK_ABS, max(1, n_fresh // 20)):
         fail("solo %d risultati con voli su %d query e nessun giro precedente con cui confrontare (%d bloccate)." % (ok_now, n_fresh, blocked))
+    meta["ret"] = returns_step(True)     # dopo il controllo anti-blocco: sono poche pagine in piu', fuori dai conteggi del giro
+    meta["minutes"] = round((time.time() - t0) / 60, 1)
     with open(META, "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=1)
     log("OK-SCAN fresh=%d ok=%d (giro prima %d) stale=%d minuti=%s" % (n_fresh, ok_now, ok_prev, len(meta["stale"]), meta["minutes"]))
@@ -356,6 +386,7 @@ def fill():
     r, t = load(RAW), load(TRIPS_RAW)
     for path, rows in ((RAW, r), (TRIPS_RAW, t)):
         rewrite(path, set())                 # una riga per chiave
+    ret = returns_step(False)            # ritorni delle opzioni nuove (e di quelle rimaste senza)
     blocked = S.stats.get("blocked", 0) + T.stats.get("blocked", 0)
     new_keys = [key(x) for x in a] + ta
     ok_new = sum(1 for k in new_keys if (r.get(k) or t.get(k) or {}).get("st") == "ok")
@@ -364,7 +395,7 @@ def fill():
                  "ok_total": sum(1 for d in (r, t) for x in d.values() if x.get("st") == "ok"),
                  "fill": {"generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                           "minutes": round((time.time() - t0) / 60, 1), "new": len(new_keys), "ok_new": ok_new,
-                          "blocked": blocked, "est": est}})
+                          "blocked": blocked, "est": est, "ret": ret}})
     with open(META, "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=1)
     log("OK-FILL nuove=%d con voli=%d bloccate=%d minuti=%s" % (len(new_keys), ok_new, blocked, meta["fill"]["minutes"]))
@@ -387,6 +418,7 @@ def retry():
     import retry as R
     assert (R.RAW, R.TRIPS_RAW) == (RAW, TRIPS_RAW), "nomi dei file dati cambiati: %s %s" % (R.RAW, R.TRIPS_RAW)
     res = R.run(float(os.environ.get("RETRY_BUDGET_MIN") or 150))
+    res["ret"] = returns_step(False)
     r, t = load(RAW), load(TRIPS_RAW)
     meta = json.load(open(META, encoding="utf-8"))
     res["generated"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

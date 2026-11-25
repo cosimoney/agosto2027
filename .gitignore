@@ -6,6 +6,7 @@ __pycache__/
 # dati dell'ultimo giro: stanno sul branch "data", non su main
 /raw_v2.jsonl
 /trips_raw_v2.jsonl
+/returns_v2.jsonl
 /trips_data.json
 /scan_meta.json
 /bot/snapshot.json

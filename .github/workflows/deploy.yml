@@ -14,6 +14,7 @@ on:
       - "world.json"
       - "build*.py"
       - "estimate.py"
+      - "returns.py"
       - "itineraries.py"
       - "stage_coords.json"
       - "pipeline.py"
