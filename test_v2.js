@@ -45,7 +45,7 @@ function boot(hash, opts){
   const listeners = {};
   const document = {title:"", hidden:false, getElementById:id => els[id] || (els[id] = mk(id)), querySelectorAll:() => [], querySelector:() => null,
     createElement:() => mk("x"), addEventListener:(t, f) => { (listeners[t] = listeners[t] || []).push(f); }};
-  const window = {__DATA__:opts.data === false ? undefined : JSON.parse(DATA_TXT), scrollY:0, scrollTo(){}, addEventListener:(t, f) => { (listeners["w:" + t] = listeners["w:" + t] || []).push(f); }, matchMedia:() => ({matches:true})};
+  const window = {__DATA__:opts.data === false ? undefined : opts.dataObj || JSON.parse(DATA_TXT), scrollY:0, scrollTo(){}, addEventListener:(t, f) => { (listeners["w:" + t] = listeners["w:" + t] || []).push(f); }, matchMedia:() => ({matches:true})};
   const ctx = {document, window, location:{hash}, history:{scrollRestoration:"auto", back(){}}, console, setInterval:() => 0, clearInterval(){}, setTimeout, requestAnimationFrame:f => f(),
     Image:function(){}, btoa:s => Buffer.from(s, "binary").toString("base64"), encodeURIComponent, decodeURIComponent, clearTimeout(){},
     localStorage:{getItem:k => (k in ls ? ls[k] : null), setItem:(k, v) => { ls[k] = String(v); }, removeItem:k => { delete ls[k]; }},
@@ -558,7 +558,7 @@ const ratesBody = extra => ({ok:true, me:"Anna", people:[{k:KA, name:"Anna", me:
   ok(priced.length > 10 && priced.every(p => p.bin === (p.pp <= 600 ? 0 : p.pp <= 900 ? 1 : p.pp <= 1200 ? 2 : p.pp <= 1600 ? 3 : 4)) && pts.filter(p => p.pp == null).every(p => p.bin === -1), "mappa: fasce di prezzo 600 / 900 / 1.200 / 1.600");
   const one = priced[0];
   ok(new RegExp(`<a class="mp m${one.bin}" href="#/d/${one.d.code}" aria-label="[^"]*: [\\d.]+ € a persona da [^"]+"><title>`).test(mk), "mappa: ogni punto è un link alla meta, con nome e prezzo");
-  ok(/class="mleg"/.test(mk) && /fino a 600 €/.test(mk) && /oltre 1\.600 €/.test(mk) && /voli non ancora in vendita/.test(mk) && /Verde = economico, rosso = caro/.test(mk) && mk.split('<i class="mk m').length - 1 >= 5, "mappa: legenda con le fasce");
+  ok(/class="mleg"/.test(mk) && /fino a 600 €/.test(mk) && /oltre 1\.600 €/.test(mk) && /nessun volo trovato/.test(mk) && /Verde = economico, rosso = caro/.test(mk) && mk.split('<i class="mk m').length - 1 >= 5, "mappa: legenda con le fasce");
   ok(/<details class="mlist"/.test(mk) && mk.slice(mk.indexOf("<details class=\"mlist\"")).split("<li><i class=\"mk ").length - 1 === good.length, "mappa: elenco testuale di tutte le mete in vista");
   ok(!/NaN|undefined|Infinity/.test((mk.match(/(cx|cy|r|x|y|viewBox|font-size)="[^"]*"/g) || []).join("")), "mappa: coordinate valide");
   audit("mappa", mk);
@@ -576,6 +576,21 @@ const ratesBody = extra => ({ok:true, me:"Anna", people:[{k:KA, name:"Anna", me:
   await tick(); await tick(); await tick();
   ok(e.App.WORLD.state === "error" && /data-act="map-retry"/.test(e.els["map-in"].innerHTML) && e.els["map-in"].innerHTML.split('<a class="mp ').length - 1 === good.length, "mappa: senza contorno i punti restano e si può riprovare");
   ok(/href="#\/mappa"/.test(boot("", {api:false}).els.app.innerHTML.match(/<nav id="topnav"[\s\S]*?<\/nav>/)[0]), "menu: voce Mappa anche senza Worker");
+}
+
+// stime (somma di due solo andata, combos con e:1): sempre dichiarate su card, pagina meta, confronto e storico
+{
+  const D = JSON.parse(JSON.stringify(DATA0)), code = D.raw.dests.find(x => x.g !== "sconsigliato" && x.tab === "new").code;
+  D.raw.combos = D.raw.combos.filter(c => c.d !== code).concat([{o:"MXP", d:code, dep:"2027-08-08", n:11, e:1, b:null, x:null,
+    a:[[987, "EgyptAir", 605, 1, "10:00", "22:05", 0, "CAI", "MXP", code, [453, "Saudia", 730, 1, "02:10", "13:20", 0, "JED", code, "MXP"], 534]]}]);
+  D.raw.cov[code] = [36, 0, null, 1];
+  D.raw.hist = {days:["2026-11-25"], runs:[["actions", 0, 1]], e:[[987, "MXP", "2027-08-08", 11, 1, 0, 0, 1]], t:{["d_" + code]:[[0, 0, -1, -1, 0]]}};
+  const e = boot("#/d/" + code, {dataObj:D});
+  const pg = e.App.pageHTML({page:"dest", id:code});
+  ok(/a persona · stima/.test(pg) && /stima: somma di due solo andata/.test(pg) && /Andata 534 €/.test(pg) && /Ritorno 453 €/.test(pg) && /Le celle segnate «stima» non sono un A\/R/.test(pg) && /· stima<\/small>/.test(pg), "stima: pagina meta con le due tratte, i due prezzi e la dichiarazione");
+  ok(/hdot[^"]* est"/.test(pg) && /Punto quadrato = stima/.test(pg), "stima: punto dello storico segnato");
+  ok(!/undefined|NaN/.test(pg), "stima: niente undefined/NaN");
+  ok(e.App.viewD(code, "all", 1).cheap.c.e === 1 && e.App.viewD(code, "all", 1).min === 987, "stima: entra nel minimo della meta con il suo segno");
 }
 
 console.log(`${checks} controlli, ${fails} falliti · pagine: ${R.dests.length} mete, ${R.trips.length} trip · origini nei dati: ${R.origins.join(", ")} · img in home: ${RAWn.d}/${RAWn.v}/${RAWn.p}`);

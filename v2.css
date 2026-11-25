@@ -488,6 +488,7 @@ button.btn{font-family:inherit}
 .hdot.s-A{width:18px;height:18px;margin:-9px 0 0 -9px;box-shadow:none;opacity:.5}
 .hdot.part{background:var(--paper);border:2px solid var(--c);box-shadow:none}
 .hdot.s-A.part{background:transparent;border-style:dashed;opacity:.9}
+.hdot.est{border-radius:2px}
 .hlast{position:absolute;transform:translate(-100%,-150%);margin-left:10px;font:900 20px/1 var(--f-display);color:var(--ink);background:var(--paper);padding:1px 3px;border-radius:4px;pointer-events:none;white-space:nowrap}
 .hlast.c{transform:translate(-50%,-150%);margin-left:0}
 @media (min-width:700px){.hfig{margin-right:74px}.hlast:not(.c){transform:translate(14px,-50%);margin-left:0;background:transparent}}

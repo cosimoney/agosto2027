@@ -227,6 +227,9 @@ function aggD(){
 const viewD = (code, origin, stops) => fold(DEST[code], (BYD[code] || []).filter(c => oMatch(c.o, origin)), stops);
 const stopsTxt = f => f[3] === 0 ? "diretto" : `${f[3]} ${f[3] === 1 ? "scalo" : "scali"}${f[7] ? " · " + esc(f[7]) : ""}`;
 const climaCls = g => g === "ottimo" ? "ok" : g === "buono" ? "info" : "warn";
+const EST_TXT = META.estNote || "stima: somma di due solo andata";
+const estBadge = c => c && c.e ? `<span class="est" title="Google Flights non restituisce l'A/R su questa rotta: il prezzo è la somma del miglior solo andata e del miglior ritorno nelle stesse date. L'A/R vero di solito costa meno.">${esc(EST_TXT)}</span>` : "";
+const priceU = c => c && c.e ? "a persona · stima" : "a persona · A/R";
 const twoBadge = o => o.two ? `<span class="b warn wrapb">2 scali: risparmi ${eur(o.save)} pp (${o.pct}%)</span>` : "";
 // badge aeroporto dell'offerta mostrata (o = aeroporto di quell'offerta); "anche da Linate" se esiste un'opzione da LIN
 function oBadge(o, set, glass){
@@ -335,10 +338,10 @@ function cardD(a, i, feat){
       <div class="card-name"><span class="k">${esc(d.country)} · <span class="iata">${esc(d.code)}</span></span><h3 class="n">${esc(d.city)}</h3></div>
     </div>
     <div class="card-bd">
-      <div class="pr"><span class="pp num">${eur(a.min)}</span><span class="u">a persona · A/R</span><span class="cp num">coppia ${eur(a.min * 2)}</span></div>
+      <div class="pr"><span class="pp num">${eur(a.min)}</span><span class="u">${priceU(b.c)}</span><span class="cp num">coppia ${eur(a.min * 2)}</span></div>
       <p class="meta"><b>${fmtD(b.c.dep)} → ${fmtD(ret)}</b> · ${b.c.n} giorni · da ${esc(oName(b.c.o))} · ${stopsTxt(b.o.f)}${a.max > a.min ? ` · altre date fino a ${eur(a.max)}` : ""}</p>
       ${d.giro ? `<p class="giro"><s>${esc(d.seen)}</s> → <b>${esc(d.giro)}</b></p>` : ""}
-      <div class="bs">${alsoBadge(b.c.o, a.origins)}<span class="b plain">${esc(d.temp)}</span>${priceBadge("d_" + d.code)}${d.flag ? `<span class="b warn wrapb">${esc(d.flag)}</span>` : ""}${twoBadge(b.o)}</div>
+      <div class="bs">${alsoBadge(b.c.o, a.origins)}<span class="b plain">${esc(d.temp)}</span>${priceBadge("d_" + d.code)}${d.flag ? `<span class="b warn wrapb">${esc(d.flag)}</span>` : ""}${twoBadge(b.o)}${estBadge(b.c)}</div>
       <div class="card-ft">${rateChip("d_" + d.code)}${cmpBtn("d_" + d.code, d.city)}</div>
     </div>
     <a class="card-link" href="#/d/${esc(d.code)}"><span class="sr">Apri ${esc(d.city)}, da ${eur(a.min)} a persona</span></a>
@@ -438,7 +441,7 @@ function homeHTML(){
       <div class="fpanel" id="fpanel" hidden></div>
     </div></div>
     <div class="wrap"><p class="count" id="count" aria-live="polite"></p><div class="grid" id="grid"></div></div>
-    <section class="sec wrap"><details class="xlists"><summary><span class="eyebrow">Mete escluse</span><span class="xl-t">Scartate per scali o clima, voli non ancora in vendita</span><span class="xl-i" aria-hidden="true">+</span></summary><div class="lists" id="lists"></div></details></section>
+    <section class="sec wrap"><details class="xlists"><summary><span class="eyebrow">Mete escluse</span><span class="xl-t">Scartate per scali o clima, nessun volo trovato</span><span class="xl-i" aria-hidden="true">+</span></summary><div class="lists" id="lists"></div></details></section>
     <section class="sec wrap" style="padding-top:0"><p class="eyebrow" style="margin-bottom:14px">Come leggere i numeri</p><div class="notes" id="notes"></div></section>
   </main>` + footHTML();
 }
@@ -510,17 +513,19 @@ function listsD(){
   const tabD = DESTS.filter(d => d.tab === S.tab);
   const valid = new Set(COMBOS.filter(c => c.a.length).map(c => c.d));
   const cov = c => COV[c] || [0, 0, null];
-  const stops = tabD.filter(d => d.g !== "sconsigliato" && !valid.has(d.code) && cov(d.code)[1] > 0);
-  const nodata = tabD.filter(d => d.g !== "sconsigliato" && cov(d.code)[1] === 0);
+  const some = new Set(COMBOS.map(c => c.d));   // anche solo con 2 scali, anche solo come stima
+  const stops = tabD.filter(d => d.g !== "sconsigliato" && !valid.has(d.code) && (cov(d.code)[1] > 0 || some.has(d.code)));
+  const nodata = tabD.filter(d => d.g !== "sconsigliato" && cov(d.code)[1] === 0 && !some.has(d.code));
   const clima = tabD.filter(d => d.g === "sconsigliato");
   const box = (t, items, sub) => `<div class="lbox"><h3>${t}</h3><p class="note">${sub}</p><ul>${items.length ? items.join("") : "<li><span>nessuna</span></li>"}</ul></div>`;
   const a = d => `<a href="#/d/${esc(d.code)}">${esc(d.city)}</a>`;
   return box("Scartate per troppi scali", stops.map(d => `<li>${a(d)} <span>${esc(d.code)} · solo con 2 scali${cov(d.code)[2] ? ", da " + eur(cov(d.code)[2]) + " pp" : ""}</span></li>`), "Nessuna opzione con al massimo 1 scalo per tratta nelle date richieste.") +
-    box("Voli non ancora disponibili", nodata.map(d => `<li>${a(d)} <span>${esc(d.code)} · ${esc(d.country)}</span></li>`), `Al ${esc(META.date || "")} Google Flights non aveva tariffe per agosto 2027 su queste rotte: da ricontrollare più avanti.`) +
+    box("Nessun volo trovato", nodata.map(d => `<li>${a(d)} <span>${esc(d.code)} · ${esc(d.country)}</span></li>`), `Al ${esc(META.date || "")} Google Flights non restituiva voli per agosto 2027 su queste rotte, né come A/R né come due solo andata. Si ricontrollano a ogni giro.`) +
     box("Scartate per clima", clima.map(d => `<li>${a(d)} <span>· ${esc(d.temp)}, ${esc(d.rain)}. ${esc(d.why)}</span></li>`).concat((RAW.excluded || []).map(e => `<li><span>${esc(e)}</span></li>`)), "Troppo caldo o in piena stagione di piogge, monsoni, uragani; in coda le esclusioni a monte.");
 }
 function notesD(){
-  return `<p><b>Prezzi.</b> Google Flights al ${esc(META.date || "")}, A/R per persona in economy (tariffa base, 1 adulto); il prezzo coppia è il doppio. A nove mesi dalla partenza molte compagnie non hanno ancora caricato agosto 2027: i prezzi sono indicativi e l'offerta crescerà.</p>
+  return `<p><b>Prezzi.</b> Google Flights al ${esc(META.date || "")}, A/R per persona in economy (tariffa base, 1 adulto); il prezzo coppia è il doppio. A nove mesi dalla partenza i prezzi sono indicativi.</p>
+  <p><b>Stime.</b> Sulle rotte poco cercate Google Flights non restituisce l'A/R per date così lontane, anche se i voli esistono. Lì il prezzo è la somma del miglior solo andata e del miglior ritorno nelle stesse date, con la regola scali applicata a ciascuna tratta, ed è sempre segnato «stima»: l'A/R vero di solito costa meno. Per la data più economica di ogni meta si prova anche a chiedere l'A/R vero, che quando arriva sostituisce la stima.${META.estDests ? ` Oggi ${META.estDests} mete hanno almeno una data stimata.` : ""}</p>
   <p><b>Aeroporti.</b> Si confrontano solo i prezzi dei voli, da qualunque aeroporto partano. Linate è il preferito ed è segnalato; il filtro «Aeroporto di partenza» restringe la ricerca.</p>
   <p><b>Scali.</b> Di base al massimo 1 scalo per tratta. Un'opzione con 2 scali compare solo con «Max scali: 2» e solo se costa almeno il ${Math.round((META.minPct || .25) * 100)}% e almeno ${META.minEur || 150} € a persona in meno del miglior volo con al massimo 1 scalo per la stessa meta, aeroporto e date. Mai 3 o più scali.</p>
   <p><b>Punteggio (0-100).</b> 50% prezzo pp (100 a 500 €, 0 a 2.200 €), 25% comodità (scali e durata dell'andata), 25% clima di agosto (ottimo 1 · buono 0,8 · accettabile 0,5).</p>
@@ -621,16 +626,28 @@ function voliD(code){
     byCity(g => viewD(code, g, S.f.stops), S.f.origin, x => [x.min, `${esc(oName(x.cheap.c.o))} · ${fmtD(x.cheap.c.dep)} · ${x.cheap.c.n} giorni · ${stopsTxt(x.cheap.o.f)}`]);
   if(!a){
     const cov = COV[code] || [0, 0, null], any = (BYD[code] || []).length;
-    const msg = any ? "Nessun volo con questi filtri: prova un altro aeroporto o più scali." : cov[1] > 0 ? `Per ora solo voli con 2 scali per tratta${cov[2] ? ", da " + eur(cov[2]) + " pp" : ""}.` : `Al ${esc(META.date || "")} Google Flights non ha ancora tariffe per agosto 2027 su questa rotta.`;
+    const msg = any ? "Nessun volo con questi filtri: prova un altro aeroporto o più scali." : cov[1] > 0 ? `Per ora solo voli con 2 scali per tratta${cov[2] ? ", da " + eur(cov[2]) + " pp" : ""}.` : `Al ${esc(META.date || "")} Google Flights non restituisce voli per agosto 2027 su questa rotta, né come A/R né come due solo andata. Capita sulle rotte poco cercate o non ancora in vendita: si ricontrolla a ogni giro.`;
     return head + (any ? ctl : "") + `<p class="empty" style="margin-top:20px">${msg}</p>`;
   }
   if(!S.cell || !a.cellBest[S.cell]) S.cell = a.cheap.c.dep + "|" + a.cheap.c.n;
   const [dep, n] = S.cell.split("|"), ret = addD(dep, +n);
-  const mx = mxHTML(a.cellBest, S.cell, x => x.o.f[0], x => oName(x.c.o) + (x.o.two ? " · 2 scali" : ""));
+  const mx = mxHTML(a.cellBest, S.cell, x => x.o.f[0], x => oName(x.c.o) + (x.o.two ? " · 2 scali" : "") + (x.c.e ? " · stima" : ""));
   let fl = "";
   const cs = (BYD[code] || []).filter(c => c.dep === dep && c.n === +n && oMatch(c.o, S.f.origin)).sort((x, y) => oRank(x.o) - oRank(y.o));
   for(const c of cs) for(const o of options(c, S.f.stops)){
     const f = o.f;
+    if(c.e && f[10]){   // stima: due biglietti solo andata, si mostrano tutte e due le tratte
+      const r = f[10], leg = x => `${esc(x[4])} → ${esc(x[5])}${x[6] ? `<sup>+${x[6]}</sup>` : ""} ${esc(x[9])}`;
+      const via = x => { const k = x[7] ? x[7].split("·").length : 0; return k === 0 ? "diretto" : `${k} ${k === 1 ? "scalo" : "scali"} · ${esc(x[7])}`; };
+      fl += `<div class="fl"><div class="fl-l">
+      <div class="fl-t"><span class="apt${c.o === "LIN" ? " lin" : ""}">${esc(f[8])}</span>${leg(f)}</div>
+      <div class="fl-m">Andata ${eur(f[11])} · ${esc(f[1])} · ${via(f)} · ${hm(f[2])}</div>
+      <div class="fl-t" style="margin-top:8px"><span class="apt">${esc(r[8])}</span>${leg(r)}</div>
+      <div class="fl-m">Ritorno ${eur(r[0])} · ${esc(r[1])} · ${via(r)} · ${hm(r[2])} · punteggio ${scoreOf(f, d)}/100</div>
+      <div class="bs">${c.o === "LIN" ? `<span class="b ok">da Linate</span>` : ""}${estBadge(c)}${twoBadge(o)}</div>
+    </div><div class="fl-r"><div class="pp num">${eur(f[0])} <small>PP</small></div><div class="cp num">coppia ${eur(f[0] * 2)}</div><a href="${gfUrl([[dep, c.o, code]], 2)}" target="_blank" rel="noopener">Andata ↗</a> <a href="${gfUrl([[ret, code, c.o]], 2)}" target="_blank" rel="noopener">Ritorno ↗</a></div></div>`;
+      continue;
+    }
     fl += `<div class="fl"><div class="fl-l">
       <div class="fl-t"><span class="apt${c.o === "LIN" ? " lin" : ""}">${esc(f[8])}</span>${esc(f[4])} → ${esc(f[5])}${f[6] ? `<sup>+${f[6]}</sup>` : ""} ${esc(f[9])}</div>
       <div class="fl-m">${esc(f[1])} · ${stopsTxt(f)} · ${hm(f[2])} all'andata · punteggio ${scoreOf(f, d)}/100</div>
@@ -639,7 +656,7 @@ function voliD(code){
   }
   return head + ctl + `<div class="v-cols"><div><h3 class="h3">Andata × durata</h3>${mx}<p class="note" style="margin-top:10px">Prezzo A/R per persona più basso della combinazione, con l'aeroporto sotto. Più intenso = più economico, il punto giallo segna il minimo. Tocca una cella per i voli.</p></div>
     <div><h3 class="h3">${fmtD(dep)} → ${fmtD(ret)} · ${n} giorni</h3>${fl}
-    <p class="note">Orari, scali e durata si riferiscono all'andata; il prezzo è il totale A/R per persona con il ritorno più economico entro lo stesso limite di scali (il ritorno si sceglie su Google Flights).</p>
+    <p class="note">Orari, scali e durata si riferiscono all'andata; il prezzo è il totale A/R per persona con il ritorno più economico entro lo stesso limite di scali (il ritorno si sceglie su Google Flights).${Object.values(a.cellBest).some(x => x.c.e) ? ` <b>Le celle segnate «stima» non sono un A/R</b>: su questa rotta Google Flights non lo restituisce, quindi il prezzo è la somma del miglior solo andata e del miglior ritorno (due biglietti separati, stessa regola scali per ciascuna tratta). L'A/R vero di solito costa meno.` : ""}</p>
     <p style="margin-top:16px"><a class="btn sun" href="${gfD(a.cellBest[S.cell].c.o, code, dep, ret)}" target="_blank" rel="noopener">Apri su Google Flights ↗</a></p></div></div>`;
 }
 function destHTML(code){
@@ -658,8 +675,8 @@ function destHTML(code){
       <h1 class="title rise${d.city.length > 14 ? " long" : ""}" style="--i:1">${esc(d.city)}</h1>
       <div class="hero-row rise" style="--i:2">
         <div class="d-cta">
-          ${b ? `<div class="tag"><span class="pp num">${eur(a.min)}</span><span class="u">a persona · A/R<small class="num">coppia ${eur(a.min * 2)}</small></span></div>` : `<div class="tag"><span class="pp">n.d.</span><span class="u">voli<small>non ancora in vendita</small></span></div>`}
-          <div class="d-when">${b ? `<b>${fmtD(b.c.dep)} → ${fmtD(ret)}</b><span>${b.c.n} giorni · da ${esc(oName(b.c.o))} · ${stopsTxt(b.o.f)}</span>` : `<span>Date da ricontrollare più avanti</span>`}</div>
+          ${b ? `<div class="tag"><span class="pp num">${eur(a.min)}</span><span class="u">${priceU(b.c)}<small class="num">coppia ${eur(a.min * 2)}</small></span></div>` : `<div class="tag"><span class="pp">n.d.</span><span class="u">voli<small>nessuno trovato per ora</small></span></div>`}
+          <div class="d-when">${b ? `<b>${fmtD(b.c.dep)} → ${fmtD(ret)}</b><span>${b.c.n} giorni · da ${esc(oName(b.c.o))} · ${stopsTxt(b.o.f)}${b.c.e ? " · somma di due solo andata" : ""}</span>` : `<span>Si ricontrolla a ogni giro</span>`}</div>
         </div>
         <div class="d-cta">${b ? `<button class="btn sun" data-act="scroll" data-to="voli">Vedi i voli</button>` : ""}${favCta("d_" + code)}${cmpBtn("d_" + code, d.city, "btn ghost")}</div>
       </div>
@@ -750,7 +767,7 @@ function tripHTML(id){
       <p class="route rise" style="--i:1">${routeTxt(t)}</p>
       <div class="hero-row rise" style="--i:2">
         <div class="d-cta">
-          ${b ? `<div class="tag"><span class="pp num">${eur(b.o.voli)}</span><span class="u">a persona · voli<small class="num">totale stimato ~${eur(a.min)} pp</small></span></div>` : `<div class="tag"><span class="pp num">${eur(t.land[0])}+</span><span class="u">a persona · a terra<small>voli non ancora disponibili</small></span></div>`}
+          ${b ? `<div class="tag"><span class="pp num">${eur(b.o.voli)}</span><span class="u">a persona · voli<small class="num">totale stimato ~${eur(a.min)} pp</small></span></div>` : `<div class="tag"><span class="pp num">${eur(t.land[0])}+</span><span class="u">a persona · a terra<small>nessun volo trovato</small></span></div>`}
           <div class="d-when">${b ? `<b>${fmtD(b.c.dep)} → ${fmtD(ret)}</b><span>${b.c.n} giorni · da ${esc(oName(b.c.o))} · coppia ${eur(a.min * 2)} tutto compreso</span>` : `<span>Date da ricontrollare più avanti</span>`}</div>
         </div>
         <div class="d-cta"><button class="btn sun" data-act="scroll" data-to="voli">Costi e voli</button>${favCta("t_" + id)}${cmpBtn("t_" + id, t.name, "btn ghost")}</div>
@@ -836,7 +853,7 @@ function favCard(f, i){
       <div class="card-name"><span class="k">${where}</span><h3 class="n">${esc(name)}</h3></div>
     </div>
     <div class="card-bd">
-      ${cur ? `<div class="pr"><span class="pp num">${eur(cur.pp)}</span><span class="u">a persona · ${kind === "t" ? "voli" : "A/R"}</span><span class="cp num">coppia ${eur(cur.pp * 2)}</span></div>` : `<div class="pr"><span class="pp">n.d.</span><span class="u">voli non ancora in vendita</span></div>`}
+      ${cur ? `<div class="pr"><span class="pp num">${eur(cur.pp)}</span><span class="u">a persona · ${kind === "t" ? "voli" : "A/R"}</span><span class="cp num">coppia ${eur(cur.pp * 2)}</span></div>` : `<div class="pr"><span class="pp">n.d.</span><span class="u">nessun volo trovato</span></div>`}
       ${when ? `<p class="meta">${when}</p>` : ""}
       ${cities.length ? `<div class="bs" aria-label="Miglior prezzo per città di partenza">${cities.map(([nm, pp]) => `<span class="b ${pp === lo ? "ok" : "plain"}">${nm} <b class="num">${eur(pp)}</b></span>`).join("")}</div>` : ""}
       <p class="meta fv-by">${star} Aggiunto${added ? " " + added : ""}${delta}</p>
@@ -981,7 +998,7 @@ function item(id){
   if(kind === "d" && DEST[key]){
     const d = DEST[key], a = viewD(key, "all", 1) || viewD(key, "all", 2), b = a && a.cheap, f = b && b.o.f, land = landD(key);
     return {id, kind, name:d.city, sub:d.country, href:"#/d/" + key, k:coverD(key), tab:d.tab, area:d.area, g:d.g, temp:d.temp, rain:d.rain, flag:d.flag || "", code:d.code,
-      pp:a ? a.min : null, unit:"A/R", o:b ? b.c.o : null, lin:!!a && a.origins.has("LIN"), dep:b ? b.c.dep : null, n:b ? b.c.n : null, dur:f ? f[2] : null, stops:f ? f[3] : null, via:f ? f[7] : "",
+      pp:a ? a.min : null, unit:b && b.c.e ? "stima" : "A/R", o:b ? b.c.o : null, lin:!!a && a.origins.has("LIN"), dep:b ? b.c.dep : null, n:b ? b.c.n : null, dur:f ? f[2] : null, stops:f ? f[3] : null, via:f ? f[7] : "",
       totLo:a && land ? a.min + land.lo : null, totHi:a && land ? a.min + land.hi : null, totNote:land ? `voli + a terra ${eur(land.lo)}–${eur(land.hi)} (giro «${land.name}»)` : "solo voli: nessuna stima a terra", score:a ? a.bestS : null};
   }
   if(kind === "t" && PT[key]){
@@ -1048,7 +1065,7 @@ function cmpHTML(){
   };
   const table = `<div class="cmp n${n}${hide >= 0 ? " hd" + hide : ""}" role="table" aria-label="Confronto tra ${its.map(x => esc(x.name)).join(", ")}" style="--n:${n}">
     <div class="cmp-r cmp-h" role="row"><div class="cmp-l" role="columnheader"><span class="sr">Voce</span></div>${its.map((x, i) => `<div class="cmp-c c${i}" role="columnheader"><a class="cmp-ph" href="${x.href}" tabindex="-1" aria-hidden="true">${x.k ? img(x.k, {sz:"thumb", alt:""}) : noPhoto(x.code)}</a><span class="cmp-k">${x.kind === "t" ? "giro" : "meta"} · ${esc(x.sub)}</span><a class="cmp-n" href="${x.href}">${esc(x.name)}</a></div>`).join("")}</div>
-    ${row("Prezzo migliore <small>a persona</small>", x => x.pp == null ? nd + `<span class="cmp-s">voli non ancora in vendita</span>` : `<b class="cmp-pp num">${eur(x.pp)}</b><span class="cmp-s">${x.unit === "voli" ? "voli" : "A/R"} · da ${esc(oName(x.o))}${x.lin && x.o !== "LIN" ? " · anche da Linate" : ""}</span>${loPP != null && x.pp === loPP ? best("il più basso") : ""}${priceBadge(x.id)}`)}
+    ${row("Prezzo migliore <small>a persona</small>", x => x.pp == null ? nd + `<span class="cmp-s">nessun volo trovato</span>` : `<b class="cmp-pp num">${eur(x.pp)}</b><span class="cmp-s">${x.unit === "voli" ? "voli" : x.unit === "stima" ? "stima, due solo andata" : "A/R"} · da ${esc(oName(x.o))}${x.lin && x.o !== "LIN" ? " · anche da Linate" : ""}</span>${loPP != null && x.pp === loPP ? best("il più basso") : ""}${priceBadge(x.id)}`)}
     ${row("Costo totale stimato <small>a persona</small>", x => x.totLo == null ? nd + `<span class="cmp-s">${esc(x.totNote)}</span>` : `<b class="num">${eur(x.totLo)} – ${eur(x.totHi)}</b> <span class="est">stima</span><span class="cmp-s">${esc(x.totNote)} · coppia ${eur(x.totLo * 2)} – ${eur(x.totHi * 2)}</span>${loTot != null && x.totLo === loTot ? best("il più basso") : ""}`)}
     ${row("Date", x => x.dep ? `<b>${fmtD(x.dep)} → ${fmtD(addD(x.dep, x.n))}</b><span class="cmp-s">${x.n} giorni, nella data più economica</span>` : nd)}
     ${row("Ore di volo <small>andata</small>", x => x.dur == null ? nd : `<b class="num">${hm(x.dur)}</b>${loDur != null && x.dur === loDur ? best("il più corto") : ""}`)}
@@ -1144,7 +1161,7 @@ async function loadWorld(){
 function mapPoints(){
   return DESTS.filter(d => d.g !== "sconsigliato" && d.lat != null && d.lon != null && (S.m.tab === "all" || d.tab === S.m.tab)).map(d => {
     const a = viewD(d.code, "all", 1), a2 = a || viewD(d.code, "all", 2), [x, y] = mapXY(d.lat, d.lon);
-    return {d, x, y, pp:a2 ? a2.min : null, two:!a && !!a2, bin:a2 ? mBin(a2.min) : -1, o:a2 ? a2.cheap.c.o : null};
+    return {d, x, y, pp:a2 ? a2.min : null, two:!a && !!a2, est:!!(a2 && a2.cheap.c.e), bin:a2 ? mBin(a2.min) : -1, o:a2 ? a2.cheap.c.o : null};
   });
 }
 function mapBody(){
@@ -1156,13 +1173,13 @@ function mapBody(){
   const r = +(vw / (narrow ? 62 : 115)).toFixed(2), fs = +(vw / (narrow ? 24 : 46)).toFixed(2), sw = +(vw / 900).toFixed(2);
   // prima le piu' care, cosi' le economiche (piu' intense) restano sopra; le n.d. sotto a tutte
   const dots = inView.slice().sort((a, b) => (a.pp == null ? -1 : 0) - (b.pp == null ? -1 : 0) || (b.pp || 0) - (a.pp || 0)).map(p => {
-    const lbl = `${p.d.city}, ${p.d.country}: ${p.pp == null ? "voli non ancora in vendita" : eur(p.pp) + " a persona da " + oName(p.o) + (p.two ? " (solo con 2 scali)" : "")}`;
+    const lbl = `${p.d.city}, ${p.d.country}: ${p.pp == null ? "nessun volo trovato" : eur(p.pp) + " a persona da " + oName(p.o) + (p.two ? " (solo con 2 scali)" : "") + (p.est ? " (stima: somma di due solo andata)" : "")}`;
     const right = p.x > x0 + vw * 0.72;
     return `<a class="mp ${p.bin < 0 ? "nd" : "m" + p.bin}" href="#/d/${esc(p.d.code)}" aria-label="${esc(lbl)}"><title>${esc(lbl)}</title><circle class="hit" cx="${p.x}" cy="${p.y}" r="${+(r * 2.1).toFixed(2)}"/><circle class="dot" cx="${p.x}" cy="${p.y}" r="${r}" stroke-width="${sw}"/><text x="${+(p.x + (right ? -1 : 1) * r * 1.5).toFixed(1)}" y="${+(p.y + fs * 0.35).toFixed(1)}" font-size="${fs}" stroke-width="${+(fs / 4).toFixed(2)}"${right ? ` text-anchor="end"` : ""}>${esc(p.d.city.split(" (")[0])}${p.pp == null ? "" : " · " + eur(p.pp)}</text></a>`;
   }).join("");
   const home = [["Milano", 45.46, 9.19], ["Roma", 41.9, 12.5], ["Pisa", 43.68, 10.39]].map(([n, la, lo]) => { const [x, y] = mapXY(la, lo); return x >= x0 && x <= x1 && y >= y0 && y <= y1 ? `<rect class="mhome" x="${+(x - r * 0.55).toFixed(1)}" y="${+(y - r * 0.55).toFixed(1)}" width="${+(r * 1.1).toFixed(2)}" height="${+(r * 1.1).toFixed(2)}" stroke-width="${sw}"><title>${n}: partenza</title></rect>` : ""; }).join("");
   const counts = [0, 1, 2, 3, 4].map(i => inView.filter(p => p.bin === i).length), nNd = inView.filter(p => p.bin < 0).length;
-  const legend = `<ul class="mleg" aria-label="Legenda: prezzo A/R a persona">${[0, 1, 2, 3, 4].map(i => `<li><i class="mk m${i}"></i>${mBinTxt(i)} <span class="num">(${counts[i]})</span></li>`).join("")}<li><i class="mk nd"></i>voli non ancora in vendita <span class="num">(${nNd})</span></li><li><i class="mk home"></i>partenza</li></ul>`;
+  const legend = `<ul class="mleg" aria-label="Legenda: prezzo A/R a persona">${[0, 1, 2, 3, 4].map(i => `<li><i class="mk m${i}"></i>${mBinTxt(i)} <span class="num">(${counts[i]})</span></li>`).join("")}<li><i class="mk nd"></i>nessun volo trovato <span class="num">(${nNd})</span></li><li><i class="mk home"></i>partenza</li></ul>`;
   const land = WORLD.state === "ok" ? `<path class="mland" d="${WORLD.d}"/>` : "";
   const status = WORLD.state === "error" ? `<p class="note">Il contorno dei continenti non si è caricato: i punti restano al loro posto. <button type="button" class="achip all" data-act="map-retry">Riprova</button></p>` : WORLD.state !== "ok" ? `<p class="note">Carico la mappa…</p>` : "";
   const sorted = inView.slice().sort((a, b) => (a.pp == null ? 1e9 : a.pp) - (b.pp == null ? 1e9 : b.pp) || a.d.city.localeCompare(b.d.city, "it"));
@@ -1189,7 +1206,7 @@ const HG = ["MIL", "ROM", "PSA"];
 const hRank = e => e[0] + (e[6] || 0);
 const fmtDY = iso => { const x = dt(iso); return `${x.getDate()} ${MESI[x.getMonth()]}`; };
 const hStops = n => n === 0 ? "diretto" : `${n} ${n === 1 ? "scalo" : "scali"}`;
-const hEntry = e => `${esc(oName(e[1]))} · ${fmtD(e[2])} → ${fmtD(addD(e[2], e[3]))} · ${e[3]} giorni · ${hStops(e[4])}${e[5] ? ` · totale stimato ~${eur(e[5])}` : ""}`;
+const hEntry = e => `${esc(oName(e[1]))} · ${fmtD(e[2])} → ${fmtD(addD(e[2], e[3]))} · ${e[3]} giorni · ${hStops(e[4])}${e[5] ? ` · totale stimato ~${eur(e[5])}` : ""}${e[7] ? ` · ${esc(EST_TXT)}` : ""}`;
 function histRows(id){
   return ((HIST.t || {})[id] || []).map(r => {
     const d = HIST.days[r[0]], run = HIST.runs[r[0]] || ["", 0, 1], g = {};
@@ -1232,7 +1249,7 @@ function histHTML(id){
   const lo = pts.reduce((a, r) => pp(r) <= pp(a) ? r : a, pts[0]);
   const tile = (l, v, s) => `<div class="hst"><span class="l">${l}</span><b class="num">${v}</b><span class="s">${s}</span></div>`;
   const stats = `<div class="hstats" role="group" aria-label="Riepilogo dell'andamento, ${esc(fName)}">` +
-    tile("Ultimo", `${eur(pp(last))} <small>${unit}</small>`, `${fmtD(last.d)} · coppia ${eur(pp(last) * 2)}${last.part ? " · dato parziale" : ""}`) +
+    tile("Ultimo", `${eur(pp(last))} <small>${unit}</small>`, `${fmtD(last.d)} · coppia ${eur(pp(last) * 2)}${last.g[F][7] ? " · stima" : ""}${last.part ? " · dato parziale" : ""}`) +
     tile("Minimo storico", `${eur(pp(lo))} <small>${unit}</small>`, lo.d === last.d ? "è il prezzo dell'ultimo giro" : `visto ${fmtD(lo.d)}`) +
     tile("Dall'inizio", prev ? hDelta(pp(first), pp(last)) : `<span class="hd eq">n.d.</span>`, prev ? `dal ${fmtD(first.d)} (${eur(pp(first))})` : "serve un secondo giro") +
     tile("Dall'ultimo giro", prev ? hDelta(pp(prev), pp(last)) : `<span class="hd eq">n.d.</span>`, prev ? `rispetto a ${fmtD(prev.d)} (${eur(pp(prev))})` : "serve un secondo giro") + `</div>`;
@@ -1256,7 +1273,7 @@ function histHTML(id){
     }
     return (so ? `<path class="hl s-${k}" d="${so}"/>` : "") + (da ? `<path class="hl s-${k} dash" d="${da}"/>` : "");
   }).join("");
-  const dots = vis.map(([k]) => bs.map((b, i) => b.g[k] && (n <= 45 || b.part || i === n - 1) ? `<i class="hdot s-${k}${b.part ? " part" : ""}" style="left:${X(b)}%;top:${Y(b.g[k][0])}px"></i>` : "").join("")).join("");
+  const dots = vis.map(([k]) => bs.map((b, i) => b.g[k] && (n <= 45 || b.part || b.g[k][7] || i === n - 1) ? `<i class="hdot s-${k}${b.part ? " part" : ""}${b.g[k][7] ? " est" : ""}" style="left:${X(b)}%;top:${Y(b.g[k][0])}px"></i>` : "").join("")).join("");
   const lb = bs[n - 1].g[F] ? bs[n - 1] : null;
   const lastLbl = lb ? `<span class="hlast num${n === 1 ? " c" : ""}" style="left:${X(lb)}%;top:${Y(lb.g[F][0])}px">${eur(lb.g[F][0])}</span>` : "";
   const bTitle = b => H.per === "month" ? `${MESI[dt(b.k).getMonth()]} ${b.k.slice(0, 4)}` : H.per === "week" ? `Settimana del ${fmtDY(b.k)}` : `${fmtD(b.k)} ${b.k.slice(0, 4)}`;
@@ -1277,7 +1294,7 @@ function histHTML(id){
   const desc = `Andamento del prezzo più basso per persona (${fName}): ${rows.length} ${rows.length === 1 ? "giorno" : "giorni"} di dati dal ${fmtD(first.d)} al ${fmtD(last.d)}, ultimo ${eur(pp(last))}, minimo ${eur(pp(lo))}.`;
   const seg = `<span class="seg" role="group" aria-label="Aggregazione">${[["day", "Giorno"], ["week", "Settimana"], ["month", "Mese"]].map(([v, l]) => `<button type="button" data-act="hist" data-hk="per" data-hv="${v}" aria-pressed="${H.per === v}">${l}</button>`).join("")}</span>`;
   const legend = ser.length > 1 ? `<span class="hlegs" role="group" aria-label="Serie mostrate">${ser.map(([k, name]) => `<button type="button" class="hleg" data-act="hist" data-hk="ser" data-hv="${k}" aria-pressed="${!H.off[k]}"><i class="hk s-${k}"></i>${esc(name)}</button>`).join("")}</span>` : "";
-  const anyPart = rows.some(r => r.part), cell = e => e ? `<b class="num">${eur(e[0])}</b><small>${esc(e[1])} · ${fmtDY(e[2])} → ${fmtDY(addD(e[2], e[3]))} · ${hStops(e[4])}${e[5] ? ` · tot. ~${eur(e[5])}` : ""}</small>` : "n.d.";
+  const anyPart = rows.some(r => r.part), cell = e => e ? `<b class="num">${eur(e[0])}</b><small>${esc(e[1])} · ${fmtDY(e[2])} → ${fmtDY(addD(e[2], e[3]))} · ${hStops(e[4])}${e[5] ? ` · tot. ~${eur(e[5])}` : ""}${e[7] ? " · stima" : ""}</small>` : "n.d.";
   const table = `<details class="htab"><summary>Tabella dei valori</summary><div class="hscroll"><table><caption class="sr">${esc(desc)}</caption><thead><tr><th scope="col">${H.per === "day" ? "Giorno" : H.per === "week" ? "Settimana del" : "Mese"}</th>${ser.map(([, name]) => `<th scope="col">${esc(name)}</th>`).join("")}<th scope="col">Nota</th></tr></thead><tbody>` +
     bs.slice().reverse().map(b => `<tr><th scope="row">${H.per === "week" ? fmtDY(b.k) : bTitle(b)}</th>${ser.map(([k]) => `<td>${cell(b.g[k])}</td>`).join("")}<td>${[b.part ? "dato parziale" : "", H.per !== "day" && b.days > 1 ? `minimo di ${b.days} giorni` : "", b.n > 1 ? `${b.n} giri, minimo del giorno` : "", /locale/.test(b.src) ? "scansione dal computer" : ""].filter(Boolean).join(" · ") || "giro completo"}</td></tr>`).join("") + `</tbody></table></div></details>`;
   return `<div class="hist">
@@ -1285,7 +1302,7 @@ function histHTML(id){
     ${stats}
     <div class="hfig${n <= 2 ? " few" : ""}"><div class="hplot" style="height:${PH}px"><svg viewBox="0 0 1000 ${PH}" preserveAspectRatio="none" role="img" aria-label="${esc(desc)}"><title>${esc(desc)}</title>${grid}${paths}</svg>${ylab}${dots}${lastLbl}${cols}</div><div class="hxax" aria-hidden="true">${xlab}</div></div>
     ${rows.length < 7 ? `<p class="note hbuild"><b>Storico in costruzione: ${rows.length} ${rows.length === 1 ? "giorno" : "giorni"} di dati.</b> Si aggiunge un punto a ogni giro di scansione, uno al giorno.</p>` : ""}
-    <p class="note">Prezzo più basso trovato a ogni giro fra tutte le date di agosto, con la regola scali (2 scali solo se conviene)${trip ? "; il totale stimato aggiunge voli interni e spese a terra" : ""}. Con più giri nello stesso giorno vale il minimo. Passa sul grafico o tocca un punto per aeroporto, date e scali.${anyPart ? ` <b>Punto vuoto e tratto tratteggiato = dato parziale</b>: quel giorno la scansione ha trovato molti meno voli del solito, il prezzo vero poteva essere più basso.` : ""}</p>
+    <p class="note">Prezzo più basso trovato a ogni giro fra tutte le date di agosto, con la regola scali (2 scali solo se conviene)${trip ? "; il totale stimato aggiunge voli interni e spese a terra" : ""}. Con più giri nello stesso giorno vale il minimo. Passa sul grafico o tocca un punto per aeroporto, date e scali.${rows.some(r => HG.some(k => r.g[k] && r.g[k][7])) ? ` <b>Punto quadrato = stima</b>: quel giorno il prezzo era la somma di due solo andata, non un A/R.` : ""}${anyPart ? ` <b>Punto vuoto e tratto tratteggiato = dato parziale</b>: quel giorno la scansione ha trovato molti meno voli del solito, il prezzo vero poteva essere più basso.` : ""}</p>
     ${table}
   </div>`;
 }
