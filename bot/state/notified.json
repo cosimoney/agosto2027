@@ -1,17 +1,52 @@
 {
  "cards": {
-  "day": "2026-11-23",
-  "n": 2
+  "day": "2026-11-25",
+  "n": 3
  },
- "digest_last": "2026-11-23",
+ "digest_last": "2026-11-25",
  "fav": {
   "d_CMB": {
    "last": 749,
    "thr": 1000,
    "under": true
   },
+  "d_JNB": {
+   "last": 814,
+   "thr": 1000,
+   "under": true
+  },
   "d_KUL": {
    "last": 792,
+   "thr": 1000,
+   "under": true
+  },
+  "d_LIM": {
+   "last": 1103,
+   "thr": 1000,
+   "under": false
+  },
+  "d_YUL": {
+   "last": 685,
+   "thr": 1000,
+   "under": true
+  },
+  "t_argentina-nord": {
+   "last": 851,
+   "thr": 1000,
+   "under": true
+  },
+  "t_atacama-uyuni-salta": {
+   "last": 1171,
+   "thr": 1000,
+   "under": false
+  },
+  "t_peru-classico": {
+   "last": 1173,
+   "thr": 1000,
+   "under": false
+  },
+  "t_usa-pacific-northwest": {
+   "last": 930,
    "thr": 1000,
    "under": true
   }
@@ -20,11 +55,56 @@
   "d_ALA@FCO-CIA": {
    "min": 603
   },
+  "d_ALA@MXP": {
+   "min": 731
+  },
+  "d_BOO@FCO-CIA": {
+   "min": 432
+  },
+  "d_BOO@LIN": {
+   "min": 605
+  },
+  "d_BOO@MXP": {
+   "min": 381
+  },
+  "d_BVC@FCO-CIA": {
+   "min": 639
+  },
+  "d_BVC@MXP": {
+   "min": 772
+  },
+  "d_CGK@MXP": {
+   "min": 873
+  },
   "d_CMB@FCO-CIA": {
    "min": 821
   },
   "d_CMB@MXP": {
    "min": 839
+  },
+  "d_DPS@MXP": {
+   "min": 929
+  },
+  "d_EDI@FCO-CIA": {
+   "min": 230
+  },
+  "d_EDI@LIN": {
+   "min": 235
+  },
+  "d_EDI@MXP": {
+   "min": 203
+  },
+  "d_EDI@PSA": {
+   "min": 270
+  },
+  "d_EVE@FCO-CIA": {
+   "min": 411
+  },
+  "d_EVE@LIN": {
+   "min": 942
+  },
+  "d_EVE@MXP": {
+   "min": 274
   },
   "d_EVN@FCO-CIA": {
    "min": 260
@@ -35,11 +115,74 @@
   "d_EVN@MXP": {
    "min": 390
   },
+  "d_EVN@PSA": {
+   "min": 465
+  },
+  "d_EZE@MXP": {
+   "min": 851
+  },
+  "d_FAE@FCO-CIA": {
+   "min": 648
+  },
+  "d_FNC@FCO-CIA": {
+   "min": 650
+  },
+  "d_FNC@LIN": {
+   "min": 580
+  },
+  "d_FNC@MXP": {
+   "min": 421
+  },
+  "d_FNC@PSA": {
+   "min": 781
+  },
+  "d_GYD@FCO-CIA": {
+   "min": 340
+  },
+  "d_GYD@LIN": {
+   "min": 941
+  },
+  "d_GYD@MXP": {
+   "min": 420
+  },
+  "d_ISB@FCO-CIA": {
+   "min": 817
+  },
+  "d_KEF@FCO-CIA": {
+   "min": 416
+  },
+  "d_KEF@LIN": {
+   "min": 405
+  },
+  "d_KEF@MXP": {
+   "min": 325
+  },
+  "d_KEF@PSA": {
+   "min": 564
+  },
   "d_KUL@FCO-CIA": {
    "min": 792
   },
   "d_KUL@MXP": {
    "min": 887
+  },
+  "d_PDL@FCO-CIA": {
+   "min": 897
+  },
+  "d_PDL@LIN": {
+   "min": 732
+  },
+  "d_PDL@MXP": {
+   "min": 383
+  },
+  "d_RAI@FCO-CIA": {
+   "min": 747
+  },
+  "d_SID@FCO-CIA": {
+   "min": 869
+  },
+  "d_SID@MXP": {
+   "min": 399
   },
   "d_TBS@FCO-CIA": {
    "min": 367
@@ -50,8 +193,80 @@
   "d_TBS@MXP": {
    "min": 190
   },
+  "d_TBS@PSA": {
+   "min": 465
+  },
+  "d_TER@FCO-CIA": {
+   "min": 588
+  },
+  "d_TER@MXP": {
+   "min": 525
+  },
+  "d_TOS@FCO-CIA": {
+   "min": 348
+  },
+  "d_TOS@LIN": {
+   "min": 466
+  },
+  "d_TOS@MXP": {
+   "min": 367
+  },
+  "d_TOS@PSA": {
+   "min": 711
+  },
+  "d_VXE@FCO-CIA": {
+   "min": 881
+  },
+  "d_VXE@MXP": {
+   "min": 806
+  },
+  "t_alaska-kenai-denali@FCO-CIA": {
+   "min": 930
+  },
+  "t_alaska-kenai-denali@MXP": {
+   "min": 920
+  },
+  "t_argentina-bariloche@MXP": {
+   "min": 961
+  },
+  "t_azzorre-isole@LIN": {
+   "min": 536
+  },
+  "t_azzorre-isole@MXP": {
+   "min": 463
+  },
+  "t_baku-tbilisi@FCO-CIA": {
+   "min": 267
+  },
+  "t_baku-tbilisi@LIN": {
+   "min": 489
+  },
+  "t_baku-tbilisi@MXP": {
+   "min": 332
+  },
+  "t_baku-tbilisi@PSA": {
+   "min": 448
+  },
+  "t_bali-flores-komodo@MXP": {
+   "min": 929
+  },
+  "t_bali-sumba-komodo@MXP": {
+   "min": 929
+  },
+  "t_borneo-tanjung-puting-giava@MXP": {
+   "min": 943
+  },
+  "t_canada-great-bear@FCO-CIA": {
+   "min": 930
+  },
+  "t_canada-great-bear@MXP": {
+   "min": 910
+  },
   "t_canada-quebec@FCO-CIA": {
    "min": 643
+  },
+  "t_canada-quebec@LIN": {
+   "min": 983
   },
   "t_canada-quebec@MXP": {
    "min": 926
@@ -62,6 +277,15 @@
   "t_canada-rockies@MXP": {
    "min": 870
   },
+  "t_capo-verde-isole@FCO-CIA": {
+   "min": 761
+  },
+  "t_capo-verde-isole@MXP": {
+   "min": 579
+  },
+  "t_flores-komodo-kelimutu@MXP": {
+   "min": 929
+  },
   "t_georgia-armenia@FCO-CIA": {
    "min": 285
   },
@@ -70,6 +294,9 @@
   },
   "t_georgia-armenia@MXP": {
    "min": 215
+  },
+  "t_georgia-armenia@PSA": {
+   "min": 580
   },
   "t_georgia-svaneti@FCO-CIA": {
    "min": 354
@@ -80,14 +307,68 @@
   "t_georgia-svaneti@MXP": {
    "min": 190
   },
+  "t_glacier-waterton@FCO-CIA": {
+   "min": 880
+  },
+  "t_glacier-waterton@MXP": {
+   "min": 860
+  },
+  "t_islanda-groenlandia-est@FCO-CIA": {
+   "min": 416
+  },
+  "t_islanda-groenlandia-est@LIN": {
+   "min": 405
+  },
+  "t_islanda-groenlandia-est@MXP": {
+   "min": 325
+  },
+  "t_islanda-ring-road@FCO-CIA": {
+   "min": 416
+  },
+  "t_islanda-ring-road@LIN": {
+   "min": 405
+  },
+  "t_islanda-ring-road@MXP": {
+   "min": 325
+  },
   "t_kirghizistan-almaty@FCO-CIA": {
    "min": 603
+  },
+  "t_ladakh-zanskar@FCO-CIA": {
+   "min": 828
+  },
+  "t_ladakh-zanskar@LIN": {
+   "min": 763
+  },
+  "t_ladakh-zanskar@MXP": {
+   "min": 682
+  },
+  "t_lofoten-tromso@FCO-CIA": {
+   "min": 367
+  },
+  "t_lofoten-tromso@LIN": {
+   "min": 396
+  },
+  "t_lofoten-tromso@MXP": {
+   "min": 274
   },
   "t_malesia-borneo@FCO-CIA": {
    "min": 852
   },
   "t_malesia-borneo@MXP": {
    "min": 947
+  },
+  "t_scozia-ebridi@FCO-CIA": {
+   "min": 230
+  },
+  "t_scozia-ebridi@LIN": {
+   "min": 235
+  },
+  "t_scozia-ebridi@MXP": {
+   "min": 203
+  },
+  "t_scozia-ebridi@PSA": {
+   "min": 270
   },
   "t_sri-lanka@FCO-CIA": {
    "min": 821
@@ -97,6 +378,27 @@
   },
   "t_sudafrica-kruger-garden@MXP": {
    "min": 945
+  },
+  "t_uganda-rwanda@MXP": {
+   "min": 938
+  },
+  "t_usa-california-utah@FCO-CIA": {
+   "min": 818
+  },
+  "t_usa-california-utah@LIN": {
+   "min": 748
+  },
+  "t_usa-california-utah@MXP": {
+   "min": 745
+  },
+  "t_usa-california-utah@PSA": {
+   "min": 744
+  },
+  "t_usa-grand-circle@FCO-CIA": {
+   "min": 850
+  },
+  "t_usa-grand-circle@MXP": {
+   "min": 840
   },
   "t_usa-pacific-northwest@FCO-CIA": {
    "min": 940
@@ -112,6 +414,18 @@
   },
   "t_usa-rockies-yellowstone@MXP": {
    "min": 888
+  },
+  "t_usa-rockies-yellowstone@PSA": {
+   "min": 878
+  },
+  "t_usa-sierra-nevada@FCO-CIA": {
+   "min": 767
+  },
+  "t_usa-sierra-nevada@LIN": {
+   "min": 684
+  },
+  "t_usa-sierra-nevada@MXP": {
+   "min": 880
   }
  },
  "prefs_cache": {
@@ -122,11 +436,53 @@
     "by": "Cosimo",
     "p": 749
    },
+   "d_JNB": {
+    "added": "2026-11-25",
+    "at": "2026-11-25T14:42:38.653Z",
+    "by": "Lavi",
+    "p": 814
+   },
    "d_KUL": {
     "added": "2026-11-23",
     "at": "2026-11-23T08:20:57.525Z",
     "by": "Cosimo",
     "p": 792
+   },
+   "d_LIM": {
+    "added": "2026-11-25",
+    "at": "2026-11-25T14:41:18.393Z",
+    "by": "Lavi",
+    "p": 1103
+   },
+   "d_YUL": {
+    "added": "2026-11-25",
+    "at": "2026-11-25T14:42:25.735Z",
+    "by": "Lavi",
+    "p": 685
+   },
+   "t_argentina-nord": {
+    "added": "2026-11-25",
+    "at": "2026-11-25T14:44:57.071Z",
+    "by": "Lavi",
+    "p": 851
+   },
+   "t_atacama-uyuni-salta": {
+    "added": "2026-11-25",
+    "at": "2026-11-25T14:44:44.578Z",
+    "by": "Lavi",
+    "p": 1171
+   },
+   "t_peru-classico": {
+    "added": "2026-11-25",
+    "at": "2026-11-25T14:45:04.386Z",
+    "by": "Lavi",
+    "p": 1173
+   },
+   "t_usa-pacific-northwest": {
+    "added": "2026-11-25",
+    "at": "2026-11-25T14:45:29.615Z",
+    "by": "Lavi",
+    "p": 930
    }
   },
   "muted": {},
