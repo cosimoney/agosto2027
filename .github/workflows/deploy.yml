@@ -11,6 +11,7 @@ on:
       - "v2.css"
       - "v2.js"
       - "img/**"
+      - "world.json"
       - "build*.py"
       - "itineraries.py"
       - "pipeline.py"

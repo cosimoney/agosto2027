@@ -25,6 +25,15 @@ Tutto su GitHub Actions, senza server.
 - Lo storico per il grafico "Il prezzo nel tempo" delle pagine meta e trip sta in `bot/state/price_history.json` (`price_history.py`): minimo per persona per giorno, totale e da Milano / Roma / Pisa. Lo aggiorna `pipeline.py build` a ogni giro riuscito, lo committa il workflow della scansione; un giro in ABORT non scrive nulla. Test: `python test_price_history.py`.
 - Il sito viene pubblicato dall'action di Pages: `index.html` non è nel repo.
 
+## Sito
+
+- La pagina è leggera: i dati (mete, voli, foto, storico) stanno in `data.json`, che `build_v2.py` scrive accanto alla pagina e `v2.js` scarica all'avvio (`data.json?v=<hash>`). `python build_v2.py --inline` rimette tutto in un solo file, apribile da disco.
+- Foto in più larghezze: `python photo_variants.py` crea `img/<nome>-480.webp`, `-800`, `-1200` dalle foto già presenti (da rilanciare dopo `photos.py`); la pagina le usa con `srcset`.
+- Pagine: `#/voti` (voti da 0 a 5 di ciascuno, incrociati), `#/confronto` (2-3 mete o giri fianco a fianco), `#/mappa` (mete colorate per prezzo; contorno in `world.json`, rigenerabile con `python build_map.py`; coordinate in `dests.py`, `COORDS`).
+- Badge «prezzo basso / tipico / alto»: ultimo giro contro la mediana dello storico, visibile da 5 giorni di dati per quella voce.
+- Voti e preferiti passano dal Worker (`/api/rate`, `/api/rates`, `/api/fav`, `/api/favs`) con il link personale di `/sito`; nel bot c'è anche `/voti`.
+- Test: `python build_v2.py && node test_v2.js`, `cd worker && npm test`.
+
 ## Protezioni
 
 - Se Google blocca il runner le pagine tornano vuote: quando i risultati con voli scendono sotto il 60% del giro precedente il giro si ferma, il sito resta quello di prima e non parte nessun avviso.

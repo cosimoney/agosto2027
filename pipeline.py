@@ -3,7 +3,7 @@
 """Giro completo per GitHub Actions: scansione -> verifica dei vuoti -> controllo anti-blocco -> build del sito.
 
   python pipeline.py scan     riscansiona tutto da zero (prezzi nuovi a ogni giro) e scrive scan_meta.json
-  python pipeline.py build    build_trips.py, build.py, storico prezzi, build_v2.py -> _site/index.html + _site/img/
+  python pipeline.py build    build_trips.py, build.py, storico prezzi, build_v2.py -> _site/index.html, data.json, world.json, img/
   python pipeline.py fill     solo le query che mancano nei dati dell'ultimo giro (mete/trip appena aggiunti)
   python pipeline.py meta     ricalcola scan_meta.json dai file presenti (dopo un caricamento a mano dei dati)
 
@@ -327,27 +327,47 @@ def build():
         elif r.returncode:
             fail("%s fallito (exit %d)" % (cmd[0], r.returncode))
     html = open("agosto-2027-v2.html", encoding="utf-8").read()
-    for marker in ("/*__DATA__*/", "/*__PHOTOS__*/", "/*__CSS__*/", "/*__JS__*/"):
+    for marker in ("/*__DATA_URL__*/", "<!--__HEAD__-->", "/*__CSS__*/", "/*__JS__*/"):
         if marker in html:
             fail("pagina incompleta: segnaposto %s non sostituito" % marker)
-    if len(html) < 200000:
-        fail("pagina troppo piccola (%d caratteri): dati mancanti" % len(html))
+    # i dati stanno in data.json, accanto alla pagina (la pagina lo scarica all'avvio)
+    if not os.path.exists("data.json"):
+        fail("manca data.json: build_v2.py non ha scritto i dati")
+    data = open("data.json", encoding="utf-8").read()
+    if len(data) < 200000 or len(html) < 60000:
+        fail("pagina o dati troppo piccoli (%d e %d caratteri): dati mancanti" % (len(html), len(data)))
+    old = re.search(r"data\.json\?v=([0-9a-f]{6,40})", html)
+    if not old:
+        fail("la pagina non punta a data.json")
     # data dei prezzi: build.py / build_trips.py la portano scritta a mano, qui diventa quella del giro
     try:
         when = json.load(open(META, encoding="utf-8"))["date"]
     except Exception:
         when = today_it()
-    html, n = re.subn(r'"date":"\d{1,2} [a-z]+ 20\d\d"', lambda m: '"date":"%s"' % when, html)
+    data, n = re.subn(r'"date":"\d{1,2} [a-z]+ 20\d\d"', lambda m: '"date":"%s"' % when, data)
     log("data dei prezzi: %s (%d punti)" % (when, n))
+    try:
+        json.loads(data)
+    except ValueError as e:
+        fail("data.json non e' JSON valido: %s" % e)
+    import hashlib
+    ver = hashlib.sha1(data.encode("utf-8")).hexdigest()[:10]   # i dati sono cambiati (data): cambia anche l'indirizzo
+    html = html.replace("data.json?v=" + old.group(1), "data.json?v=" + ver)
     if re.search(r'(src|href)=["\']/(?!/)', html):
         log("ATTENZIONE: la pagina contiene path assoluti (/...): su Pages il sito sta sotto /agosto2027/")
     shutil.rmtree("_site", ignore_errors=True)
     os.makedirs("_site")
     with open("_site/index.html", "w", encoding="utf-8", newline="\n") as f:
         f.write(html)
+    with open("_site/data.json", "w", encoding="utf-8", newline="\n") as f:
+        f.write(data)
+    if os.path.exists("world.json"):
+        shutil.copyfile("world.json", "_site/world.json")      # contorno dei continenti per la pagina Mappa
+    else:
+        log("ATTENZIONE: manca world.json (python build_map.py): la mappa esce senza continenti")
     shutil.copytree("img", "_site/img")
     open("_site/.nojekyll", "w").close()
-    log("OK-BUILD _site/index.html %d byte, img %d file" % (os.path.getsize("_site/index.html"), len(os.listdir("_site/img"))))
+    log("OK-BUILD _site/index.html %d byte, data.json %d byte, img %d file" % (os.path.getsize("_site/index.html"), os.path.getsize("_site/data.json"), len(os.listdir("_site/img"))))
 
 
 if __name__ == "__main__":

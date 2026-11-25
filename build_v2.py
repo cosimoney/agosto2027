@@ -1,16 +1,22 @@
 # -*- coding: utf-8 -*-
-"""template_v2.html + v2.css + v2.js + dati + img/manifest.json -> agosto-2027-v2.html
+"""template_v2.html + v2.css + v2.js -> agosto-2027-v2.html (leggera)  |  dati + img/manifest.json -> data.json
 
 Dati: esegue in memoria build.py (RAW) e build_trips.py (RAW.trips_popular) senza far loro scrivere nulla
 (agosto-2027.html e trips_data.json restano come sono).
-Foto: solo quelle davvero presenti in img/. Uso: python build_v2.py [--raw v1|v2|auto]
+Foto: solo quelle davvero presenti in img/, con le varianti ridotte trovate su disco (photo_variants.py).
+Uso: python build_v2.py [--raw v1|v2|auto] [--inline]
+Dati fuori dalla pagina: data.json sta accanto all'HTML e v2.js lo scarica all'avvio (indirizzo "data.json?v=<hash>": la
+pagina e i suoi dati restano allineati anche con la cache del browser). --inline rimette i dati dentro l'HTML (un solo
+file, apribile da disco senza server).
 Storico prezzi: bot/state/price_history.json (price_history.py) entra nel blob come RAW.hist, in forma compatta e solo
 per le mete e i trip della pagina; se il file manca il grafico dell'andamento non compare.
 """
-import io, json, os, re, sys, types, contextlib
+import hashlib, io, json, os, re, sys, types, contextlib
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 os.chdir(ROOT); sys.path.insert(0, ROOT)
+VARIANTS = (480, 800, 1200)
+DATA_FILE = "data.json"
 OUTPUTS = {"agosto-2027.html", "trips_data.json", "origins.json"}   # file che build.py / build_trips.py scriverebbero: qui non si toccano
 
 def _open(path, mode="r", *a, **k):
@@ -60,10 +66,17 @@ def pick():
 def manifest():
     p = os.path.join("img", "manifest.json")
     man = json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}
-    ph = {k: v for k, v in man.get("photos", {}).items() if os.path.exists(os.path.join(ROOT, v["f"]))}
+    ph = {k: dict(v) for k, v in man.get("photos", {}).items() if os.path.exists(os.path.join(ROOT, v["f"]))}
+    for v in ph.values():       # varianti ridotte presenti: img/<nome>-<larghezza>.webp
+        s = [w for w in VARIANTS if w < v["w"] and os.path.exists(os.path.join(ROOT, re.sub(r"\.webp$", "-%d.webp" % w, v["f"])))]
+        if s:
+            v["s"] = s
     return {"photos": ph, "cover": {c: k for c, k in man.get("cover", {}).items() if k in ph},
             "gallery": {c: [k for k in ks if k in ph] for c, ks in man.get("gallery", {}).items()},
             "pop": {c: k for c, k in man.get("pop", {}).items() if k in ph}, "stage": [x for x in man.get("stage", []) if x[1] in ph]}
+
+def data_version(text):
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()[:10]
 
 def worker_url():
     """Base del Worker dei preferiti: variabile WORKER_URL, altrimenti "worker_url" in bot/config.json. '' = stella solo via Telegram."""
@@ -94,11 +107,16 @@ def main():
     blob["hist"] = history(blob)
     man = manifest()
     js = open("v2.js", encoding="utf-8").read()
-    assert "/*__DATA__*/" in js and "/*__PHOTOS__*/" in js and "/*__API__*/" in js
-    api = worker_url()
-    js = js.replace("/*__API__*/", api, 1).replace("/*__DATA__*/", dump(blob), 1).replace("/*__PHOTOS__*/", dump(man), 1)
     tpl = open("template_v2.html", encoding="utf-8").read()
-    out = tpl.replace("/*__CSS__*/", open("v2.css", encoding="utf-8").read(), 1).replace("/*__JS__*/", js, 1)
+    assert "/*__DATA_URL__*/" in js and "/*__API__*/" in js and "<!--__HEAD__-->" in tpl
+    api = worker_url()
+    data = dump({"raw": blob, "photos": man})
+    open(DATA_FILE, "w", encoding="utf-8", newline="\n").write(data)
+    inline = "--inline" in sys.argv
+    url = "%s?v=%s" % (DATA_FILE, data_version(data))
+    head = '<script id="data">window.__DATA__=%s;</script>' % data if inline else '<link rel="preload" href="%s" as="fetch" crossorigin="anonymous">' % url
+    js = js.replace("/*__API__*/", api, 1).replace("/*__DATA_URL__*/", "" if inline else url, 1)
+    out = tpl.replace("<!--__HEAD__-->", head, 1).replace("/*__CSS__*/", open("v2.css", encoding="utf-8").read(), 1).replace("/*__JS__*/", js, 1)
     open("agosto-2027-v2.html", "w", encoding="utf-8", newline="\n").write(out)
     sys.stdout.reconfigure(encoding="utf-8")
     codes = {c["d"] for c in blob["combos"] if c["a"]}
@@ -106,7 +124,11 @@ def main():
     print("dati:", src1)
     print("storico prezzi:", len(blob["hist"]["days"]), "giorni,", len(blob["hist"]["t"]), "target,", len(dump(blob["hist"])), "caratteri")
     print("preferiti:", "Worker " + api if api else "solo link Telegram (worker_url non impostato)")
-    print("html bytes", len(out.encode("utf-8")), "| foto", len(man["photos"]), "| mete con voli", len(codes), "senza cover:", sorted(codes - set(man["cover"])),
+    nocoord = sorted(d["code"] for d in blob["dests"] if d.get("lat") is None)
+    if nocoord:
+        print("ATTENZIONE: mete senza coordinate in dests.COORDS (fuori dalla mappa):", nocoord)
+    print("html bytes", len(out.encode("utf-8")), "| data.json bytes", len(data.encode("utf-8")), "(dentro l'HTML)" if inline else "",
+          "| foto", len(man["photos"]), "con varianti:", sum(1 for p in man["photos"].values() if p.get("s")), "| mete con voli", len(codes), "senza cover:", sorted(codes - set(man["cover"])),
           "| trip con voli", len(pop), "senza cover dedicata:", sorted(set(pop) - set(man["pop"])), "| origini:", sorted({c["o"] for c in blob["combos"]}))
 
 if __name__ == "__main__":

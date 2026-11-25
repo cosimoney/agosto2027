@@ -1,13 +1,17 @@
 /* Agosto 2027 v2: sito di viaggio a pagine (hash routing). Dati: RAW (build.py + build_trips.py), foto: PH (img/manifest.json).
    Rotte: #/ (nuove mete) · #/visitati · #/trips · #/d/<IATA> · #/t/<trip.id> · #/preferiti · #/login/<token> · #/crediti
+          #/voti (voti di coppia) · #/confronto[/id,id,id] (fianco a fianco) · #/mappa
    Preferiti: se API (base del Worker Cloudflare, da bot/config.json "worker_url") e' valorizzata e il dispositivo ha un
    token personale (link #/login/<token> mandato dal bot con /sito), la stella salva subito via Worker; altrimenti apre Telegram. */
 "use strict";
 const BOT_USERNAME = "Trip2027_bot";
 const API = "/*__API__*/".replace(/\/+$/, "");
 const WEEKEND_URL = "https://cosimoney.github.io/flightsMI/";
-const RAW = /*__DATA__*/;
-const PH = /*__PHOTOS__*/;
+/* I dati non stanno piu' nella pagina: data.json (accanto a index.html) viene scaricato all'avvio e passato a start().
+   Con window.__DATA__ gia' presente (build_v2.py --inline, test) si parte subito senza rete. */
+const DATA_URL = "/*__DATA_URL__*/";
+const WORLD_URL = "world.json";
+function start(RAW, PH){
 
 /* ------------------------------------------------------------------ base */
 const MESI = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -74,9 +78,17 @@ function galleryT(t){
   for(const c of [t.arr, t.dep]){ if(coverD(c)) ks.push(coverD(c)); for(const k of (PH.gallery || {})[c] || []) ks.push(k); }
   return uniq(ks).filter(k => PHO[k] && k !== cov).slice(0, 5);
 }
+// varianti ridotte (p.s = larghezze presenti in img/, vedi photo_variants.py): il browser sceglie con srcset + sizes.
+// Su telefono le card dichiarano 66vw: a densita' 3 basta la variante da 800 px, la differenza non si vede.
+// La copertina riempie lo schermo in altezza (object-fit: cover), quindi sul telefono e' piu' larga dello schermo: 150vw.
+const SIZES = {card:"(max-width:620px) 66vw, (max-width:1000px) 50vw, 420px", feat:"(max-width:620px) 66vw, (max-width:1000px) 50vw, 840px",
+  hero:"(max-width:720px) 150vw, 100vw", full:"100vw", gal:"(max-width:720px) 66vw, 40vw", thumb:"120px"};
+const variant = (f, w) => f.replace(/\.webp$/, "-" + w + ".webp");
+const srcsetOf = p => (p.s || []).length ? p.s.map(w => `${variant(p.f, w)} ${w}w`).concat(`${p.f} ${p.w}w`).join(", ") : "";
 function img(k, o){
   const p = PHO[k]; o = o || {};
-  return `<img src="${esc(p.f)}" width="${p.w}" height="${p.h}" alt="${esc(o.alt || p.cap)}"${o.eager ? ` fetchpriority="high"` : ` loading="lazy"`} decoding="async"${o.cls ? ` class="${o.cls}"` : ""}>`;
+  const ss = srcsetOf(p);
+  return `<img src="${esc(p.f)}"${ss ? ` srcset="${esc(ss)}" sizes="${SIZES[o.sz] || SIZES.card}"` : ""} width="${p.w}" height="${p.h}" alt="${esc(o.alt || p.cap)}"${o.eager ? ` fetchpriority="high"` : ` loading="lazy"`} decoding="async"${o.cls ? ` class="${o.cls}"` : ""}>`;
 }
 const creditTxt = k => { const p = PHO[k]; return p ? `Foto: <a href="${esc(safeUrl(p.src))}" target="_blank" rel="noopener">${esc(p.by)}</a> · ${esc(p.lic)}` : ""; };
 const noPhoto = txt => `<span class="nophoto" aria-hidden="true">${esc(txt)}</span>`;
@@ -84,7 +96,8 @@ const noPhoto = txt => `<span class="nophoto" aria-hidden="true">${esc(txt)}</sp
 /* ------------------------------------------------------------------ stato */
 const F0 = {q:"", origin:"all", area:"all", country:"all", budget:0, stops:1, dur:"all", dep:"all", clima:"all", sort:"score"};
 const P0 = {q:"", origin:"all", kind:"all", area:"all", style:"all", budget:0, stops:1, sort:"tot"};
-const S = {tab:"new", f:Object.assign({}, F0), p:Object.assign({}, P0), panel:false, cell:null, homeY:0, depth:0, route:null, page:null, lb:[], lbi:0, heroT:null, h:{per:"day", off:{}}};
+const S = {tab:"new", f:Object.assign({}, F0), p:Object.assign({}, P0), panel:false, cell:null, homeY:0, depth:0, route:null, page:null, lb:[], lbi:0, heroT:null, h:{per:"day", off:{}},
+  c:{hide:2}, v:{view:"rank", tab:"all", area:"all", n:30}, m:{tab:"all", zoom:"world"}};
 const TABS = {new:{hash:"#/", label:"Nuove mete", sub:"Paesi dove non siete mai stati, scelti per il clima di agosto."},
               vis:{hash:"#/visitati", label:"Già visitati", sub:"Paesi che conoscete già, con un giro diverso da quello fatto."},
               pop:{hash:"#/trips", label:"Popular trips", sub:"Itinerari completi, anche open-jaw: tappe, voli e costo a terra."}};
@@ -110,7 +123,7 @@ async function favCall(path, body){
   return r.json();
 }
 function favApply(j){ FAV.map = new Map((j.favs || []).map(f => [f.id, f])); FAV.me = j.me || ""; FAV.state = "ok"; }
-function favExpired(){ saveToken(""); FAV.map = new Map(); FAV.me = ""; FAV.state = "expired"; }
+function favExpired(){ saveToken(""); FAV.map = new Map(); FAV.me = ""; FAV.state = "expired"; rateReset(); }
 function favPaint(){
   document.querySelectorAll("[data-act='fav']").forEach(el => {
     const on = favOn(el.dataset.id), l = el.querySelector(".lbl");
@@ -316,7 +329,7 @@ const ptwoBadge = v => v.two ? `<span class="b warn wrapb">2 scali: risparmi ${e
 function cardD(a, i, feat){
   const d = a.d, b = a.cheap, k = coverD(d.code), ret = addD(b.c.dep, b.c.n);
   return `<article class="card rise${feat ? " feat" : ""}" style="--i:${Math.min(i, 8)}">
-    <div class="card-ph">${k ? img(k, {alt:PHO[k].cap + ", " + d.country}) : noPhoto(d.code)}
+    <div class="card-ph">${k ? img(k, {alt:PHO[k].cap + ", " + d.country, sz:feat ? "feat" : "card"}) : noPhoto(d.code)}
       <div class="card-top"><span class="bs"><span class="b glass">clima ${esc(d.g)}</span>${oBadge(b.c.o, a.origins, true)}</span>
         <span class="card-r"><span class="score" title="Punteggio 0-100: prezzo pp 50%, comodità 25%, clima 25%"><span class="sr">Punteggio </span>${a.bestS}</span></span></div>
       <div class="card-name"><span class="k">${esc(d.country)} · <span class="iata">${esc(d.code)}</span></span><h3 class="n">${esc(d.city)}</h3></div>
@@ -325,7 +338,8 @@ function cardD(a, i, feat){
       <div class="pr"><span class="pp num">${eur(a.min)}</span><span class="u">a persona · A/R</span><span class="cp num">coppia ${eur(a.min * 2)}</span></div>
       <p class="meta"><b>${fmtD(b.c.dep)} → ${fmtD(ret)}</b> · ${b.c.n} giorni · da ${esc(oName(b.c.o))} · ${stopsTxt(b.o.f)}${a.max > a.min ? ` · altre date fino a ${eur(a.max)}` : ""}</p>
       ${d.giro ? `<p class="giro"><s>${esc(d.seen)}</s> → <b>${esc(d.giro)}</b></p>` : ""}
-      <div class="bs">${alsoBadge(b.c.o, a.origins)}<span class="b plain">${esc(d.temp)}</span>${d.flag ? `<span class="b warn wrapb">${esc(d.flag)}</span>` : ""}${twoBadge(b.o)}</div>
+      <div class="bs">${alsoBadge(b.c.o, a.origins)}<span class="b plain">${esc(d.temp)}</span>${priceBadge("d_" + d.code)}${d.flag ? `<span class="b warn wrapb">${esc(d.flag)}</span>` : ""}${twoBadge(b.o)}</div>
+      <div class="card-ft">${rateChip("d_" + d.code)}${cmpBtn("d_" + d.code, d.city)}</div>
     </div>
     <a class="card-link" href="#/d/${esc(d.code)}"><span class="sr">Apri ${esc(d.city)}, da ${eur(a.min)} a persona</span></a>
     ${favBtn("d_" + d.code, d.city)}
@@ -334,7 +348,7 @@ function cardD(a, i, feat){
 function cardT(a, i, feat){
   const t = a.t, o = a.cheap.o, c = a.cheap.c, k = coverT(t), ret = addD(c.dep, c.n);
   return `<article class="card pop rise${feat ? " feat" : ""}" style="--i:${Math.min(i, 8)}">
-    <div class="card-ph">${k ? img(k, {alt:PHO[k].cap + ", " + t.name}) : noPhoto(t.arr)}
+    <div class="card-ph">${k ? img(k, {alt:PHO[k].cap + ", " + t.name, sz:feat ? "feat" : "card"}) : noPhoto(t.arr)}
       <div class="card-top"><span class="bs"><span class="b glass">${t.type === "oj" ? "open-jaw" : "A/R"}</span><span class="b glass">clima ${esc(t.g)}</span>${oBadge(c.o, a.origins, true)}</span>
         <span class="card-r"><span class="score" title="Punteggio 0-100: totale stimato pp 50%, comodità voli 25%, clima 25%"><span class="sr">Punteggio </span>${a.bestS}</span></span></div>
       <div class="card-name"><span class="k">${esc(t.countries.join(" + "))} · ${t.nights} notti</span><h3 class="n">${esc(t.name)}</h3></div>
@@ -344,7 +358,8 @@ function cardT(a, i, feat){
       <div class="pr2"><span>Totale stimato <b class="num">${eur(a.min)} pp</b> <span class="est">stima</span></span><span class="num">coppia ${eur(a.min * 2)}</span></div>
       <p class="meta"><b>${fmtD(c.dep)} → ${fmtD(ret)}</b> · ${c.n} giorni · da ${esc(oName(c.o))} · ${howTxt(t, o)}</p>
       <p class="meta">${t.stages.map(s => esc(s[0])).join(" → ")}</p>
-      <div class="bs">${alsoBadge(c.o, a.origins)}<span class="b plain">ritmo ${esc(t.pace)}</span>${t.visited ? `<span class="b plain">giro nuovo</span>` : ""}${t.flag ? `<span class="b warn wrapb">${esc(t.flag)}</span>` : ""}${ptwoBadge(o)}</div>
+      <div class="bs">${alsoBadge(c.o, a.origins)}<span class="b plain">ritmo ${esc(t.pace)}</span>${priceBadge("t_" + t.id)}${t.visited ? `<span class="b plain">giro nuovo</span>` : ""}${t.flag ? `<span class="b warn wrapb">${esc(t.flag)}</span>` : ""}${ptwoBadge(o)}</div>
+      <div class="card-ft">${rateChip("t_" + t.id)}${cmpBtn("t_" + t.id, t.name)}</div>
     </div>
     <a class="card-link" href="#/t/${esc(t.id)}"><span class="sr">Apri ${esc(t.name)}, voli da ${eur(o.voli)} a persona</span></a>
     ${favBtn("t_" + t.id, t.name)}
@@ -357,7 +372,9 @@ function cardT(a, i, feat){
 function topHTML(detail){
   const main = !detail || detail === "nav", solid = detail === "plain" || detail === "nav";
   const favA = API ? `<a class="nav-fav" href="#/preferiti"${S.page === "favs" ? ` aria-current="page"` : ""}>${star}<span>Preferiti</span></a>` : "";
-  const nav = Object.entries(TABS).map(([k, t]) => `<a href="${t.hash}"${!detail && S.page === "home" && S.tab === k ? ` aria-current="page"` : ""}>${t.label}</a>`).join("") + favA;
+  const cur = pg => S.page === pg ? ` aria-current="page"` : "";
+  const nav = Object.entries(TABS).map(([k, t]) => `<a href="${t.hash}"${!detail && S.page === "home" && S.tab === k ? ` aria-current="page"` : ""}>${t.label}</a>`).join("") +
+    `<a href="#/mappa"${cur("map")}>Mappa</a>` + (API ? `<a href="#/voti"${cur("rates")}>Voti</a>` : "") + favA;
   return `<div class="top${solid ? " solid" : ""}" id="top"${solid ? ` data-solid="1"` : ""}><div class="wrap top-in">
     ${main ? `<a class="brand" href="#/">Agosto 2027<i>da Milano, Roma, Pisa</i></a>` : `<a class="back" href="${TABS[S.tab].hash}" data-act="back"><span aria-hidden="true">←</span> Tutte le mete</a>`}
     ${main ? `<button class="menu-b" data-act="menu" aria-expanded="false" aria-controls="topnav" aria-label="Menu"><span aria-hidden="true"></span></button>` : ""}
@@ -381,11 +398,11 @@ function heroPicks(){
 const heroPP = h => h.min != null ? "da " + eur(h.min) + " pp" : "scopri la meta";
 function footHTML(){
   return `<footer class="foot"><div class="wrap foot-in"><span>Agosto 2027 da Milano, Roma, Pisa · prezzi Google Flights al ${esc(META.date || "")}</span>
-    <span>${API ? `<a href="#/preferiti">Preferiti</a> · ` : ""}<a href="#/crediti">Crediti delle foto</a> · <a href="https://t.me/${BOT_USERNAME}" target="_blank" rel="noopener">Bot Telegram</a></span></div></footer>`;
+    <span><a href="#/mappa">Mappa</a> · <a href="#/confronto">Confronto</a> · ${API ? `<a href="#/voti">Voti</a> · <a href="#/preferiti">Preferiti</a> · ` : ""}<a href="#/crediti">Crediti delle foto</a> · <a href="https://t.me/${BOT_USERNAME}" target="_blank" rel="noopener">Bot Telegram</a></span></div></footer>`;
 }
 function homeHTML(){
   const picks = S.hero = heroPicks(), p0 = picks[0];
-  const bg = p0 ? img(p0.k, {eager:true, cls:"on", alt:""}) : "";
+  const bg = p0 ? img(p0.k, {eager:true, cls:"on", alt:"", sz:"hero"}) : "";
   const origins = [["Milano", ["LIN", "MXP"]], ["Roma", ["ROM"]], ["Pisa", ["PSA"]]].filter(([, ks]) => ks.some(k => HAS_O.has(k))).map(x => x[0]);
   return topHTML(false) + `
   <header class="hero" id="hero">
@@ -545,7 +562,7 @@ function galHTML(keys){
   if(keys.length < 2) return "";
   S.lb = keys;
   return `<section class="sec wrap"><p class="eyebrow">Galleria</p><h2 class="h2" style="margin:6px 0 22px">I posti <i>del giro</i></h2>
-    <div class="gal n${keys.length}">${keys.map((k, i) => `<button data-act="lb" data-i="${i}" aria-label="Ingrandisci: ${esc(PHO[k].cap)}">${img(k)}<span class="cap"><b>${esc(PHO[k].cap)}</b><small>${esc(PHO[k].by)} · ${esc(PHO[k].lic)}</small></span></button>`).join("")}</div></section>`;
+    <div class="gal n${keys.length}">${keys.map((k, i) => `<button data-act="lb" data-i="${i}" aria-label="Ingrandisci: ${esc(PHO[k].cap)}">${img(k, {sz:"gal"})}<span class="cap"><b>${esc(PHO[k].cap)}</b><small>${esc(PHO[k].by)} · ${esc(PHO[k].lic)}</small></span></button>`).join("")}</div></section>`;
 }
 function mxHTML(cellBest, cur, priceOf, tagOf){
   const keys = Object.keys(cellBest), ps = keys.map(k => priceOf(cellBest[k])), lo = Math.min(...ps), hi = Math.max(...ps);
@@ -577,7 +594,7 @@ function itinHTML(d){
   const items = all.map((t, ix) => {
     const nights = t.t.reduce((s, x) => s + x[1], 0);
     const g = `https://www.google.com/search?q=${encodeURIComponent(`itinerario ${t.n} ${d.country} agosto ${nights} notti`)}`;
-    const tl = t.t.map((x, i) => { const k = stageKey(x[0]); return `<li><span class="ph${k ? "" : " none"}" data-i="${i + 1}">${k ? img(k, {alt:PHO[k].cap}) : ""}</span><span class="rail"></span><span class="n">${esc(x[0])}</span><span class="d">${x[1]} ${x[1] === 1 ? "notte" : "notti"}</span></li>`; }).join("");
+    const tl = t.t.map((x, i) => { const k = stageKey(x[0]); return `<li><span class="ph${k ? "" : " none"}" data-i="${i + 1}">${k ? img(k, {alt:PHO[k].cap, sz:"thumb"}) : ""}</span><span class="rail"></span><span class="n">${esc(x[0])}</span><span class="d">${x[1]} ${x[1] === 1 ? "notte" : "notti"}</span></li>`; }).join("");
     return `<details class="it"${ix === 0 ? " open" : ""}>
       <summary><div class="it-h"><div><h3 class="it-n">${esc(t.n)}</h3>
           <div class="bs" style="margin-top:10px">${(t.s || []).map(x => `<span class="b plain">${esc(x)}</span>`).join("")}<span class="b ${pace[t.r] || "plain"}">ritmo ${esc(t.r)}</span><span class="b plain">${nights} notti</span><span class="b sun" title="Stima a terra per persona, mid-range, volo internazionale escluso">a terra ~ ${esc(t.c)}</span></div></div>
@@ -634,7 +651,7 @@ function destHTML(code){
   const more = DESTS.filter(x => x.code !== code && x.area === d.area && x.g !== "sconsigliato").map(x => viewD(x.code, "all", 1)).filter(Boolean).sort((x, y) => y.bestS - x.bestS).slice(0, 3);
   return topHTML("photo") + `
   <header class="hero d">
-    <div class="hero-bg">${k ? img(k, {eager:true, cls:"on", alt:PHO[k].cap + ", " + d.country}) : noPhoto(d.code)}</div>
+    <div class="hero-bg">${k ? img(k, {eager:true, cls:"on", alt:PHO[k].cap + ", " + d.country, sz:"hero"}) : noPhoto(d.code)}</div>
     ${k ? `<p class="credit">${esc(PHO[k].cap)} · ${creditTxt(k)}</p>` : ""}
     <div class="wrap hero-in">
       <p class="kicker rise">${esc(d.country)}<span class="dot"></span>${esc(d.area)}<span class="dot"></span><span class="iata">${esc(d.code)}</span></p>
@@ -644,12 +661,13 @@ function destHTML(code){
           ${b ? `<div class="tag"><span class="pp num">${eur(a.min)}</span><span class="u">a persona · A/R<small class="num">coppia ${eur(a.min * 2)}</small></span></div>` : `<div class="tag"><span class="pp">n.d.</span><span class="u">voli<small>non ancora in vendita</small></span></div>`}
           <div class="d-when">${b ? `<b>${fmtD(b.c.dep)} → ${fmtD(ret)}</b><span>${b.c.n} giorni · da ${esc(oName(b.c.o))} · ${stopsTxt(b.o.f)}</span>` : `<span>Date da ricontrollare più avanti</span>`}</div>
         </div>
-        <div class="d-cta">${b ? `<button class="btn sun" data-act="scroll" data-to="voli">Vedi i voli</button>` : ""}${favCta("d_" + code)}</div>
+        <div class="d-cta">${b ? `<button class="btn sun" data-act="scroll" data-to="voli">Vedi i voli</button>` : ""}${favCta("d_" + code)}${cmpBtn("d_" + code, d.city, "btn ghost")}</div>
       </div>
-      <div class="d-facts rise" style="--i:3"><span class="b glass">clima ${esc(d.g)}</span><span class="b glass">${esc(d.temp)}</span>${a ? `<span class="b glass">punteggio ${a.bestS}/100</span>` : ""}${a ? oBadge(b.c.o, a.origins, true) : ""}${d.flag ? `<span class="b glass">${esc(d.flag)}</span>` : ""}</div>
+      <div class="d-facts rise" style="--i:3"><span class="b glass">clima ${esc(d.g)}</span><span class="b glass">${esc(d.temp)}</span>${a ? `<span class="b glass">punteggio ${a.bestS}/100</span>` : ""}${a ? oBadge(b.c.o, a.origins, true) : ""}${priceBadge("d_" + code, true)}${d.flag ? `<span class="b glass">${esc(d.flag)}</span>` : ""}</div>
     </div>
   </header>
   <main>
+    ${rateBlock("d_" + code, d.city)}
     <section class="sec wrap"><div class="why">
       <div><p class="eyebrow" style="margin-bottom:14px">Perché ad agosto</p><blockquote>${esc(d.why)}</blockquote></div>
       <div class="clima" role="group" aria-label="Clima ad agosto">
@@ -721,10 +739,10 @@ function tripHTML(id){
   const a = viewT(t, "all", 1) || viewT(t, "all", 2), k = coverT(t);
   S.cell = null;
   const b = a && a.cheap, ret = b && addD(b.c.dep, b.c.n);
-  const stages = t.stages.map((s, i) => { const sk = stageKey(s[0]); return `<li><span class="ph${sk ? "" : " none"}" data-i="${i + 1}">${sk ? img(sk, {alt:PHO[sk].cap}) : ""}</span><div class="tx"><span class="d">${s[1]} ${s[1] === 1 ? "notte" : "notti"}</span><h3 class="n">${esc(s[0])}</h3><p class="s">${esc(s[2])}</p></div></li>`; }).join("");
+  const stages = t.stages.map((s, i) => { const sk = stageKey(s[0]); return `<li><span class="ph${sk ? "" : " none"}" data-i="${i + 1}">${sk ? img(sk, {alt:PHO[sk].cap, sz:"thumb"}) : ""}</span><div class="tx"><span class="d">${s[1]} ${s[1] === 1 ? "notte" : "notti"}</span><h3 class="n">${esc(s[0])}</h3><p class="s">${esc(s[2])}</p></div></li>`; }).join("");
   return topHTML("photo") + `
   <header class="hero d">
-    <div class="hero-bg">${k ? img(k, {eager:true, cls:"on", alt:PHO[k].cap + ", " + t.name}) : noPhoto(t.arr)}</div>
+    <div class="hero-bg">${k ? img(k, {eager:true, cls:"on", alt:PHO[k].cap + ", " + t.name, sz:"hero"}) : noPhoto(t.arr)}</div>
     ${k ? `<p class="credit">${esc(PHO[k].cap)} · ${creditTxt(k)}</p>` : ""}
     <div class="wrap hero-in">
       <p class="kicker rise">Popular trip<span class="dot"></span>${esc(t.countries.join(" + "))}<span class="dot"></span>${t.nights} notti</p>
@@ -735,12 +753,13 @@ function tripHTML(id){
           ${b ? `<div class="tag"><span class="pp num">${eur(b.o.voli)}</span><span class="u">a persona · voli<small class="num">totale stimato ~${eur(a.min)} pp</small></span></div>` : `<div class="tag"><span class="pp num">${eur(t.land[0])}+</span><span class="u">a persona · a terra<small>voli non ancora disponibili</small></span></div>`}
           <div class="d-when">${b ? `<b>${fmtD(b.c.dep)} → ${fmtD(ret)}</b><span>${b.c.n} giorni · da ${esc(oName(b.c.o))} · coppia ${eur(a.min * 2)} tutto compreso</span>` : `<span>Date da ricontrollare più avanti</span>`}</div>
         </div>
-        <div class="d-cta"><button class="btn sun" data-act="scroll" data-to="voli">Costi e voli</button>${favCta("t_" + id)}</div>
+        <div class="d-cta"><button class="btn sun" data-act="scroll" data-to="voli">Costi e voli</button>${favCta("t_" + id)}${cmpBtn("t_" + id, t.name, "btn ghost")}</div>
       </div>
-      <div class="d-facts rise" style="--i:3"><span class="b glass">${t.type === "oj" ? "open-jaw" : "A/R"}</span><span class="b glass">clima ${esc(t.g)}</span><span class="b glass">${esc(t.temp)}</span><span class="b glass">ritmo ${esc(t.pace)}</span>${a ? `<span class="b glass">punteggio ${a.bestS}/100</span>` : ""}${a ? oBadge(b.c.o, a.origins, true) : ""}</div>
+      <div class="d-facts rise" style="--i:3"><span class="b glass">${t.type === "oj" ? "open-jaw" : "A/R"}</span><span class="b glass">clima ${esc(t.g)}</span><span class="b glass">${esc(t.temp)}</span><span class="b glass">ritmo ${esc(t.pace)}</span>${a ? `<span class="b glass">punteggio ${a.bestS}/100</span>` : ""}${a ? oBadge(b.c.o, a.origins, true) : ""}${priceBadge("t_" + id, true)}</div>
     </div>
   </header>
   <main>
+    ${rateBlock("t_" + id, t.name)}
     <section class="sec wrap"><p class="eyebrow" style="margin-bottom:16px">Il meglio del giro</p><ul class="hi">${t.hi.map(h => `<li>${esc(h)}</li>`).join("")}</ul></section>
     <section class="sec wrap" style="padding-top:0"><div class="why">
       <div><p class="eyebrow" style="margin-bottom:14px">Perché ad agosto</p><blockquote>${esc(t.aug)}</blockquote></div>
@@ -766,7 +785,7 @@ function tripHTML(id){
 }
 function creditsHTML(){
   const items = Object.entries(PHO).sort((a, b) => a[1].cap.localeCompare(b[1].cap, "it")).map(([k, p]) =>
-    `<li>${img(k)}<span><b>${esc(p.cap)}</b>${esc(p.by)} · ${esc(p.lic)} · <a href="${esc(safeUrl(p.src))}" target="_blank" rel="noopener">${/flickr\.com/.test(p.src) ? "Flickr" : "Wikimedia Commons"} ↗</a></span></li>`).join("");
+    `<li>${img(k, {sz:"thumb"})}<span><b>${esc(p.cap)}</b>${esc(p.by)} · ${esc(p.lic)} · <a href="${esc(safeUrl(p.src))}" target="_blank" rel="noopener">${/flickr\.com/.test(p.src) ? "Flickr" : "Wikimedia Commons"} ↗</a></span></li>`).join("");
   return topHTML("plain") + `<main class="wrap cr-head sec"><p class="eyebrow">Crediti</p><h1 class="h2" style="margin:8px 0 14px">Le foto <i>e chi le ha fatte</i></h1>
     <p class="sub">${Object.keys(PHO).length} fotografie da Wikimedia Commons e Flickr (trovate con Openverse), con licenze libere (CC0, CC BY, CC BY-SA, pubblico dominio). Sono state ridimensionate e convertite in WebP; ogni voce rimanda alla pagina originale con autore e licenza.</p>
     <ul class="cr">${items}</ul></main>` + footHTML();
@@ -812,7 +831,7 @@ function favCard(f, i){
   }
   const added = [f.by ? `da <b>${esc(f.by)}</b>` : "", fmtWhen(f.at)].filter(Boolean).join(" ");
   return `<article class="card fv rise" style="--i:${Math.min(i, 8)}">
-    <div class="card-ph">${k ? img(k, {alt:PHO[k].cap + ", " + name}) : noPhoto(d ? d.code : t ? t.arr : key)}
+    <div class="card-ph">${k ? img(k, {alt:PHO[k].cap + ", " + name, sz:"card"}) : noPhoto(d ? d.code : t ? t.arr : key)}
       <div class="card-top"><span class="bs"><span class="b glass">${kind === "t" ? "giro" : kind === "w" ? "weekend" : "meta"}</span>${cur && cur.o ? `<span class="b glass">da ${esc(oName(cur.o))}</span>` : ""}</span></div>
       <div class="card-name"><span class="k">${where}</span><h3 class="n">${esc(name)}</h3></div>
     </div>
@@ -821,7 +840,8 @@ function favCard(f, i){
       ${when ? `<p class="meta">${when}</p>` : ""}
       ${cities.length ? `<div class="bs" aria-label="Miglior prezzo per città di partenza">${cities.map(([nm, pp]) => `<span class="b ${pp === lo ? "ok" : "plain"}">${nm} <b class="num">${eur(pp)}</b></span>`).join("")}</div>` : ""}
       <p class="meta fv-by">${star} Aggiunto${added ? " " + added : ""}${delta}</p>
-      <div class="fv-act">${href ? `<a class="pill" href="${href}"${kind === "w" ? ` target="_blank" rel="noopener"` : ""}>Apri la pagina</a>` : ""}<button class="pill rm" data-act="fav-rm" data-id="${esc(f.id)}" aria-label="Rimuovi ${esc(name)} dai preferiti">Rimuovi</button></div>
+      ${d || t ? `<div class="bs">${priceBadge(f.id)}${rateChip(f.id)}</div>` : ""}
+      <div class="fv-act">${href ? `<a class="pill" href="${href}"${kind === "w" ? ` target="_blank" rel="noopener"` : ""}>Apri la pagina</a>` : ""}${d || t ? cmpBtn(f.id, name, "pill cmpp") : ""}<button class="pill rm" data-act="fav-rm" data-id="${esc(f.id)}" aria-label="Rimuovi ${esc(name)} dai preferiti">Rimuovi</button></div>
     </div>
     ${href && kind !== "w" ? `<a class="card-link" href="${href}"><span class="sr">Apri ${esc(name)}</span></a>` : ""}
     <div class="fv-on" aria-hidden="true">${star}</div>
@@ -845,6 +865,320 @@ function favsHTML(){
       + `<p class="fv-me">${FAV.me ? `Collegato come <b>${esc(FAV.me)}</b> · ` : ""}<button class="achip all" data-act="fav-logout">Scollega questo dispositivo</button></p>`;
   }
   return head + body + `</main>` + footHTML();
+}
+
+/* ------------------------------------------------------------------ badge prezzo: basso / tipico / alto rispetto allo storico */
+// Confronta il prezzo dell'ultimo giro con la mediana dei giorni precedenti (come typical() di bot/alerts.py).
+// Nascosto finche' la voce non ha almeno PB_MIN_DAYS giorni di storico; fascia "tipico" = mediana ± 5% (almeno 10 €).
+const PB_MIN_DAYS = 5;
+function priceLevel(id){
+  const rows = histRows(id);
+  if(rows.length < PB_MIN_DAYS) return null;
+  const last = rows[rows.length - 1], cur = last.g.A[0];
+  let prev = rows.slice(0, -1);
+  const full = prev.filter(r => !r.part);
+  if(full.length >= 3) prev = full;                  // i giorni a dato parziale restano fuori dal riferimento, se ne restano abbastanza
+  const v = prev.map(r => r.g.A[0]).sort((a, b) => a - b), m = v.length;
+  const typ = Math.round(m % 2 ? v[(m - 1) / 2] : (v[m / 2 - 1] + v[m / 2]) / 2), band = Math.max(10, typ * 0.05);
+  const lvl = cur <= typ - band ? "low" : cur >= typ + band ? "high" : "mid";
+  if(last.part && lvl === "high") return null;       // giro parziale: il prezzo vero poteva essere piu' basso
+  return {lvl, cur, typ, days:rows.length};
+}
+const PB = {low:["▼", "prezzo basso", "ok"], mid:["●", "prezzo tipico", "plain"], high:["▲", "prezzo alto", "warn"]};
+function priceBadge(id, glass){
+  const l = priceLevel(id);
+  if(!l) return "";
+  const [ic, txt, cls] = PB[l.lvl], unit = id[0] === "t" ? "voli pp" : "pp";
+  return `<span class="b ${glass ? "glass" : cls} pb pb-${l.lvl}" title="Ultimo giro ${eur(l.cur)} ${unit}, tipico ${eur(l.typ)} (mediana su ${l.days} giorni di storico)"><span aria-hidden="true">${ic}</span> ${txt}<span class="sr">: ${eur(l.cur)} contro ${eur(l.typ)} tipico</span></span>`;
+}
+
+/* ------------------------------------------------------------------ voti di coppia (Worker: /api/rates, /api/rate) */
+// RATE.map = {id: {k: stelle 0-5}}, RATE.people = [{k, name, me}] (nomi e chiavi arrivano dal Worker, qui non c'e' nessun nome).
+// RATE.state: off (nessun Worker o nessun token) | loading | ok | error
+const RATE = {map:{}, people:[], state:"off", busy:new Set()};
+const rateOf = (id, k) => { const r = RATE.map[id]; return r && Number.isInteger(r[k]) ? r[k] : null; };
+const rateMe = () => RATE.people.find(p => p.me) || null;
+const rateVals = id => RATE.people.map(p => rateOf(id, p.k));
+const rateAvg = id => { const v = rateVals(id).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+const avgTxt = a => (Math.round(a * 10) / 10).toFixed(1).replace(".", ",");
+const starsTxt = n => n === 1 ? "1 stella" : n + " stelle";
+function rateApply(j){ RATE.map = j.rates || {}; RATE.people = j.people || []; RATE.state = "ok"; }
+function rateReset(){ RATE.map = {}; RATE.people = []; RATE.state = "off"; }
+async function loadRates(){
+  if(!favLive()) return;
+  if(RATE.state !== "ok") RATE.state = "loading";
+  try { rateApply(await favCall("/api/rates")); }
+  catch(e){ if(e.auth){ favExpired(); favPaint(); } else if(RATE.state !== "ok") RATE.state = "error"; }
+  ratePaint();
+}
+// ottimistico come la stella dei preferiti; s = 0..5, null = toglie il voto
+async function setRate(id, s){
+  const me = rateMe();
+  if(!favLive() || !me || RATE.busy.has(id)) return;
+  const was = rateOf(id, me.k);
+  if(was === s) return;
+  RATE.busy.add(id);
+  const put = v => { const r = RATE.map[id] = Object.assign({}, RATE.map[id]); if(v == null) delete r[me.k]; else r[me.k] = v; };
+  put(s); ratePaint();
+  try { rateApply(await favCall("/api/rate", {id, s})); toast(s == null ? "Voto tolto" : `Voto salvato: ${starsTxt(s)}`); }
+  catch(e){
+    put(was);
+    if(e.auth){ favExpired(); favPaint(); toast("Il link personale non vale più: chiedine uno nuovo al bot con /sito"); }
+    else toast("Non sono riuscito a salvare il voto. Riprova tra poco.");
+  }
+  RATE.busy.delete(id);
+  ratePaint();
+}
+const starsRO = v => `<span class="st" aria-hidden="true">${[1, 2, 3, 4, 5].map(i => `<i${v != null && i <= v ? ` class="on"` : ""}>★</i>`).join("")}</span>`;
+// riga di una persona: la propria e' un gruppo di 6 scelte (0 e 1-5 stelle), quella dell'altro si legge soltanto
+function rateRow(p, id, name){
+  const v = rateOf(id, p.k);
+  if(!p.me) return `<div class="rt-row"><span class="rt-who">${esc(p.name)}</span><span class="rt ro" role="img" aria-label="${esc(p.name)}: ${v == null ? "non ha ancora votato" : starsTxt(v) + " su 5"}">${starsRO(v)}</span><span class="rt-v">${v == null ? "non ha ancora votato" : v + " su 5"}</span></div>`;
+  const b = i => `<button type="button" role="radio" class="${i ? "rt-s" : "rt-0"}${v != null && (i ? i <= v : v === 0) ? " on" : ""}" data-act="rate" data-id="${esc(id)}" data-s="${i}" aria-checked="${v === i}" aria-label="${i ? starsTxt(i) + " su 5" : "0 stelle: da scartare"}" title="${i ? starsTxt(i) : "0 stelle"}">${i ? "★" : "0"}</button>`;
+  return `<div class="rt-row me"><span class="rt-who">${esc(p.name)} <small>tu</small></span><span class="rt" role="radiogroup" aria-label="Il tuo voto per ${esc(name)}">${[0, 1, 2, 3, 4, 5].map(b).join("")}</span><span class="rt-v">${v == null ? "tocca per votare" : `${v} su 5 · <button type="button" class="achip all" data-act="rate" data-id="${esc(id)}" data-s="">togli</button>`}</span></div>`;
+}
+const loginAsk = what => `Per ${what} scrivi <b>/sito</b> a @${BOT_USERNAME}: ti manda un link personale da aprire su questo dispositivo. <a href="https://t.me/${BOT_USERNAME}?start=sito" target="_blank" rel="noopener">Chiedi il link</a>`;
+function rateVerdict(id){
+  const v = rateVals(id);
+  if(v.length < 2 || v.some(x => x == null)) return "";
+  const a = rateAvg(id), d = Math.max(...v) - Math.min(...v);
+  return `<span class="b ${d >= 2 ? "warn" : Math.min(...v) >= 4 ? "ok" : "plain"}">${d >= 2 ? "divisiva" : Math.min(...v) >= 4 ? "piace a entrambi" : "d'accordo"}</span> <span class="rt-avg">media <b class="num">${avgTxt(a)}</b></span>`;
+}
+function rateBlockIn(id, name){
+  const head = `<div class="rate-h"><p class="eyebrow">I vostri voti</p><span class="rate-x">${RATE.state === "ok" ? rateVerdict(id) : ""}</span></div>`;
+  if(!favLive()){
+    const off = `<span class="rt off" role="img" aria-label="Voto non disponibile senza il link personale"><button type="button" class="rt-0" disabled>0</button>${[1, 2, 3, 4, 5].map(() => `<button type="button" class="rt-s" disabled>★</button>`).join("")}</span>`;
+    return head + `<div class="rt-row"><span class="rt-who">Il tuo voto</span>${off}</div><p class="note rate-ask">${loginAsk("votare da 0 a 5 stelle e vedere i voti dell'altro")}</p>`;
+  }
+  if(RATE.state === "error") return head + `<p class="note">Non riesco a leggere i voti in questo momento. <button type="button" class="achip all" data-act="rate-retry">Riprova</button></p>`;
+  if(RATE.state !== "ok") return head + `<p class="note">Carico i voti…</p>`;
+  const ps = RATE.people.slice().sort((a, b) => (b.me ? 1 : 0) - (a.me ? 1 : 0));
+  return head + ps.map(p => rateRow(p, id, name)).join("") + `<p class="note">Da 0 a 5 stelle, 5 = ci voglio andare. Ognuno vota per sé; <a href="#/voti">tutti i voti a confronto</a>.</p>`;
+}
+const rateBlock = (id, name) => API ? `<section class="wrap rate-sec"><div class="rate" data-rateblock="${esc(id)}" data-name="${esc(name)}">${rateBlockIn(id, name)}</div></section>` : "";
+// etichetta compatta per le card: "Nome 4★ · Nome –" (solo se c'e' almeno un voto)
+function rateChipIn(id){
+  if(RATE.state !== "ok" || !RATE.map[id] || !rateVals(id).some(v => v != null)) return "";
+  return `<span class="b plain rc-b" title="I vostri voti">${RATE.people.map(p => { const v = rateOf(id, p.k); return `${esc(p.name)} <b class="num">${v == null ? "–" : v}</b>${v == null ? "" : `<i aria-hidden="true">★</i>`}`; }).join(" · ")}</span>`;
+}
+const rateChip = id => API ? `<span class="rc" data-rate="${esc(id)}">${rateChipIn(id)}</span>` : "";
+function ratePaint(){
+  document.querySelectorAll("[data-rate]").forEach(el => { el.innerHTML = rateChipIn(el.dataset.rate); });
+  document.querySelectorAll("[data-rateblock]").forEach(el => { el.innerHTML = rateBlockIn(el.dataset.rateblock, el.dataset.name || ""); });
+  if(S.page === "rates"){ const el = $("voti-in"); if(el && el.innerHTML) el.innerHTML = votiBody(); else $("app").innerHTML = votiHTML(); }
+  if(S.page === "cmp") $("app").innerHTML = cmpHTML();
+}
+
+/* ------------------------------------------------------------------ voci (mete e trip) per voti, confronto, mappa */
+const itemIds = () => DESTS.filter(d => d.g !== "sconsigliato").map(d => "d_" + d.code).concat(POP.trips.map(t => "t_" + t.id));
+// a terra di una meta: fascia del primo itinerario ("1.000–1.400 € pp")
+function landD(code){
+  const t = (ITIN[code] || [])[0], m = t && /(\d[\d.]*)\s*[–-]\s*(\d[\d.]*)/.exec(String(t.c || ""));
+  return m ? {lo:+m[1].replace(/\./g, ""), hi:+m[2].replace(/\./g, ""), name:t.n} : null;
+}
+function item(id){
+  const kind = id[0], key = id.slice(2);
+  if(kind === "d" && DEST[key]){
+    const d = DEST[key], a = viewD(key, "all", 1) || viewD(key, "all", 2), b = a && a.cheap, f = b && b.o.f, land = landD(key);
+    return {id, kind, name:d.city, sub:d.country, href:"#/d/" + key, k:coverD(key), tab:d.tab, area:d.area, g:d.g, temp:d.temp, rain:d.rain, flag:d.flag || "", code:d.code,
+      pp:a ? a.min : null, unit:"A/R", o:b ? b.c.o : null, lin:!!a && a.origins.has("LIN"), dep:b ? b.c.dep : null, n:b ? b.c.n : null, dur:f ? f[2] : null, stops:f ? f[3] : null, via:f ? f[7] : "",
+      totLo:a && land ? a.min + land.lo : null, totHi:a && land ? a.min + land.hi : null, totNote:land ? `voli + a terra ${eur(land.lo)}–${eur(land.hi)} (giro «${land.name}»)` : "solo voli: nessuna stima a terra", score:a ? a.bestS : null};
+  }
+  if(kind === "t" && PT[key]){
+    const t = PT[key], a = viewT(t, "all", 1) || viewT(t, "all", 2), b = a && a.cheap, v = b && b.o;
+    return {id, kind, name:t.name, sub:t.countries.join(" + "), href:"#/t/" + key, k:coverT(t), tab:"pop", area:t.area, g:t.g, temp:t.temp, rain:"", flag:t.flag || "", code:t.arr,
+      pp:v ? v.voli + v.extra : null, unit:"voli", o:b ? b.c.o : null, lin:!!a && a.origins.has("LIN"), dep:b ? b.c.dep : null, n:b ? b.c.n : null, dur:v ? v.out[2] : null,
+      stops:v ? Math.max(v.out[3], v.back ? v.back[3] : v.out[3]) : null, via:v ? v.out[7] : "",
+      totLo:v ? v.lo : t.land[0] + t.itot, totHi:v ? v.hi : t.land[1] + t.itot, totNote:v ? `voli + interni + a terra, ${t.nights} notti` : "senza voli internazionali", score:a ? a.bestS : null};
+  }
+  return null;
+}
+const stopsShort = n => n == null ? "" : n === 0 ? "diretto" : n === 1 ? "1 scalo" : n + " scali";
+
+/* ------------------------------------------------------------------ confronto affiancato (fino a 3 voci, scelta salvata sul dispositivo) */
+const CMP_KEY = "agosto2027.cmp", CMP_MAX = 3;
+const CMP = {ids:[]};
+function cmpRead(){ try { const a = JSON.parse(localStorage.getItem(CMP_KEY) || "[]"); return Array.isArray(a) ? uniq(a.filter(x => typeof x === "string" && item(x))).slice(0, CMP_MAX) : []; } catch(e){ return []; } }
+function cmpSave(){ try { localStorage.setItem(CMP_KEY, JSON.stringify(CMP.ids)); } catch(e){ /* resta in memoria */ } }
+const cmpOn = id => CMP.ids.includes(id);
+function cmpToggle(id){
+  if(cmpOn(id)) CMP.ids = CMP.ids.filter(x => x !== id);
+  else if(CMP.ids.length >= CMP_MAX){ toast(`Si confrontano al massimo ${CMP_MAX} voci: toglierne una per aggiungere questa.`); return; }
+  else if(item(id)) CMP.ids.push(id);
+  S.c.hide = CMP.ids.length - 1;
+  cmpSave(); cmpPaint();
+}
+const cmpIcon = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 5h6v14H4zM14 5h6v14h-6z"/></svg>`;
+const cmpBtn = (id, name, cls) => `<button type="button" class="${cls || "cmpb"}${cmpOn(id) ? " on" : ""}" data-act="cmp" data-id="${esc(id)}" aria-pressed="${cmpOn(id)}" aria-label="${cmpOn(id) ? "Togli" : "Aggiungi"} ${esc(name)} ${cmpOn(id) ? "dal" : "al"} confronto">${cmpIcon}<span class="lbl">${cmpOn(id) ? "Nel confronto" : "Confronta"}</span></button>`;
+function cmpBarHTML(){
+  const its = CMP.ids.map(item).filter(Boolean);
+  return `<div class="cmpbar-in"><span class="cmpbar-t"><b>Confronto</b> <span class="num">${its.length} di ${CMP_MAX}</span><small>${its.map(x => esc(x.name)).join(" · ")}</small></span>
+    ${its.length > 1 ? `<a class="btn sun" href="#/confronto">Confronta</a>` : `<span class="cmpbar-h">aggiungine un'altra</span>`}<button type="button" class="cmpbar-x" data-act="cmp-clear" aria-label="Svuota il confronto">×</button></div>`;
+}
+function cmpPaint(){
+  document.querySelectorAll("[data-act='cmp']").forEach(el => {
+    const on = cmpOn(el.dataset.id), l = el.querySelector(".lbl");
+    el.classList.toggle("on", on); el.setAttribute("aria-pressed", String(on));
+    if(l) l.textContent = on ? "Nel confronto" : "Confronta";
+  });
+  cmpBar();
+  if(S.page === "cmp") $("app").innerHTML = cmpHTML();
+}
+function cmpBar(){
+  const bar = $("cmpbar");
+  if(bar){ const show = CMP.ids.length > 0 && S.page !== "cmp"; bar.hidden = !show; bar.innerHTML = show ? cmpBarHTML() : ""; }
+}
+function cmpHTML(){
+  const its = CMP.ids.map(item).filter(Boolean), n = its.length;
+  const head = topHTML("nav") + `<main class="wrap cr-head sec cmp-page" id="confronto"><p class="eyebrow">Confronto</p><h1 class="h2" style="margin:8px 0 14px">Fianco <i>a fianco</i></h1>`;
+  if(n < 2) return head + `<p class="sub">${n ? `Hai scelto solo <b>${esc(its[0].name)}</b>: aggiungi almeno un'altra meta o un altro giro.` : "Scegli 2 o 3 mete o giri da mettere a confronto."} Il pulsante «Confronta» è su ogni card, nelle pagine delle mete, tra i preferiti e nei voti.</p>
+    <p style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap"><a class="btn" href="#/">Tutte le mete</a>${API ? `<a class="btn" href="#/preferiti">Dai preferiti</a>` : ""}</p></main>` + footHTML();
+  const hide = n === 3 ? Math.min(Math.max(S.c.hide, 0), 2) : -1;
+  const lo = (f) => { const v = its.map(f).filter(x => x != null); return v.length > 1 && Math.min(...v) < Math.max(...v) ? Math.min(...v) : null; };
+  const loPP = lo(x => x.pp), loTot = lo(x => x.totLo), loDur = lo(x => x.dur), hiAvg = (() => { const v = its.map(x => rateAvg(x.id)).filter(x => x != null); return v.length > 1 && Math.max(...v) > Math.min(...v) ? Math.max(...v) : null; })();
+  const row = (label, cell, cls) => `<div class="cmp-r${cls ? " " + cls : ""}" role="row"><div class="cmp-l" role="rowheader">${label}</div>${its.map((x, i) => `<div class="cmp-c c${i}" role="cell">${cell(x, i)}</div>`).join("")}</div>`;
+  const nd = `<span class="cmp-nd">n.d.</span>`;
+  const best = t => ` <span class="b ok">${t}</span>`;
+  const votes = x => {
+    if(!favLive()) return `<span class="cmp-s">${loginAsk("votare e vedere i voti")}</span>`;
+    if(RATE.state !== "ok") return `<span class="cmp-s">${RATE.state === "error" ? "voti non disponibili" : "carico i voti…"}</span>`;
+    const a = rateAvg(x.id);
+    return RATE.people.map(p => { const v = rateOf(x.id, p.k); return `<span class="cmp-v"><span class="rt-who">${esc(p.name)}</span><span class="rt ro" role="img" aria-label="${esc(p.name)}: ${v == null ? "nessun voto" : starsTxt(v) + " su 5"}">${starsRO(v)}</span><b class="num">${v == null ? "–" : v}</b></span>`; }).join("") +
+      (a != null ? `<span class="cmp-s">media <b class="num">${avgTxt(a)}</b>${hiAvg != null && a === hiAvg ? best("la più votata") : ""}</span>` : `<span class="cmp-s">ancora nessun voto</span>`);
+  };
+  const table = `<div class="cmp n${n}${hide >= 0 ? " hd" + hide : ""}" role="table" aria-label="Confronto tra ${its.map(x => esc(x.name)).join(", ")}" style="--n:${n}">
+    <div class="cmp-r cmp-h" role="row"><div class="cmp-l" role="columnheader"><span class="sr">Voce</span></div>${its.map((x, i) => `<div class="cmp-c c${i}" role="columnheader"><a class="cmp-ph" href="${x.href}" tabindex="-1" aria-hidden="true">${x.k ? img(x.k, {sz:"thumb", alt:""}) : noPhoto(x.code)}</a><span class="cmp-k">${x.kind === "t" ? "giro" : "meta"} · ${esc(x.sub)}</span><a class="cmp-n" href="${x.href}">${esc(x.name)}</a></div>`).join("")}</div>
+    ${row("Prezzo migliore <small>a persona</small>", x => x.pp == null ? nd + `<span class="cmp-s">voli non ancora in vendita</span>` : `<b class="cmp-pp num">${eur(x.pp)}</b><span class="cmp-s">${x.unit === "voli" ? "voli" : "A/R"} · da ${esc(oName(x.o))}${x.lin && x.o !== "LIN" ? " · anche da Linate" : ""}</span>${loPP != null && x.pp === loPP ? best("il più basso") : ""}${priceBadge(x.id)}`)}
+    ${row("Costo totale stimato <small>a persona</small>", x => x.totLo == null ? nd + `<span class="cmp-s">${esc(x.totNote)}</span>` : `<b class="num">${eur(x.totLo)} – ${eur(x.totHi)}</b> <span class="est">stima</span><span class="cmp-s">${esc(x.totNote)} · coppia ${eur(x.totLo * 2)} – ${eur(x.totHi * 2)}</span>${loTot != null && x.totLo === loTot ? best("il più basso") : ""}`)}
+    ${row("Date", x => x.dep ? `<b>${fmtD(x.dep)} → ${fmtD(addD(x.dep, x.n))}</b><span class="cmp-s">${x.n} giorni, nella data più economica</span>` : nd)}
+    ${row("Ore di volo <small>andata</small>", x => x.dur == null ? nd : `<b class="num">${hm(x.dur)}</b>${loDur != null && x.dur === loDur ? best("il più corto") : ""}`)}
+    ${row("Scali", x => x.stops == null ? nd : `<b>${stopsShort(x.stops)}</b>${x.via ? `<span class="cmp-s">via ${esc(x.via)}</span>` : ""}`)}
+    ${row("Clima ad agosto", x => `<span class="b ${climaCls(x.g)}">${esc(x.g)}</span><span class="cmp-s">${esc(x.temp)}${x.rain ? " · " + esc(x.rain) : ""}</span>${x.flag ? `<span class="cmp-s warn">${esc(x.flag)}</span>` : ""}`)}
+    ${API ? row("Voti", votes) : ""}
+    ${row(`<span class="sr">Azioni</span>`, x => `<a class="pill" href="${x.href}">Apri</a><button type="button" class="pill rm" data-act="cmp" data-id="${esc(x.id)}" aria-label="Togli ${esc(x.name)} dal confronto">Togli</button>`, "cmp-a")}
+  </div>`;
+  const pick = n === 3 ? `<div class="cmp-pick" role="group" aria-label="Colonne mostrate su telefono"><span class="l">Sul telefono due alla volta: nascondi</span><span class="seg">${its.map((x, i) => `<button type="button" data-act="cmp-hide" data-i="${i}" aria-pressed="${hide === i}">${esc(x.name)}</button>`).join("")}</span></div>` : "";
+  return head + `<p class="sub">Prezzo dei voli nella data più economica, con al massimo 1 scalo per tratta (2 solo dove non c'è altro). Il costo totale somma ai voli la stima a terra.</p>${pick}${table}
+    <p style="margin-top:22px"><button type="button" class="achip all" data-act="cmp-clear">Svuota il confronto</button></p></main>` + footHTML();
+}
+
+/* ------------------------------------------------------------------ pagina voti: le preferenze dei due a confronto */
+const VTABS = [["all", "Tutto"], ["new", "Nuove mete"], ["vis", "Già visitati"], ["pop", "Popular trips"]];
+function votiViews(){
+  return [["rank", "Classifica", "per media dei voti"], ["both", "Entrambi ≥ 4", "piace a tutti e due"], ["div", "Divisivi", "almeno 2 stelle di differenza"]]
+    .concat(RATE.people.map(p => ["todo:" + p.k, p.me ? "Da votare: tu" : "Da votare: " + p.name, "non ancora votati da " + p.name]));
+}
+function votiList(view, pool){
+  const vals = x => rateVals(x.id), all = v => v.length > 1 && v.every(y => y != null);
+  let list;
+  if(view === "both") list = pool.filter(x => { const v = vals(x); return all(v) && Math.min(...v) >= 4; });
+  else if(view === "div") list = pool.filter(x => { const v = vals(x); return all(v) && Math.max(...v) - Math.min(...v) >= 2; });
+  else if(view.startsWith("todo:")) return pool.filter(x => rateOf(x.id, view.slice(5)) == null).sort((x, y) => (y.score || 0) - (x.score || 0) || x.name.localeCompare(y.name, "it"));
+  else list = pool.filter(x => vals(x).some(y => y != null));
+  const cnt = x => vals(x).filter(y => y != null).length;
+  if(view === "div") return list.sort((x, y) => { const a = vals(x), b = vals(y); return (Math.max(...b) - Math.min(...b)) - (Math.max(...a) - Math.min(...a)) || rateAvg(y.id) - rateAvg(x.id); });
+  return list.sort((x, y) => rateAvg(y.id) - rateAvg(x.id) || cnt(y) - cnt(x) || (x.pp == null ? 1e9 : x.pp) - (y.pp == null ? 1e9 : y.pp));
+}
+function votiRow(x, i, rank){
+  const a = rateAvg(x.id), ps = RATE.people.slice().sort((p, q) => (q.me ? 1 : 0) - (p.me ? 1 : 0));
+  return `<li class="vrow"><a class="vrow-ph" href="${x.href}" tabindex="-1" aria-hidden="true">${x.k ? img(x.k, {sz:"thumb", alt:""}) : noPhoto(x.code)}</a>
+    <div class="vrow-t">${rank ? `<span class="vrow-i num">${i + 1}</span>` : ""}<a class="vrow-n" href="${x.href}">${esc(x.name)}</a>
+      <span class="vrow-s">${x.kind === "t" ? "giro" : "meta"} · ${esc(x.sub)} · ${x.pp == null ? "voli n.d." : `<b class="num">${eur(x.pp)}</b> ${x.unit === "voli" ? "voli pp" : "pp"}`}</span>
+      <span class="bs">${a != null ? `<span class="b sun">media <b class="num">${avgTxt(a)}</b></span>` : ""}${rateVerdict(x.id).replace(/<span class="rt-avg">.*$/, "")}${priceBadge(x.id)}</span></div>
+    <div class="vrow-r">${ps.map(p => rateRow(p, x.id, x.name)).join("")}</div>
+    <div class="vrow-a">${cmpBtn(x.id, x.name, "cmpb sm")}</div></li>`;
+}
+function votiBody(){
+  const V = S.v, all = itemIds().map(item).filter(Boolean);
+  const inTab = all.filter(x => V.tab === "all" || x.tab === V.tab);
+  const areas = uniq(inTab.map(x => x.area)).sort((a, b) => a.localeCompare(b, "it"));
+  if(V.area !== "all" && !areas.includes(V.area)) V.area = "all";
+  const pool = inTab.filter(x => V.area === "all" || x.area === V.area);
+  const views = votiViews();
+  if(!views.some(v => v[0] === V.view)) V.view = "rank";
+  const list = votiList(V.view, pool), cur = views.find(v => v[0] === V.view), me = rateMe();
+  const mine = me ? pool.filter(x => rateOf(x.id, me.k) != null).length : 0;
+  const empty = {rank:"Ancora nessun voto qui. Parti da «Da votare: tu».", both:"Nessuna voce con 4 o più stelle da entrambi, per ora.", div:"Nessun disaccordo: non ci sono voci con almeno 2 stelle di differenza."}[V.view] || "Tutto votato in questa sezione.";
+  return `<div class="vt-ctl">
+      <div class="chips" role="group" aria-label="Sezione">${VTABS.map(([v, l]) => `<button type="button" class="chip" data-act="vt" data-k="tab" data-v="${v}" aria-pressed="${V.tab === v}">${l}</button>`).join("")}</div>
+      <label class="vt-area"><span class="sr">Area</span><select class="pill" data-vk="area" aria-label="Area">${[["all", "Tutte le aree"], ...areas.map(a => [a, a])].map(([v, l]) => `<option value="${esc(v)}"${V.area === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>
+    </div>
+    <div class="vt-views" role="group" aria-label="Cosa mostrare">${views.map(([v, l]) => `<button type="button" class="vt-v" data-act="vt" data-k="view" data-v="${esc(v)}" aria-pressed="${V.view === v}">${esc(l)}<sup class="num">${votiList(v, pool).length}</sup></button>`).join("")}</div>
+    <p class="count" aria-live="polite"><b>${list.length}</b> ${list.length === 1 ? "voce" : "voci"} · ${esc(cur[2])}${me ? ` · hai votato <b>${mine}</b> di ${pool.length}` : ""}</p>
+    ${list.length ? `<ol class="vlist">${list.slice(0, V.n).map((x, i) => votiRow(x, i, V.view === "rank" || V.view === "both")).join("")}</ol>${list.length > V.n ? `<p style="margin-top:18px"><button type="button" class="pill" data-act="vt-more">Mostra altre ${Math.min(30, list.length - V.n)}</button></p>` : ""}` : `<p class="empty">${empty}</p>`}`;
+}
+function votiHTML(){
+  const head = topHTML("nav") + `<main class="wrap cr-head sec vt-page" id="voti"><p class="eyebrow">Voti</p><h1 class="h2" style="margin:8px 0 14px">Dove vuole andare <i>chi</i></h1>`;
+  let body;
+  if(!API) body = `<p class="sub">I voti non sono attivi su questa copia del sito.</p>`;
+  else if(!favLive()) body = (FAV.state === "expired" ? `<p class="sub fv-warn">Il link usato su questo dispositivo non vale più.</p>` : "") +
+    `<p class="sub">Ognuno dà da 0 a 5 stelle a mete e giri, dal proprio profilo; qui i voti si incrociano: classifica, cosa piace a entrambi, dove non siete d'accordo, cosa manca da votare.</p>
+     <p class="sub" style="margin-top:12px">${loginAsk("votare")}</p>`;
+  else if(RATE.state === "error") body = `<p class="sub">Non riesco a leggere i voti in questo momento.</p><p style="margin-top:22px"><button class="btn" data-act="rate-retry">Riprova</button></p>`;
+  else if(RATE.state !== "ok") body = `<p class="sub">Carico i voti…</p>`;
+  else body = `<p class="sub">Da 0 a 5 stelle, 5 = ci voglio andare. Ognuno vota per sé e vede il voto dell'altro: ${RATE.people.map(p => `<b>${esc(p.name)}</b>${p.me ? " (tu)" : ""}`).join(" e ")}.</p><div id="voti-in">${votiBody()}</div>`;
+  return head + body + `</main>` + footHTML();
+}
+
+/* ------------------------------------------------------------------ mappa: mete colorate per prezzo pp (SVG, nessuna libreria) */
+// Proiezione equirettangolare, la stessa di build_map.py. Il contorno delle terre (world.json, ~50 kB) si scarica solo qui.
+const WORLD = {state:"idle", d:"", w:1000, h:388.9, lat0:82, k:1000 / 360};
+const mapXY = (lat, lon) => [+((lon + 180) * WORLD.k).toFixed(1), +((WORLD.lat0 - lat) * WORLD.k).toFixed(1)];
+const MBINS = [600, 900, 1200, 1600];                       // soglie in euro pp: 5 fasce, piu' intenso = piu' economico
+const mBin = p => { let i = 0; while(i < MBINS.length && p > MBINS[i]) i++; return i; };
+const mBinTxt = i => i === 0 ? `fino a ${eur(MBINS[0])}` : i === MBINS.length ? `oltre ${eur(MBINS[i - 1])}` : `${num(MBINS[i - 1] + 1)} – ${eur(MBINS[i])}`;
+// riquadri [lon0, lon1, lat0, lat1]
+const MZOOM = [["world", "Mondo", [-180, 180, -58, 82]], ["Asia", "Asia", [38, 150, -13, 57]], ["Africa", "Africa", [-28, 64, -37, 40]], ["Nord America", "Nord e Centro America", [-170, -50, 5, 74]],
+  ["Sud America", "Sud America", [-95, -30, -57, 15]], ["Oceania", "Oceania", [108, 180, -50, 2]], ["Europa remota", "Europa remota", [-32, 50, 33, 81]]];
+async function loadWorld(){
+  if(WORLD.state === "ok" || WORLD.state === "loading") return;
+  WORLD.state = "loading";
+  try {
+    const r = await fetch(WORLD_URL);
+    if(!r.ok) throw new Error("http " + r.status);
+    const j = await r.json();
+    Object.assign(WORLD, {d:String(j.d || ""), w:j.w || 1000, h:j.h || 388.9, lat0:j.lat0 || 82, k:j.k || 1000 / 360, state:"ok"});
+  } catch(e){ WORLD.state = "error"; }
+  if(S.page === "map"){ const el = $("map-in"); if(el) el.innerHTML = mapBody(); }
+}
+function mapPoints(){
+  return DESTS.filter(d => d.g !== "sconsigliato" && d.lat != null && d.lon != null && (S.m.tab === "all" || d.tab === S.m.tab)).map(d => {
+    const a = viewD(d.code, "all", 1), a2 = a || viewD(d.code, "all", 2), [x, y] = mapXY(d.lat, d.lon);
+    return {d, x, y, pp:a2 ? a2.min : null, two:!a && !!a2, bin:a2 ? mBin(a2.min) : -1, o:a2 ? a2.cheap.c.o : null};
+  });
+}
+function mapBody(){
+  const M = S.m, z = MZOOM.find(q => q[0] === M.zoom) || MZOOM[0], [lon0, lon1, la0, la1] = z[2];
+  const [x0, y0] = mapXY(la1, lon0), [x1, y1] = mapXY(la0, lon1), vw = +(x1 - x0).toFixed(1), vh = +(y1 - y0).toFixed(1);
+  const pts = mapPoints(), inView = pts.filter(p => p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1);
+  // punti piu' grandi (in unita' della mappa) quando lo schermo e' stretto e si guarda una zona: restano toccabili
+  const narrow = typeof window !== "undefined" && window.innerWidth < 720 && M.zoom !== "world";
+  const r = +(vw / (narrow ? 62 : 115)).toFixed(2), fs = +(vw / (narrow ? 24 : 46)).toFixed(2), sw = +(vw / 900).toFixed(2);
+  // prima le piu' care, cosi' le economiche (piu' intense) restano sopra; le n.d. sotto a tutte
+  const dots = inView.slice().sort((a, b) => (a.pp == null ? -1 : 0) - (b.pp == null ? -1 : 0) || (b.pp || 0) - (a.pp || 0)).map(p => {
+    const lbl = `${p.d.city}, ${p.d.country}: ${p.pp == null ? "voli non ancora in vendita" : eur(p.pp) + " a persona da " + oName(p.o) + (p.two ? " (solo con 2 scali)" : "")}`;
+    const right = p.x > x0 + vw * 0.72;
+    return `<a class="mp ${p.bin < 0 ? "nd" : "m" + p.bin}" href="#/d/${esc(p.d.code)}" aria-label="${esc(lbl)}"><title>${esc(lbl)}</title><circle class="hit" cx="${p.x}" cy="${p.y}" r="${+(r * 2.1).toFixed(2)}"/><circle class="dot" cx="${p.x}" cy="${p.y}" r="${r}" stroke-width="${sw}"/><text x="${+(p.x + (right ? -1 : 1) * r * 1.5).toFixed(1)}" y="${+(p.y + fs * 0.35).toFixed(1)}" font-size="${fs}" stroke-width="${+(fs / 4).toFixed(2)}"${right ? ` text-anchor="end"` : ""}>${esc(p.d.city.split(" (")[0])}${p.pp == null ? "" : " · " + eur(p.pp)}</text></a>`;
+  }).join("");
+  const home = [["Milano", 45.46, 9.19], ["Roma", 41.9, 12.5], ["Pisa", 43.68, 10.39]].map(([n, la, lo]) => { const [x, y] = mapXY(la, lo); return x >= x0 && x <= x1 && y >= y0 && y <= y1 ? `<rect class="mhome" x="${+(x - r * 0.55).toFixed(1)}" y="${+(y - r * 0.55).toFixed(1)}" width="${+(r * 1.1).toFixed(2)}" height="${+(r * 1.1).toFixed(2)}" stroke-width="${sw}"><title>${n}: partenza</title></rect>` : ""; }).join("");
+  const counts = [0, 1, 2, 3, 4].map(i => inView.filter(p => p.bin === i).length), nNd = inView.filter(p => p.bin < 0).length;
+  const legend = `<ul class="mleg" aria-label="Legenda: prezzo A/R a persona">${[0, 1, 2, 3, 4].map(i => `<li><i class="mk m${i}"></i>${mBinTxt(i)} <span class="num">(${counts[i]})</span></li>`).join("")}<li><i class="mk nd"></i>voli non ancora in vendita <span class="num">(${nNd})</span></li><li><i class="mk home"></i>partenza</li></ul>`;
+  const land = WORLD.state === "ok" ? `<path class="mland" d="${WORLD.d}"/>` : "";
+  const status = WORLD.state === "error" ? `<p class="note">Il contorno dei continenti non si è caricato: i punti restano al loro posto. <button type="button" class="achip all" data-act="map-retry">Riprova</button></p>` : WORLD.state !== "ok" ? `<p class="note">Carico la mappa…</p>` : "";
+  const sorted = inView.slice().sort((a, b) => (a.pp == null ? 1e9 : a.pp) - (b.pp == null ? 1e9 : b.pp) || a.d.city.localeCompare(b.d.city, "it"));
+  const list = `<details class="mlist"${M.zoom !== "world" ? " open" : ""}><summary>Elenco delle ${inView.length} mete in vista, dalla più economica</summary><ol>${sorted.map(p => `<li><i class="mk ${p.bin < 0 ? "nd" : "m" + p.bin}"></i><a href="#/d/${esc(p.d.code)}">${esc(p.d.city)}</a> <span>${esc(p.d.country)}</span> <b class="num">${p.pp == null ? "n.d." : eur(p.pp)}</b>${p.two ? ` <span class="est">2 scali</span>` : ""}${priceBadge("d_" + p.d.code)}</li>`).join("")}</ol></details>`;
+  return `<div class="m-ctl">
+      <div class="chips" role="group" aria-label="Sezione">${[["all", "Tutte"], ["new", "Nuove mete"], ["vis", "Già visitati"]].map(([v, l]) => `<button type="button" class="chip" data-act="mp" data-k="tab" data-v="${v}" aria-pressed="${M.tab === v}">${l}</button>`).join("")}</div>
+      <div class="chips" role="group" aria-label="Zona">${MZOOM.map(([v, l]) => `<button type="button" class="chip" data-act="mp" data-k="zoom" data-v="${esc(v)}" aria-pressed="${M.zoom === v}">${esc(l)}</button>`).join("")}</div>
+    </div>
+    <figure class="mfig"><div class="mscroll"><svg class="map z-${M.zoom === "world" ? "world" : "zone"}" viewBox="${x0} ${y0} ${vw} ${vh}" role="group" aria-label="Mappa: ${inView.length} mete, colore per prezzo a persona">${land}${home}${dots}</svg></div>
+      <figcaption>${legend}<p class="note">Prezzo A/R a persona più basso tra tutte le date, con al massimo 1 scalo per tratta (2 dove non c'è altro). <b>Più intenso = più economico.</b> Tocca un punto per aprire la meta${M.zoom === "world" ? "; sul telefono conviene scegliere una zona" : ""}.</p>${status}</figcaption></figure>
+    ${list}`;
+}
+function mapHTML(){
+  loadWorld();
+  return topHTML("nav") + `<main class="wrap cr-head sec m-page" id="mappa"><p class="eyebrow">Mappa</p><h1 class="h2" style="margin:8px 0 14px">Dove costa <i>meno volare</i></h1>
+    <div id="map-in">${mapBody()}</div></main>` + footHTML();
 }
 
 /* ------------------------------------------------------------------ router */
@@ -964,20 +1298,29 @@ function parse(hash){
   if(parts[0] === "crediti") return {page:"credits"};
   if(parts[0] === "preferiti") return {page:"favs"};
   if(parts[0] === "login") return {page:"login", token:parts[1] || ""};
+  if(parts[0] === "voti") return {page:"rates"};
+  if(parts[0] === "mappa") return {page:"map"};
+  if(parts[0] === "confronto") return {page:"cmp", ids:parts[1] ? parts[1].split(",").filter(Boolean) : null};
   return {page:"home", tab:parts[0] === "visitati" ? "vis" : parts[0] === "trips" ? "pop" : "new"};
 }
 function pageHTML(r){
-  return r.page === "dest" ? destHTML(r.id) : r.page === "trip" ? tripHTML(r.id) : r.page === "credits" ? creditsHTML() : r.page === "favs" || r.page === "login" ? favsHTML() : homeHTML();
+  return r.page === "dest" ? destHTML(r.id) : r.page === "trip" ? tripHTML(r.id) : r.page === "credits" ? creditsHTML() : r.page === "favs" || r.page === "login" ? favsHTML() :
+    r.page === "rates" ? votiHTML() : r.page === "cmp" ? cmpHTML() : r.page === "map" ? mapHTML() : homeHTML();
 }
 function go(){
   let r = parse(location.hash);
   const prev = S.route, app = $("app");
   if(r.page === "login"){
     // link personale mandato dal bot: si salva il token e lo si toglie subito dalla barra degli indirizzi e dalla cronologia
-    if(API && r.token){ saveToken(r.token); FAV.map = new Map(); FAV.state = "loading"; loadFavs(); }
+    if(API && r.token){ saveToken(r.token); FAV.map = new Map(); FAV.state = "loading"; rateReset(); loadFavs(); loadRates(); }
     try { history.replaceState(null, "", "#/preferiti"); } catch(e){ /* resta l'indirizzo com'e' */ }
     r = {page:"favs"};
   } else if(r.page === "favs" && favLive() && FAV.state !== "loading") loadFavs();
+  else if(r.page === "rates" && favLive() && RATE.state !== "loading"){ S.v.n = 30; loadRates(); }
+  else if(r.page === "cmp" && r.ids){
+    // link condivisibile #/confronto/d_DPS,t_x: la scelta arriva dall'indirizzo e diventa quella del dispositivo
+    CMP.ids = uniq(r.ids.filter(x => item(x))).slice(0, CMP_MAX); S.c.hide = CMP.ids.length - 1; cmpSave();
+  }
   S.prev = prev;
   if(prev && prev.page === "home") S.homeY = window.scrollY || 0;
   clearInterval(S.heroT);
@@ -993,10 +1336,11 @@ function go(){
   } else {
     S.page = r.page; S.route = r; S.panel = false;
     app.innerHTML = pageHTML(r);
-    const name = r.page === "dest" ? (DEST[r.id] || {}).city : r.page === "trip" ? (PT[r.id] || {}).name : r.page === "favs" ? "Preferiti" : "Crediti foto";
+    const name = r.page === "dest" ? (DEST[r.id] || {}).city : r.page === "trip" ? (PT[r.id] || {}).name : r.page === "favs" ? "Preferiti" : r.page === "rates" ? "Voti" : r.page === "cmp" ? "Confronto" : r.page === "map" ? "Mappa" : "Crediti foto";
     document.title = (name ? name + " · " : "") + "Agosto 2027 da Milano";
     window.scrollTo(0, 0);
   }
+  cmpBar();
   onScroll();
 }
 function startHero(){
@@ -1006,9 +1350,10 @@ function startHero(){
   S.heroT = setInterval(() => {
     const bg = $("hero-bg"); if(!bg || document.hidden) return;
     i = (i + 1) % S.hero.length;
-    const h = S.hero[i], p = PHO[h.k], im = new Image();
+    const h = S.hero[i], p = PHO[h.k], im = new Image(), ss = srcsetOf(p);
     im.onload = () => {
       const el = document.createElement("img");
+      if(ss){ el.srcset = ss; el.sizes = SIZES.hero; }
       el.src = p.f; el.width = p.w; el.height = p.h; el.alt = "";
       bg.appendChild(el);
       requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -1018,6 +1363,7 @@ function startHero(){
         $("hero-note").setAttribute("href", "#/d/" + h.code); $("hero-credit").innerHTML = esc(p.cap) + " · " + creditTxt(h.k);
       }));
     };
+    if(ss){ im.sizes = SIZES.hero; im.srcset = ss; }
     im.src = p.f;
   }, 7000);
 }
@@ -1030,7 +1376,7 @@ function openLb(i){
   const lb = $("lb"), k = S.lb[i]; if(!k) return;
   S.lbi = i;
   const p = PHO[k];
-  $("lb-fig").innerHTML = `${img(k, {eager:true})}<figcaption><b>${esc(p.cap)}</b>${creditTxt(k)}</figcaption>`;
+  $("lb-fig").innerHTML = `${img(k, {eager:true, sz:"full"})}<figcaption><b>${esc(p.cap)}</b>${creditTxt(k)}</figcaption>`;
   if(!lb.open && lb.showModal) lb.showModal();
 }
 function setF(k, v){
@@ -1051,7 +1397,16 @@ function init(){
       if(a === "menu"){ const on = !tn.classList.contains("open"); tn.classList.toggle("open", on); act.setAttribute("aria-expanded", String(on)); return; }
       if(a === "fav" || a === "fav-rm"){ e.preventDefault(); toggleFav(act.dataset.id); return; }
       if(a === "fav-retry"){ FAV.state = "loading"; favPaint(); loadFavs(); return; }
-      if(a === "fav-logout"){ saveToken(""); FAV.map = new Map(); FAV.me = ""; FAV.state = "anon"; favPaint(); return; }
+      if(a === "fav-logout"){ saveToken(""); FAV.map = new Map(); FAV.me = ""; FAV.state = "anon"; rateReset(); favPaint(); ratePaint(); return; }
+      if(a === "rate"){ e.preventDefault(); const me = rateMe(), v = act.dataset.s === "" ? null : +act.dataset.s; setRate(act.dataset.id, me && v != null && rateOf(act.dataset.id, me.k) === v ? null : v); return; }
+      if(a === "rate-retry"){ RATE.state = "loading"; ratePaint(); loadRates(); return; }
+      if(a === "cmp"){ e.preventDefault(); cmpToggle(act.dataset.id); return; }
+      if(a === "cmp-clear"){ CMP.ids = []; cmpSave(); cmpPaint(); return; }
+      if(a === "cmp-hide"){ S.c.hide = +act.dataset.i; $("app").innerHTML = cmpHTML(); return; }
+      if(a === "vt"){ S.v[act.dataset.k] = act.dataset.v; S.v.n = 30; $("voti-in").innerHTML = votiBody(); return; }
+      if(a === "vt-more"){ S.v.n += 30; $("voti-in").innerHTML = votiBody(); return; }
+      if(a === "mp"){ S.m[act.dataset.k] = act.dataset.v; $("map-in").innerHTML = mapBody(); return; }
+      if(a === "map-retry"){ WORLD.state = "idle"; loadWorld(); $("map-in").innerHTML = mapBody(); return; }
       if(a === "back"){ if(S.prev && S.prev.page === "home"){ e.preventDefault(); history.back(); } return; }
       if(a === "panel"){ setPanel(!S.panel); return; }
       if(a === "panel-close"){ setPanel(false); return; }
@@ -1074,7 +1429,10 @@ function init(){
     const cell = t.closest("[data-cell]");
     if(cell){ S.cell = cell.dataset.cell; $("voli-in").innerHTML = S.page === "trip" ? voliT(S.route.id) : voliD(S.route.id); return; }
   });
-  document.addEventListener("change", e => { const s = e.target.closest("select[data-k]"); if(s) setF(s.dataset.k, s.value); });
+  document.addEventListener("change", e => {
+    const s = e.target.closest("select[data-k]"); if(s){ setF(s.dataset.k, s.value); return; }
+    const v = e.target.closest("select[data-vk]"); if(v){ S.v[v.dataset.vk] = v.value; S.v.n = 30; $("voti-in").innerHTML = votiBody(); }
+  });
   document.addEventListener("input", e => { if(e.target.id === "q"){ (S.tab === "pop" ? S.p : S.f).q = e.target.value.trim(); updateHome(); } });
   document.addEventListener("keydown", e => {
     if(e.key === "Escape" && S.panel) setPanel(false);
@@ -1084,9 +1442,36 @@ function init(){
   window.addEventListener("scroll", onScroll, {passive:true});
   FAV.token = API ? readToken() : "";
   FAV.state = !API ? "off" : FAV.token ? "loading" : "anon";
-  if(favLive()) loadFavs();
+  CMP.ids = cmpRead();
+  if(favLive()){ loadFavs(); loadRates(); }
   go();
 }
-const App = {S, parse, pageHTML, homeParts, aggD, aggT, viewD, viewT, go, favUrl, BOT_USERNAME, API, FAV, favsHTML, toggleFav, loadFavs, flightT, histHTML, histRows, histAgg, HIST};
+const App = {S, parse, pageHTML, homeParts, aggD, aggT, viewD, viewT, go, favUrl, BOT_USERNAME, API, FAV, favsHTML, toggleFav, loadFavs, flightT, histHTML, histRows, histAgg, HIST,
+  RATE, loadRates, setRate, rateBlockIn, rateChipIn, votiHTML, votiList, priceLevel, priceBadge, CMP, cmpToggle, cmpHTML, cmpBarHTML, item, mapHTML, mapBody, mapPoints, mapXY, loadWorld, WORLD, img, srcsetOf};
 if(typeof window !== "undefined") window.App = App;
-if(typeof document !== "undefined") init();
+init();
+  return App;
+}
+/* ------------------------------------------------------------------ avvio: stato di caricamento, dati, errore */
+const BOOT = {busy:false, bound:false};
+function bootMsg(html){ const a = document.getElementById("app"); if(a) a.innerHTML = `<div class="boot" role="status" aria-live="polite">${html}</div>`; }
+async function boot(){
+  if(BOOT.busy) return;
+  const pre = typeof window !== "undefined" && window.__DATA__;
+  if(pre) return start(pre.raw, pre.photos);
+  if(!BOOT.bound){ BOOT.bound = true; document.addEventListener("click", e => { if(e.target && e.target.closest && e.target.closest("#boot-retry")) boot(); }); }
+  BOOT.busy = true;
+  bootMsg(`<span class="boot-dot" aria-hidden="true"></span><b>Agosto 2027</b><span>Carico mete e prezzi…</span>`);
+  try {
+    const r = await fetch(DATA_URL);
+    if(!r.ok) throw new Error("http " + r.status);
+    const j = await r.json();
+    if(!j || !j.raw || !j.photos) throw new Error("dati incompleti");
+    BOOT.busy = false;
+    start(j.raw, j.photos);
+  } catch(e){
+    BOOT.busy = false;
+    bootMsg(`<b>Agosto 2027</b><span>Non riesco a caricare mete e prezzi. Controlla la connessione.</span><button class="btn" id="boot-retry" type="button">Riprova</button>`);
+  }
+}
+if(typeof document !== "undefined") boot();
