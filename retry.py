@@ -173,6 +173,9 @@ def trip_best():
         subprocess.run([sys.executable, "build_trips.py"], env=dict(os.environ, RAW=RAW, TRIPS_RAW=TRIPS_RAW, TRIPS_OUT=tmp),
                        stdout=subprocess.DEVNULL, check=True, timeout=600)
         return {t["id"]: t["best"] for t in json.load(open(tmp, encoding="utf-8"))["trips"]}
+    except Exception as e:      # senza elenco tutti i trip contano come "senza prezzo": cambia solo l'ordine
+        print("ATTENZIONE: build_trips.py non ha risposto (%s): trip trattati tutti come senza prezzo" % type(e).__name__, flush=True)
+        return {t["id"]: None for t in popular_trips.TRIPS}
     finally:
         os.remove(tmp)
 
