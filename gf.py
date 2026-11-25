@@ -79,15 +79,34 @@ def _rows(p, out=None, seen=None):
                     continue
                 segs = []
                 for s in f[2]:
-                    segs.append({"f": s[3], "t": s[6], "dd": _d(s[20]), "dt": _t(s[8]), "ad": _d(s[21]), "at": _t(s[10]), "m": s[11]})
+                    seg = {"f": s[3], "t": s[6], "dd": _d(s[20]), "dt": _t(s[8]), "ad": _d(s[21]), "at": _t(s[10]), "m": s[11]}
+                    try:        # compagnia e numero del volo: servono al sito e alla pagina dei ritorni (returns.py)
+                        c = s[22]
+                        if c[0] and c[1]:
+                            seg["c"], seg["n"] = str(c[0]), str(c[1])
+                            if c[3]:
+                                seg["a"] = str(c[3])
+                    except Exception:
+                        pass
+                    segs.append(seg)
                 if not segs:
                     continue
+                ly = {}
+                try:            # citta' degli aeroporti di scalo: [minuti, arrivo, ripartenza, _, nome, citta', nome, citta']
+                    for x in f[13] or []:
+                        if x[1] and x[5]: ly[str(x[1])] = str(x[5])
+                        if x[2] and x[7]: ly[str(x[2])] = str(x[7])
+                except Exception:
+                    pass
                 if seen is not None:
                     key = (price, f[9], tuple((x["f"], x["t"], x["dd"], x["dt"]) for x in segs))
                     if key in seen:
                         continue
                     seen.add(key)
-                out.append({"price": price, "al": list(f[1] or []), "dur": f[9], "segs": segs, "best": best})
+                row = {"price": price, "al": list(f[1] or []), "dur": f[9], "segs": segs, "best": best}
+                if ly:
+                    row["ly"] = ly
+                out.append(row)
             except Exception:
                 continue
     return out
@@ -161,9 +180,36 @@ def build(o, d, dep, ret=None):
         fl.append(FlightQuery(date=ret, from_airport=d, to_airport=o))
     return create_query(flights=fl, trip="round-trip" if ret else "one-way", passengers=Passengers(adults=1), currency="EUR", language="it")
 
+def _ld(tag, b):
+    """Campo protobuf a lunghezza delimitata (lunghezza varint)."""
+    n, v = len(b), b""
+    while True:
+        v += bytes([(n & 0x7F) | (0x80 if n > 0x7F else 0)]); n >>= 7
+        if not n:
+            return bytes([tag]) + v + b
+
+
+class ReturnQuery:
+    """Pagina "scegli il ritorno" di un A/R: la stessa ricerca A/R con i voli dell'andata gia' scelti (tfs come lo
+    scrive il browser dopo il clic sull'andata). La pagina HTML porta i ritorni di QUEL biglietto, con il prezzo
+    totale A/R: stessa richiesta leggera delle altre pagine, nessuna chiamata a GetShoppingResults.
+    segs = segmenti dell'andata con "c" (compagnia) e "n" (numero del volo)."""
+    def __init__(self, o, d, dep, ret, ms, segs):
+        e = lambda s: str(s).encode()
+        sel = b"".join(_ld(0x22, _ld(0x0A, e(s["f"])) + _ld(0x12, e(s["dd"])) + _ld(0x1A, e(s["t"])) + _ld(0x2A, e(s["c"])) + _ld(0x32, e(s["n"]))) for s in segs)
+        leg = lambda day, a, b, extra=b"": _ld(0x1A, _ld(0x12, e(day)) + extra + (bytes([0x28, ms]) if ms is not None else b"") + _ld(0x6A, _ld(0x12, e(a))) + _ld(0x72, _ld(0x12, e(b))))
+        raw = leg(dep, o, d, sel) + leg(ret, d, o) + bytes([0x42, 1, 1, 0x48, 1, 0x98, 1, 1])
+        import base64
+        self.tfs = base64.urlsafe_b64encode(raw).decode()
+
+    def params(self):
+        return {"tfs": self.tfs, "hl": "it", "curr": "EUR"}
+
+
 def fetch(q, tries=3):
     """-> (status, flights). Solleva Blocked su 429/captcha persistente.
-    Pagina vuota -> ripiego su GetShoppingResults: 'empty' resta solo se anche li' non ci sono voli (o da' errore)."""
+    Pagina vuota -> ripiego su GetShoppingResults: 'empty' resta solo se anche li' non ci sono voli (o da' errore).
+    q = query di fast-flights oppure ReturnQuery (per quella nessun ripiego: resta la sola pagina)."""
     last = None
     for a in range(tries):
         try:
@@ -177,7 +223,8 @@ def fetch(q, tries=3):
                 time.sleep(2 + a * 3 + random.random())
                 client(reset=True)
                 continue
-            if st == "empty" and API_ON:
+            if st == "empty" and API_ON and hasattr(q, "flight_data"):
+
                 st2, fl2 = fetch_api(*spec(q))
                 if st2 == "ok":
                     return "ok", fl2
