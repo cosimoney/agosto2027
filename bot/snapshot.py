@@ -306,6 +306,13 @@ def adapt_trips_data(path, cfg):
                             "q": sum(c[0] for c in cov), "ok": sum(c[1] for c in cov)}
             if t.get("g"):
                 targets[tid]["clima"] = t["g"]
+            # costo del giro oltre ai voli (per /voti: totale pp = voli + interni + a terra): a terra [min, max], voli interni, notti
+            land = t.get("land") or []
+            if len(land) == 2 and all(isinstance(x, (int, float)) for x in land):
+                targets[tid]["land"] = [int(round(land[0])), int(round(land[1]))]
+                targets[tid]["itot"] = int(round(t.get("itot") or 0))
+            if isinstance(t.get("nights"), int):
+                targets[tid]["nights"] = t["nights"]
             if sl != str(t["id"]):
                 targets[tid]["page_id"] = str(t["id"])  # il link #/t/<id> usa l'id originale del trip
         except Exception:

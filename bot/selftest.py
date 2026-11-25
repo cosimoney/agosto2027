@@ -475,7 +475,7 @@ def main():
     # popular trips da un trips_data.json di prova (formato di build_trips.py), con cella da Roma
     (fxd / "trips_data.json").write_text(json.dumps({"legs": [[300, "Wizz Air", 240, 0, "06:10", "12:00", 0, "", "FCO", "TBS", D1], [260, "Pegasus", 400, 1, "09:00", "15:00", 0, "SAW", "EVN", "FCO", R1],
                                                               [450, "easyJet", 250, 0, "07:00", "13:00", 0, "", "MXP", "TBS", D1]],
-        "trips": [{"id": "georgia-armenia", "name": "Georgia + Armenia", "countries": ["Georgia", "Armenia"], "arr": "TBS", "cov": [[4, 2, 0]],
+        "trips": [{"id": "georgia-armenia", "name": "Georgia + Armenia", "countries": ["Georgia", "Armenia"], "arr": "TBS", "cov": [[4, 2, 0]], "land": [1100, 1600], "itot": 40, "nights": 10,
                    "air": [{"k": "ow", "a": "TBS", "b": "EVN"}, {"k": "rt", "a": "TBS", "b": "TBS"}],
                    "cells": [{"dep": D1, "n": 11, "o": "FCO", "a": [[0, 560, 0, 0, 1]], "b": None, "x": None}, {"dep": D1, "n": 11, "o": "MXP", "a": [[1, 450, 25, 2, -1]], "b": None, "x": None},
                              {"dep": D1, "n": 12, "o": "PSA", "a": [], "b": None, "x": 900}]}]}), encoding="utf-8")
@@ -483,6 +483,9 @@ def main():
     po = {o["origin"]: o for o in stp["offers"] if o["source"] == "popular"}
     check(set(po) == {"FCO", "MXP"} and po["FCO"]["id"] == "t_georgia-armenia:FCO:%s:%s" % (D1, R1) and po["FCO"]["price_pp"] == 560 and po["FCO"]["kind"] == "openjaw" and po["MXP"]["price_pp"] == 475,
           "popular trips: celle da origini diverse, id con l'origine, prezzo solo volo (+ tratte stimate del giro)", {k: (v["id"], v["price_pp"]) for k, v in po.items()})
+    tgp = stp["targets"]["t_georgia-armenia"]
+    check(tgp.get("land") == [1100, 1600] and tgp.get("itot") == 40 and tgp.get("nights") == 10 and S.lite(stp)["targets"]["t_georgia-armenia"].get("land") == [1100, 1600],
+          "popular trips: a terra, voli interni e notti nel target (servono a /voti per il costo totale pp), anche nello snapshot ridotto", tgp)
     pl = C.offer_line(po["FCO"], cfg, show_origin=True)
     check('<a href="https://example.org/dashboard/#/t/georgia-armenia"><b>Georgia + Armenia</b></a>' in pl and "da Roma FCO" in pl and "rientro da EVN" in pl and "andata</a>/<a" in pl,
           "popular trip: link #/t/georgia-armenia, origine e rientro open-jaw nella riga", pl[:200])

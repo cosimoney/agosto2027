@@ -2,7 +2,7 @@
 //
 //   POST /api/fav     {id, on}      aggiunge o toglie un preferito            (Bearer: token personale da /sito)
 //   GET  /api/favs                  elenco dei preferiti con chi e quando     (Bearer: token personale)
-//   POST /api/rate    {id, s}       voto 0-5 di chi chiama su una meta o un trip; s null lo toglie   (Bearer: token personale)
+//   POST /api/rate    {id, s}       voto 0-5 di chi chiama su un giro (il sito vota solo i trip "t_..."); s null lo toglie   (Bearer: token personale)
 //   GET  /api/rates                 voti di tutti i profili, con i nomi                          (Bearer: token personale)
 //   POST /api/pin     {alias, pin}  indirizzo corto + PIN di 4 cifre -> {token, name}: lo stesso token di /sito   (nessun Bearer)
 //   GET  /api/prefs                 preferenze complete per bot/alerts.py     (Bearer: PREFS_SECRET)
@@ -15,7 +15,7 @@
 // e ALIASES ("alias:id,alias:id": gli indirizzi corti del sito, mai scritti nel repo).
 // Nei log non finiscono mai chat_id, nomi, token o testi dei messaggi.
 import CONFIG from "../../bot/config.json" with { type: "json" };
-import { Bot, ID_RE, esc, loadConfig, normPrefs, resolveTarget, splitMessage, romeToday } from "./bot.js";
+import { Bot, ID_RE, esc, euro, loadConfig, normPrefs, resolveTarget, splitMessage, romeToday } from "./bot.js";
 
 const DEFAULTS = {
   ALLOWED_ORIGIN: "https://cosimoney.github.io",
@@ -405,24 +405,44 @@ async function apiRate(req, env) {
   return json(req, env, 200, Object.assign(ratesPayload(user, R), { changed }));
 }
 const stars = (n) => "★".repeat(n) + "☆".repeat(5 - n);
-/** /voti: quello che avete votato in ordine di media, dove manca un voto, link alla pagina del sito. */
+/** Costo di un giro dallo snapshot: voli pp migliori (al massimo 1 scalo, come sul sito) e totale pp = voli + interni + a terra. */
+export function tripCost(snap, id) {
+  const t = ((snap && snap.targets) || {})[id] || {};
+  let fl = null;
+  for (const o of (snap && snap.offers) || []) {
+    if (o.target !== id) continue;
+    const p = o.price_1stop != null ? o.price_1stop : o.price_pp;
+    if (typeof p === "number" && (fl == null || p < fl.p)) fl = { p, o };
+  }
+  const land = Array.isArray(t.land) && t.land.length === 2 ? t.land : null, itot = t.itot || 0;
+  const bits = [];
+  if (fl) bits.push(`voli ${euro(fl.p)} pp${fl.o.origin ? ` da ${esc(fl.o.origin)}` : ""}${fl.o.kind === "openjaw" ? " (stima, 2 solo andata)" : ""}`);
+  else bits.push("voli n.d.");
+  if (land && fl) bits.push(`totale ${euro(fl.p + itot + land[0])}–${euro(fl.p + itot + land[1])} pp`);
+  else if (land) bits.push(`a terra ${euro(land[0] + itot)}–${euro(land[1] + itot)} pp, senza voli`);
+  if (t.nights) bits.push(`${t.nights} notti`);
+  return { voli: fl ? fl.p : null, lo: land && fl ? fl.p + itot + land[0] : null, hi: land && fl ? fl.p + itot + land[1] : null, text: bits.join(" · ") };
+}
+/** /voti: solo i giri completi (trip), in ordine di media, con voli e costo totale pp; dove manca un voto; link alla pagina del sito.
+ *  I voti dati in passato alle mete singole (d_...) restano su KV ma qui, come sul sito, non si mostrano. */
 async function cmdVoti(env, chat, name, snap) {
   const R = await loadRates(env, { chat, name }), tg = (snap && snap.targets) || {};
-  const ids = [...new Set(R.people.flatMap((p) => Object.keys(R.by[p.k])))];
+  const ids = [...new Set(R.people.flatMap((p) => Object.keys(R.by[p.k])))].filter((id) => id.startsWith("t_"));
   const site = conf(env, "SITE_URL").split("#")[0] + "#/voti";
   const btn = [[["⭐ Apri i voti sul sito", "url:" + site]]];
-  if (!ids.length) return ["⭐ <b>I vostri voti</b>\nAncora nessun voto. Si vota dal sito, da 0 a 5 stelle, su ogni meta e ogni giro: aprilo con il link di /sito.", btn];
+  if (!ids.length) return ["⭐ <b>I vostri voti</b>\nAncora nessun voto sui giri. Si vota dal sito, da 0 a 5 stelle, solo sui giri completi (Popular trips), con voli e costo totale a persona: aprilo con il link di /sito.", btn];
   const rows = ids.map((id) => {
     const vs = R.people.map((p) => (id in R.by[p.k] ? R.by[p.k][id][0] : null)), got = vs.filter((v) => v != null);
-    return { id, vs, n: got.length, avg: got.reduce((a, b) => a + b, 0) / got.length, name: (tg[id] && tg[id].name) || id.slice(2) };
-  }).sort((a, b) => b.avg - a.avg || a.name.localeCompare(b.name, "it"));
+    return { id, vs, n: got.length, avg: got.reduce((a, b) => a + b, 0) / got.length, name: (tg[id] && tg[id].name) || id.slice(2), cost: tripCost(snap, id) };
+  }).sort((a, b) => b.avg - a.avg || (a.cost.lo == null ? 1e9 : a.cost.lo) - (b.cost.lo == null ? 1e9 : b.cost.lo) || a.name.localeCompare(b.name, "it"));
   const line = (r, i) => `${i + 1}. <b>${esc(r.name)}</b> · ` + R.people.map((p, j) => `${esc(p.name)} ${r.vs[j] == null ? "–" : stars(r.vs[j])}`).join(" · ") +
-    (r.n > 1 ? ` · media ${String(Math.round(r.avg * 10) / 10).replace(".", ",")}` : "");
+    (r.n > 1 ? ` · media ${String(Math.round(r.avg * 10) / 10).replace(".", ",")}` : "") + `\n   ${r.cost.text}`;
   const full = (r) => r.n > 1 && r.n === R.people.length;
   const both = rows.filter(full), part = rows.filter((r) => !full(r));
-  let text = "⭐ <b>I vostri voti</b>";
+  let text = "⭐ <b>I vostri voti</b> · solo giri completi";
   if (both.length) text += "\n\n<b>Votati da entrambi</b>\n" + both.slice(0, 15).map(line).join("\n") + (both.length > 15 ? `\n… e altri ${both.length - 15}` : "");
   if (part.length) text += "\n\n<b>Manca un voto</b>\n" + part.slice(0, 10).map(line).join("\n") + (part.length > 10 ? `\n… e altri ${part.length - 10}` : "");
+  text += "\n\n<i>Totale a persona = voli + voli interni + a terra (stima).</i>";
   return [text, btn];
 }
 
@@ -468,7 +488,7 @@ export async function handleUpdate(u, env, cfg) {
     res = cb ? bot.onCallback(cb.data) : bot.onText(msg.text);
     if (JSON.stringify(bot.prefs) !== before) await savePrefs(env, bot.prefs); // prima di rispondere: un invio fallito non perde la modifica
     // /voti vive solo nel Worker (i voti stanno su KV): la riga si aggiunge qui, cosi' bot.js resta allineato a commands.py
-    if (res && c && (c.cmd === "help" || (c.cmd === "start" && !c.arg))) res = [res[0] + "\n/voti - i voti che avete dato a mete e giri\n/pin - il tuo indirizzo corto del sito e il PIN di 4 cifre per entrarci", res[1]];
+    if (res && c && (c.cmd === "help" || (c.cmd === "start" && !c.arg))) res = [res[0] + "\n/voti - i voti che avete dato ai giri completi, con voli e costo totale\n/pin - il tuo indirizzo corto del sito e il PIN di 4 cifre per entrarci", res[1]];
   }
   if (!res) return "skip";
   await tg.send(chat, res[0], res[1]);

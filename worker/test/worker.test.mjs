@@ -1,13 +1,13 @@
 // Test del Worker senza rete: KV finto, fetch finto (Telegram e snapshot), update Telegram finti.  node --test test/
 import test from "node:test";
 import assert from "node:assert/strict";
-import worker, { signToken, verifyToken, chatHash, derivedPrefsKey, pinHash, aliasMap, _resetSnapshotCache, _resetPinMemory } from "../src/index.js";
+import worker, { signToken, verifyToken, chatHash, derivedPrefsKey, pinHash, aliasMap, tripCost, _resetSnapshotCache, _resetPinMemory } from "../src/index.js";
 
 const ME = 111111111, LAVI = 9222222222, STRANGER = 999999999;
 const ORIGIN = "https://cosimoney.github.io";
 const offer = (target, origin, dep, ret, price, extra = {}) => Object.assign({ id: `${target}:${origin}:${dep}:${ret}`, target, origin, dep, ret, nights: 11,
   price_pp: price, stops: 0, airlines: ["Test Air"], source: target[0] === "w" ? "weekend" : target[0] === "t" ? "popular" : "agosto2027",
-  code: target.slice(2), name: { d_TBS: "Tbilisi", d_EVN: "Erevan", "t_georgia-armenia": "Georgia e Armenia" }[target], country: "Georgia",
+  code: target.slice(2), name: { d_TBS: "Tbilisi", d_EVN: "Erevan", "t_georgia-armenia": "Georgia e Armenia", "t_peru": "Perù classico", "t_islanda": "Islanda" }[target], country: "Georgia",
   url: "https://www.google.com/travel/flights?q=x" }, extra);
 const SNAPSHOT = {
   generated: "2026-11-22T06:00:00Z", sources: {},
@@ -15,10 +15,15 @@ const SNAPSHOT = {
     d_TBS: { name: "Tbilisi", country: "Georgia", code: "TBS", source: "agosto2027", tab: "new", clima: "buono", n: 2, min: 190 },
     d_EVN: { name: "Erevan", country: "Armenia", code: "EVN", source: "agosto2027", tab: "new", clima: "buono", n: 1, min: 230 },
     d_AKL: { name: "Auckland", country: "Nuova Zelanda", code: "AKL", source: "agosto2027", tab: "new", clima: "accettabile", n: 0, min: null },
-    "t_georgia-armenia": { name: "Georgia e Armenia", country: "Georgia", code: "TBS", source: "popular", n: 1, min: 410 },
+    "t_georgia-armenia": { name: "Georgia e Armenia", country: "Georgia", code: "TBS", source: "popular", n: 1, min: 410, land: [1100, 1600], itot: 0, nights: 10 },
+    t_peru: { name: "Perù classico", country: "Perù", code: "LIM", source: "popular", n: 2, min: 1450, land: [1500, 2100], itot: 180, nights: 11 },
+    t_islanda: { name: "Islanda", country: "Islanda", code: "KEF", source: "popular", n: 0, min: null, land: [2000, 2600], itot: 0, nights: 9 },
+    "t_vecchio": { name: "Giro di uno snapshot vecchio", country: "X", code: "XXX", source: "popular", n: 1, min: 300 },
   },
   offers: [offer("d_TBS", "MXP", "2027-08-11", "2027-08-22", 190), offer("d_TBS", "FCO", "2027-08-10", "2027-08-21", 240),
-    offer("d_EVN", "FCO", "2027-08-10", "2027-08-20", 230), offer("t_georgia-armenia", "MXP", "2027-08-07", "2027-08-18", 410)],
+    offer("d_EVN", "FCO", "2027-08-10", "2027-08-20", 230), offer("t_georgia-armenia", "MXP", "2027-08-07", "2027-08-18", 410),
+    offer("t_peru", "FCO", "2027-08-06", "2027-08-17", 1500, { kind: "openjaw" }), offer("t_peru", "MXP", "2027-08-06", "2027-08-17", 1390, { kind: "openjaw", stops: 2, price_1stop: 1450 }),
+    offer("t_vecchio", "MXP", "2027-08-07", "2027-08-18", 300)],
 };
 
 function setup(extraEnv = {}) {
@@ -349,16 +354,27 @@ test("webhook: /voti e riga in /help", async () => {
   await s.text(ME, "/voti");
   assert.match(s.sent[0].text, /Ancora nessun voto/);
   assert.equal(s.sent[0].reply_markup.inline_keyboard[0][0].url, "https://cosimoney.github.io/agosto2027/#/voti");
-  for (const [t, id, v] of [[tok, "d_TBS", 5], [tokL, "d_TBS", 4], [tok, "d_EVN", 2], [tokL, "t_georgia-armenia", 0]]) {
+  assert.match(s.sent[0].text, /solo sui giri completi/);
+  // i voti rimasti sulle mete singole (d_...) non contano: finche' ci sono solo quelli, /voti resta vuoto
+  for (const [t, id, v] of [[tok, "d_TBS", 5], [tokL, "d_TBS", 4], [tok, "d_EVN", 2]]) await s.api("/api/rate", t, { method: "POST", body: JSON.stringify({ id, s: v }) });
+  await s.text(ME, "/voti");
+  assert.match(s.sent[1].text, /Ancora nessun voto sui giri/);
+  for (const [t, id, v] of [[tok, "t_georgia-armenia", 5], [tokL, "t_georgia-armenia", 4], [tok, "t_peru", 5], [tokL, "t_peru", 4], [tok, "t_islanda", 2], [tokL, "t_vecchio", 0]]) {
     await s.api("/api/rate", t, { method: "POST", body: JSON.stringify({ id, s: v }) });
   }
   await s.text(LAVI, "/voti");
-  const t = s.sent[1].text;
-  assert.equal(s.sent[1].chat_id, LAVI);
-  assert.match(t, /<b>Votati da entrambi<\/b>\n1\. <b>Tbilisi<\/b> · Cosimo ★★★★★ · Lavi ★★★★☆ · media 4,5/);
-  assert.match(t, /<b>Manca un voto<\/b>\n1\. <b>Erevan<\/b> · Cosimo ★★☆☆☆ · Lavi –\n2\. <b>Georgia e Armenia<\/b> · Cosimo – · Lavi ☆☆☆☆☆/);
+  const t = s.sent[2].text;
+  assert.equal(s.sent[2].chat_id, LAVI);
+  assert.doesNotMatch(t, /Tbilisi|Erevan/, "le mete singole non compaiono");
+  assert.match(t, /^⭐ <b>I vostri voti<\/b> · solo giri completi/);
+  // a parita' di media prima il giro che costa meno in totale; voli migliori con al massimo 1 scalo (price_1stop), open-jaw = stima
+  assert.match(t, /<b>Votati da entrambi<\/b>\n1\. <b>Georgia e Armenia<\/b> · Cosimo ★★★★★ · Lavi ★★★★☆ · media 4,5\n   voli 410 € pp da MXP · totale 1\.510 €–2\.010 € pp · 10 notti\n2\. <b>Perù classico<\/b> · Cosimo ★★★★★ · Lavi ★★★★☆ · media 4,5\n   voli 1\.450 € pp da MXP \(stima, 2 solo andata\) · totale 3\.130 €–3\.730 € pp · 11 notti/);
+  assert.match(t, /<b>Manca un voto<\/b>\n1\. <b>Islanda<\/b> · Cosimo ★★☆☆☆ · Lavi –\n   voli n\.d\. · a terra 2\.000 €–2\.600 € pp, senza voli · 9 notti\n2\. <b>Giro di uno snapshot vecchio<\/b> · Cosimo – · Lavi ☆☆☆☆☆\n   voli 300 € pp da MXP$/m);
+  assert.match(t, /Totale a persona = voli \+ voli interni \+ a terra/);
+  assert.deepEqual([tripCost(SNAPSHOT, "t_peru").voli, tripCost(SNAPSHOT, "t_peru").lo, tripCost(SNAPSHOT, "t_peru").hi], [1450, 1450 + 180 + 1500, 1450 + 180 + 2100]);
+  assert.equal(tripCost(SNAPSHOT, "t_non-esiste").text, "voli n.d.");
   await s.text(ME, "/help");
-  assert.match(s.sent[2].text, /\/voti - /);
+  assert.match(s.sent[3].text, /\/voti - i voti che avete dato ai giri completi/);
 });
 
 test("/pin nel bot: stato, imposta, rifiuta i PIN facili, off; nel KV solo l'hash", async () => {
