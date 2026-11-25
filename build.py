@@ -8,13 +8,20 @@ combos con "e": 1. Il prezzo e' la somma dei due solo andata, non un A/R: va sem
   opzione stimata = i 10 campi soliti riferiti all'andata, con [0] = somma e [3] = scali della tratta peggiore,
                     + [10] = ritorno (stessi 10 campi, [0] = prezzo del ritorno) + [11] = prezzo dell'andata
   cov[meta] = [query, query con voli, min prezzo con 2 scali, celle stimate]
-  bestBy: la voce di una stima ha un sesto campo 1"""
+  bestBy: la voce di una stima ha un sesto campo 1
+
+Tratte complete e ritorno (returns.py): ogni opzione ha tre campi in piu' dopo i 10 soliti
+  [10] = ritorno (i 10 campi soliti + [10] indice in itin.rows + [11] tipo) oppure 0 se non si conosce ancora
+         tipo 0 = solo andata della stima, 1 = ritorno dello stesso biglietto A/R, 2 = indicativo (il piu' economico del giorno)
+  [11] = prezzo dell'andata (solo stime, altrimenti 0)      [12] = indice in itin.rows dell'andata (-1 = nessuno)
+  itin = {rows, al, ap}: tratte di ogni volo, nomi delle compagnie e citta' degli scali (returns.Itin)"""
 import json, os, sys
 from datetime import date
 import dests
 import estimate
 import itineraries
 import origins
+import returns
 
 MIN_PCT, MIN_EUR = 0.25, 150
 raw = {}
@@ -29,6 +36,25 @@ def days(a, b):
 
 def sig(f):
     return (f["price"], tuple((s["f"], s["t"], s["dt"]) for s in f["segs"]))
+
+ITIN = returns.Itin()
+RET_ROWS = returns.load()
+PICKS = []      # opzioni A/R mostrate, con il volo dell'andata: returns.py ci cerca il ritorno
+_trips_ow = None
+def trips_ow():
+    global _trips_ow
+    if _trips_ow is None:
+        _trips_ow = {k: r for k, r in estimate.load(os.environ.get("TRIPS_RAW", "trips_raw_v2.jsonl")).items() if k.startswith("OW|")}
+    return _trips_ow
+
+def back_of(f, kind):
+    return compact(f) + [ITIN.add(f), kind]
+
+def opt(f, o, dc, dep, ret, ms):
+    """Opzione A/R: i 10 campi dell'andata + ritorno (se letto) + 0 + indice dell'itinerario."""
+    PICKS.append({"o": o, "d": dc, "dep": dep, "ret": ret, "ms": ms, "f": f, "tot": f["price"], "tgt": "d_" + dc})
+    r = returns.lookup(RET_ROWS, trips_ow(), o, dc, dep, ret, ms, f)
+    return compact(f) + [back_of(r[0], r[1]) if r else 0, 0, ITIN.add(f)]
 
 def compact(f):
     s = f["segs"]
@@ -66,7 +92,7 @@ for k, r in raw.items():
     for f in f1:
         key = (f["price"], f["segs"][0]["dt"], tuple(f["al"]))
         if key in seen: continue
-        seen.add(key); a.append(compact(f))
+        seen.add(key); a.append(opt(f, o, dc, dep, ret, 1))
         if len(a) == 4: break
     b = None; x = None
     if f2:
@@ -75,7 +101,7 @@ for k, r in raw.items():
         if a:
             p1 = a[0][0]
             if p1 - p2 >= MIN_EUR and (p1 - p2) / p1 >= MIN_PCT:
-                b = compact(f2[0])
+                b = opt(f2[0], o, dc, dep, ret, 2)
             else:
                 x = p2
         else:
@@ -89,7 +115,7 @@ def est_opt(pair):
     f = compact(out)
     f[0] = out["price"] + back["price"]
     f[3] = max(f[3], len(back["segs"]) - 1)
-    return f + [compact(back), out["price"]]
+    return f + [back_of(back, 0), out["price"], ITIN.add(out)]
 
 n_est = 0
 for e in estimate.combos(raw, estimate.load(os.environ.get("TRIPS_RAW", "trips_raw_v2.jsonl"))):
@@ -117,7 +143,8 @@ for c in combos:
 codes = {d["code"] for d in D}
 trips = {k: v for k, v in itineraries.TRIPS.items() if k in codes}
 assert len(trips) == len(itineraries.TRIPS), sorted(set(itineraries.TRIPS) - codes)
-blob = {"dests": D, "combos": combos, "cov": cov, "bestBy": best_by, "excluded": dests.EXCLUDED, "clima": dests.CLIMA_SCORE, "trips": trips,
+blob = {"dests": D, "combos": combos, "cov": cov, "bestBy": best_by, "excluded": dests.EXCLUDED, "clima": dests.CLIMA_SCORE, "trips": trips, "itin": ITIN.export(),
+
         "meta": {"q": q_tot, "ok": q_ok, "empty": q_empty, "date": "21 novembre 2026", "minPct": MIN_PCT, "minEur": MIN_EUR,
                  "est": n_est, "estDests": len({c["d"] for c in combos if c.get("e")}), "estNote": estimate.NOTE, **origins.export()}}
 js = json.dumps(blob, ensure_ascii=False, separators=(",", ":")).replace("</", "<" + chr(92) + "/")

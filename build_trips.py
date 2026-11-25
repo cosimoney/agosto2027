@@ -12,11 +12,17 @@ Formati compatti:
   legs[i]  = [prezzo, compagnie, durataMin, scali, partenza, arrivo, giorni+, scali via, da, a, data]
   opzione  = [indice in trip.air, prezzo voli Google pp, extra stimato pp, leg andata, leg ritorno | -1]
   cella    = {dep, n, o, a:[opzioni <=1 scalo, dalla piu' economica], b: opzione con 2 scali che rispetta la regola | null, x: min prezzo 2 scali altrimenti}
+
+Tratte complete e ritorno degli A/R (returns.py):
+  legs[i][11] = indice in itin.rows (tratte del volo: vedi returns.Itin); blob["itin"] = {rows, al, ap}
+  opzione A/R: [4] resta -1; se il ritorno e' stato letto seguono [5] = leg del ritorno e [6] = tipo
+               (1 = ritorno dello stesso biglietto A/R, 2 = indicativo: il piu' economico del giorno)
 """
 import json, os, sys
 from datetime import date, timedelta
 import popular_trips as P
 import origins
+import returns
 
 MIN_PCT, MIN_EUR = 0.25, 150
 ORIGINS = origins.ORIGINS
@@ -44,13 +50,23 @@ def sig(f):
     return (f["price"], tuple((s["f"], s["t"], s["dt"]) for s in f["segs"]))
 
 LEGS, LEG_IX = [], {}
+ITIN = returns.Itin()
+RET_ROWS = returns.load()
+OW_ROWS = {k: r for k, r in raw.items() if k.startswith("OW|")}
+PICKS = []      # opzioni A/R mostrate, con il volo dell'andata: returns.py ci cerca il ritorno
 def leg(f):
     s = f["segs"]
     t = (f["price"], " + ".join(f["al"]) or "n.d.", f["dur"], len(s) - 1, s[0]["dt"], s[-1]["at"], days(s[0]["dd"], s[-1]["ad"]),
-         "·".join(x["t"] for x in s[:-1]), s[0]["f"], s[-1]["t"], s[0]["dd"])
+         "·".join(x["t"] for x in s[:-1]), s[0]["f"], s[-1]["t"], s[0]["dd"], ITIN.add(f))
     if t not in LEG_IX:
         LEG_IX[t] = len(LEGS); LEGS.append(list(t))
     return LEG_IX[t]
+
+def rt_opt(tid, ai, f, x, o, hub, dep, ret, ms):
+    """Opzione A/R su un hub: andata + (se letto) il ritorno."""
+    PICKS.append({"o": o, "d": hub, "dep": dep, "ret": ret, "ms": ms, "f": f, "tot": f["price"] + x, "tgt": "t_" + tid})
+    r = returns.lookup(RET_ROWS, OW_ROWS, o, hub, dep, ret, ms, f)
+    return [ai, f["price"], x, leg(f), -1] + ([leg(r[0]), r[1]] if r else [])
 
 used = {"q": 0, "ok": 0, "reuse": 0}
 seen_keys = set()
@@ -120,9 +136,9 @@ for t in P.TRIPS:
                         f1, f2, ks = rt_pool(o, a["a"], dep, ret)
                         covk[ai].update(ks)
                         if f1:
-                            one.append([ai, f1[0]["price"], x, leg(f1[0]), -1]); cov[ai][2] += 1
+                            one.append(rt_opt(t["id"], ai, f1[0], x, o, a["a"], dep, ret, 1)); cov[ai][2] += 1
                         if f2:
-                            two.append([ai, f2[0]["price"], x, leg(f2[0]), -1])
+                            two.append(rt_opt(t["id"], ai, f2[0], x, o, a["a"], dep, ret, 2))
                 tot = lambda op: op[1] + op[2]
                 one.sort(key=tot); two.sort(key=tot)
                 if not one and not two:
@@ -171,7 +187,7 @@ for t in P.TRIPS:
 
 blob = {"meta": {"date": "21 novembre 2026", "multiCity": False, "q": len(mine), "ok": sum(r["st"] == "ok" for r in mine.values()),
                  "empty": sum(r["st"] != "ok" for r in mine.values()), "reused": used["reuse"], "minPct": MIN_PCT, "minEur": MIN_EUR, **origins.export()},
-        "trips": trips_out, "legs": LEGS, "city": P.CITY, "styles": P.STYLES, "skipped": P.SKIPPED,
+        "trips": trips_out, "legs": LEGS, "itin": ITIN.export(), "city": P.CITY, "styles": P.STYLES, "skipped": P.SKIPPED,
         "clima": {"ottimo": 1.0, "buono": 0.8, "accettabile": 0.5}}
 js = json.dumps(blob, ensure_ascii=False, separators=(",", ":"))
 open(os.environ.get("TRIPS_OUT", "trips_data.json"), "w", encoding="utf-8").write(js)
