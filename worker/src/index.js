@@ -283,7 +283,56 @@ async function webhook(req, env, cfg, ctx, pathSecret) {
   return new Response("ok"); // sempre 200: Telegram non deve riproporre l'update
 }
 
+// ---------------------------------------------------------------- avvio puntuale della scansione giornaliera
+// Il cron di GitHub parte con ore di ritardo: il Worker lancia scan.yml all'ora giusta (workflow_dispatch) e piu' tardi
+// controlla che il giro ci sia stato. Serve il secret GH_TOKEN: token fine-grained limitato al repo, permesso Actions R/W.
+const GH_REPO = "cosimoney/agosto2027";
+async function gh(env, path, init = {}) {
+  return fetch(`https://api.github.com/repos/${GH_REPO}${path}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${env.GH_TOKEN}`, Accept: "application/vnd.github+json",
+               "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "agosto2027-worker", ...(init.headers || {}) },
+  });
+}
+async function scanRunsToday(env) {
+  const day = new Date().toISOString().slice(0, 10);
+  const r = await gh(env, `/actions/workflows/scan.yml/runs?created=>=${day}T00:00:00Z&per_page=20`);
+  if (!r.ok) throw new Error("GitHub runs " + r.status);
+  return ((await r.json()).workflow_runs || []);
+}
+async function adminMsg(env, text) {
+  const chat = String(env.TELEGRAM_ADMIN_CHAT || env.TEST_CHAT_ID || "").trim() || String(env.TELEGRAM_CHAT_IDS || "").split(/[\s,;]+/)[0];
+  if (!chat || !env.TELEGRAM_BOT_TOKEN) return;
+  await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chat, text, disable_web_page_preview: true }),
+  });
+}
+export async function onCron(cron, env) {
+  if (!env.GH_TOKEN) { console.log("cron: GH_TOKEN mancante"); return "no_token"; }
+  const runs = await scanRunsToday(env);
+  const live = runs.filter((x) => x.status !== "completed");
+  const good = runs.filter((x) => x.conclusion === "success");
+  if (cron === "23 5 * * *") {                       // avvio
+    if (live.length || good.length) return "gia' partita";
+    const r = await gh(env, "/actions/workflows/scan.yml/dispatches", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ref: "main", inputs: { send_alerts: "true" } }) });
+    if (r.status !== 204) { await adminMsg(env, "Cron Worker: avvio della scansione fallito (GitHub " + r.status + ")."); return "dispatch " + r.status; }
+    return "avviata";
+  }
+  // controllo di meta' giornata: se non c'e' un giro riuscito ne' in corso, si rilancia una volta e si avvisa
+  if (good.length || live.length) return "ok";
+  const r = await gh(env, "/actions/workflows/scan.yml/dispatches", { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ref: "main", inputs: { send_alerts: "true" } }) });
+  await adminMsg(env, "Cron Worker: oggi nessuna scansione riuscita (" + runs.length + " tentativi). Rilanciata: GitHub " + r.status + ".");
+  return "rilanciata " + r.status;
+}
+
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(onCron(event.cron, env).then((r) => console.log("cron " + event.cron + ": " + r),
+      (e) => console.log("cron errore: " + String(e && e.message).slice(0, 120))));
+  },
   async fetch(req, env, ctx) {
     const url = new URL(req.url), path = url.pathname.replace(/\/+$/, "") || "/";
     const cfg = loadConfig(CONFIG, { SITE_URL: conf(env, "SITE_URL") });

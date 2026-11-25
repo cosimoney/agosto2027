@@ -5,6 +5,10 @@ compatibility_date = "2026-10-01"
 workers_dev = true
 preview_urls = false
 
+# 05:23 UTC avvia la scansione giornaliera; 11:07 UTC controlla che ci sia stata (vedi onCron in src/index.js)
+[triggers]
+crons = ["23 5 * * *", "7 11 * * *"]
+
 [observability]
 enabled = true
 
