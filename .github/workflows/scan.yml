@@ -39,7 +39,7 @@ jobs:
     timeout-minutes: 350
     environment:
       name: github-pages
-      url: ${{ steps.pages.outputs.page_url }}
+      url: ${{ steps.pages1.outputs.page_url || steps.pages2.outputs.page_url || steps.pages.outputs.page_url }}
     env:
       DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
       ALERTS: ${{ github.event_name != 'workflow_dispatch' || inputs.send_alerts }}
@@ -73,15 +73,34 @@ jobs:
         if: env.DRY != 'true'
         run: bash .github/push_data.sh "Dati del giro $(date -u +%F)"
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         if: env.DRY != 'true'
         with:
           path: _site
 
+      # deploy-pages a volte non trova subito l'artifact ("No artifacts named github-pages"): si riprova due volte con una
+      # pausa, e se fallisce lo stesso gli avvisi del bot partono comunque (i dati sono gia' sul branch data)
       - name: Pubblica su GitHub Pages
         if: env.DRY != 'true'
+        id: pages1
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+      - name: Pausa prima del secondo tentativo
+        if: env.DRY != 'true' && steps.pages1.outcome == 'failure'
+        run: sleep 60
+      - name: Pubblica su GitHub Pages (2)
+        if: env.DRY != 'true' && steps.pages1.outcome == 'failure'
+        id: pages2
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+      - name: Pausa prima del terzo tentativo
+        if: env.DRY != 'true' && steps.pages1.outcome == 'failure' && steps.pages2.outcome == 'failure'
+        run: sleep 120
+      - name: Pubblica su GitHub Pages (3)
+        if: env.DRY != 'true' && steps.pages1.outcome == 'failure' && steps.pages2.outcome == 'failure'
         id: pages
-        uses: actions/deploy-pages@v4
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
 
       - name: Bot - avvisi Telegram
         if: env.DRY != 'true' && env.ALERTS == 'true'

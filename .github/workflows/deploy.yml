@@ -37,7 +37,7 @@ jobs:
     timeout-minutes: 15
     environment:
       name: github-pages
-      url: ${{ steps.pages.outputs.page_url }}
+      url: ${{ steps.pages1.outputs.page_url || steps.pages2.outputs.page_url || steps.pages.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -51,10 +51,27 @@ jobs:
       - name: Build del sito
         run: python pipeline.py build
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
+      # deploy-pages a volte non trova subito l'artifact ("No artifacts named github-pages"): si riprova due volte con una pausa
       - name: Pubblica su GitHub Pages
+        id: pages1
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+      - name: Pausa prima del secondo tentativo
+        if: steps.pages1.outcome == 'failure'
+        run: sleep 60
+      - name: Pubblica su GitHub Pages (2)
+        id: pages2
+        if: steps.pages1.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+      - name: Pausa prima del terzo tentativo
+        if: steps.pages1.outcome == 'failure' && steps.pages2.outcome == 'failure'
+        run: sleep 120
+      - name: Pubblica su GitHub Pages (3)
         id: pages
-        uses: actions/deploy-pages@v4
+        if: steps.pages1.outcome == 'failure' && steps.pages2.outcome == 'failure'
+        uses: actions/deploy-pages@v5
