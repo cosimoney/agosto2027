@@ -984,6 +984,82 @@ SRC.update({
     "scozia-ebridi": ["https://www.sivola.it/viaggi/scozia-skye-isola-di-lewis", "https://kel12.com/icnc_viaggi/scozia-remota-trekking-nelle-isole-ebridi-estrene/", "https://www.climatestotravel.com/climate/scotland", "https://www.calmac.co.uk/travel/latest-customer-updates/customer-update-winter-timetables-2026-and-2027/"],
 })
 
+# =====================================================================================================
+# AGGIUNTE DEL 25 NOVEMBRE 2026: quattro giri negli Stati Uniti tra parchi mai visti (Utah, Yosemite, Death Valley, Sequoia,
+# Alaska). Regole dei parchi lette sulle pagine NPS lo stesso giorno: sono quelle della stagione 2026, per il 2027 non c'e'
+# ancora nulla di annunciato (prenotazioni d'ingresso, lotterie, supplemento per non residenti). Costi a terra stimati su
+# hotel, auto, benzina, pasti e ingressi ai prezzi di agosto, non preventivi. SFO e PHX sono solo aeroporti dei giri.
+# =====================================================================================================
+_NR_PASS = "conviene il pass annuale per non residenti da 250 $, che copre tutta l'auto"
+TRIPS += [
+    T("usa-grand-circle", "USA: Grand Circle tra Utah e Arizona, da Zion al Grand Canyon", ["Stati Uniti"], "Nord America", "rt", "LAS", "LAS",
+      [("Las Vegas", 1, "arrivo e ritiro dell'auto"), ("Springdale (Zion)", 2, "Narrows dal basso, Canyon Overlook, Angels Landing con permesso"),
+       ("Bryce Canyon", 1, "alba a Sunrise Point, anello Queens Garden-Navajo tra gli hoodoo"), ("Torrey (Capitol Reef)", 1, "Scenic Byway 12, Hickman Bridge, frutteti di Fruita"),
+       ("Moab", 2, "Arches all'alba (Delicate Arch, Windows), Canyonlands da Island in the Sky"), ("Monument Valley", 1, "Valley Drive tra le butte, alba dal belvedere"),
+       ("Page", 1, "Horseshoe Bend, Antelope Canyon con guida navajo"), ("Grand Canyon South Rim (Tusayan)", 2, "Desert View Drive, tramonto a Hopi Point, primo tratto del South Kaibab")],
+      "Auto a noleggio ad anello da Las Vegas, circa 2.300 km in tappe da 2-4 ore; dal South Rim 4 ore e mezza fino a Las Vegas, oppure 3 ore e mezza fino a Phoenix nella versione open-jaw",
+      [], (2100, 2900), ["on the road", "natura", "trekking", "avventura"], "intenso",
+      ["Zion e gli hoodoo di Bryce", "Archi di Moab e Canyonlands", "Monument Valley, Antelope Canyon e Grand Canyon"],
+      "È il giro più classico del Sud-Ovest, ma agosto è il suo mese più duro: 35-40°C a Zion, Moab e Page (Bryce e il bordo del Grand Canyon, sopra i 2.000 m, stanno sui 26-29°C), quindi sentieri all'alba e auto nelle ore centrali. È anche il monsone: temporali pomeridiani e piene improvvise, i Narrows chiudono con l'allerta e i tour di Antelope Canyon saltano con poco preavviso (il 29/8/2026 una piena ha chiuso per giorni i sentieri interni del Grand Canyon). Regole 2026, da ricontrollare per il 2027: Arches senza ingresso a orario, Angels Landing solo con permesso a lotteria (stagionale ad aprile oppure il giorno prima), Zion Canyon solo in navetta. Grand Canyon: il North Rim (2.500 m, più fresco e molto meno affollato) ha riaperto il 15/5/2026 dopo l'incendio Dragon Bravo ma senza alloggi, e il loro ritorno nel 2027 non è confermato: qui si dorme al South Rim, che ha tutti i servizi. Non residenti: 100 $ a testa in più a Zion, Bryce e Grand Canyon, " + _NR_PASS + ". Costo a terra stimato; un fly-drive inglese di 10 giorni sullo stesso anello parte da 1.899 sterline a testa, voli compresi.",
+      "accettabile", "18-38°C (8-28 a Bryce e al Grand Canyon)",
+      [("rt", "LAS", [], ""), ("oj", "LAS", "PHX"),
+       ("rt", "SLC", [], "anello da Salt Lake City: si entra da Moab (3 ore e mezza) e si chiude da Zion (4 ore e mezza), senza passare da Las Vegas")],
+      visited=True, seen="Arizona, Nevada e California già visti come stati; mai i parchi dello Utah", flag="35-40°C e piene improvvise del monsone"),
+    T("usa-california-utah", "USA: da San Francisco a Las Vegas tra Yosemite, Death Valley, Zion e Bryce", ["Stati Uniti"], "Nord America", "oj", "SFO", "LAS",
+      [("San Francisco", 1, "arrivo e ritiro dell'auto"), ("Yosemite Valley", 3, "Tunnel View, Mist Trail fino a Vernal e Nevada Fall, Glacier Point, sequoie di Mariposa Grove"),
+       ("Lee Vining (Mono Lake)", 1, "Tioga Road, Tuolumne Meadows, Tenaya Lake, tufi di Mono Lake al tramonto"), ("Lone Pine", 1, "Highway 395 sotto la Sierra, Alabama Hills e Mount Whitney"),
+       ("Las Vegas", 1, "Death Valley all'alba: Zabriskie Point e Badwater entro le 10, poi fuori dalla valle"),
+       ("Springdale (Zion)", 2, "Narrows dal basso, Canyon Overlook, Angels Landing con permesso"), ("Bryce Canyon", 2, "alba a Sunrise Point, anello Queens Garden-Navajo, Scenic Byway 12")],
+      "Auto a noleggio da San Francisco con rilascio a Las Vegas (supplemento one-way da verificare al preventivo), circa 2.100 km; da Bryce 4 ore fino a Las Vegas o a Salt Lake City per il volo di rientro",
+      [], (2400, 3200), ["on the road", "natura", "trekking", "montagna"], "intenso",
+      ["Yosemite Valley e Tioga Road", "Mono Lake e la Highway 395", "Zion e Bryce Canyon"],
+      "Variante con più parchi nuovi: Sierra in piena stagione, deserto da attraversare in fretta. Yosemite: nel 2026 nessuna prenotazione d'ingresso (regole 2027 non annunciate), Valley a 32°C e affollata, cascate ridotte a fine estate. Tioga Road aperta di norma da fine maggio o giugno a novembre (nel 2026 dal 15 maggio): ad agosto si passa, salvo incendi. Death Valley è il punto critico: massime medie sui 46°C, picchi oltre 49, notti intorno ai 30. Il parco chiede di non camminare a bassa quota dopo le 10, di restare sull'asfalto e a pochi minuti dall'auto con l'aria condizionata: si parte da Lone Pine prima dell'alba, due soste brevi e si esce verso Las Vegas; chi non se la sente la salta passando da Tonopah. A Zion 36-38°C e monsone, con i Narrows chiusi quando c'è allerta piene; Angels Landing solo con permesso a lotteria. Non residenti: 100 $ a testa in più a Yosemite, Zion e Bryce, " + _NR_PASS + ". Costo a terra stimato, senza un pacchetto venduto dietro; alloggi dentro Yosemite da prenotare un anno prima.",
+      "accettabile", "13-32°C a Yosemite, 20-38 a Zion, oltre 45 in Death Valley",
+      [("oj", "SFO", "LAS"), ("oj", "SFO", "SLC"),
+       ("rt", "LAS", [("Las Vegas-San Francisco", 80)], "A/R su Las Vegas più volo interno per San Francisco all'inizio (1 ora e mezza, tariffa non verificata)")],
+      visited=True, seen="California, Nevada e Arizona già visti come stati; mai Yosemite, Death Valley e i parchi dello Utah", flag="Death Valley oltre 45°C: solo all'alba"),
+    T("usa-sierra-nevada", "USA: Sierra Nevada tra Sequoia, Kings Canyon, Yosemite e Lake Tahoe", ["Stati Uniti"], "Nord America", "rt", "SFO", "SFO",
+      [("San Francisco", 1, "arrivo e ritiro dell'auto"), ("Sequoia (Giant Forest)", 2, "General Sherman, Moro Rock, Crescent Meadow, Tokopah Falls"),
+       ("Kings Canyon (Grant Grove)", 1, "General Grant, Scenic Byway fino a Cedar Grove e Zumwalt Meadow"),
+       ("Yosemite Valley", 3, "Tunnel View, Mist Trail, Glacier Point, Mariposa Grove"), ("Lee Vining (Mono Lake)", 1, "Tioga Road, Tuolumne Meadows, tufi di Mono Lake"),
+       ("South Lake Tahoe", 2, "Emerald Bay, Rubicon Trail, kayak sul lago"), ("San Francisco", 1, "rientro via Sacramento, ultima sera")],
+      "Auto a noleggio ad anello da San Francisco, circa 1.700 km; 3 ore e mezza tra Kings Canyon e Yosemite, 2 ore e mezza tra Mono Lake e Lake Tahoe lungo la Highway 395",
+      [], (2300, 3100), ["on the road", "natura", "trekking", "montagna"], "medio-intenso",
+      ["Sequoie giganti di Giant Forest", "Yosemite Valley e Tuolumne Meadows", "Emerald Bay sul Lake Tahoe"],
+      "Terza variante, scelta perché ad agosto sta quasi tutta tra 1.900 e 3.000 m: 24-27°C tra le sequoie e a Tahoe, 21°C a Tuolumne, fuori dal monsone del deserto. Scartato il giro dei cinque parchi dello Utah con Great Basin: stesse rocce rosse del Grand Circle e stessi 35-40°C. Restano calde le quote basse (Central Valley e Three Rivers oltre 35°C, Yosemite Valley a 32°C) e c'è il rischio vero dell'estate californiana: incendi e fumo, che possono chiudere strade e togliere la vista per giorni. Nel 2026 Yosemite non chiedeva la prenotazione d'ingresso e per Sequoia e Kings Canyon non ne risulta nessuna; regole 2027 non annunciate. Tioga Road aperta ad agosto (nel 2026 dal 15 maggio). A Sequoia nel 2026 alcune strade secondarie e più campeggi erano chiusi per lavori o frane: da ricontrollare. Non residenti: 100 $ a testa in più a Yosemite e a Sequoia e Kings Canyon, " + _NR_PASS + ". Costo a terra stimato: i tour accompagnati di 8-9 giorni sugli stessi parchi partono da 3.800-4.400 $ a testa; alloggi nei parchi da prenotare un anno prima.",
+      "buono", "6-27°C in quota (32 a Yosemite Valley)",
+      [("rt", "SFO", [], "")],
+      visited=True, seen="California già vista come stato; mai Yosemite, Sequoia e Kings Canyon", flag="incendi e fumo possibili"),
+    T("alaska-kenai-denali", "Alaska: Kenai Fjords, Denali e Talkeetna da Anchorage", ["Stati Uniti"], "Nord America", "rt", "ANC", "ANC",
+      [("Anchorage", 1, "arrivo e ritiro dell'auto"), ("Seward", 3, "crociera di 6-7 ore nei Kenai Fjords tra ghiacciai, orche e megattere, Exit Glacier e Harding Icefield"),
+       ("Girdwood", 1, "Seward Highway lungo il Turnagain Arm, ghiacciaio di Portage, funivia dell'Alyeska"),
+       ("Denali", 3, "bus sulla Park Road tra grizzly, caribù e alci, sentieri di Savage River e Horseshoe Lake"),
+       ("Talkeetna", 2, "volo panoramico sul Denali con atterraggio sul ghiacciaio, fiume Susitna"), ("Anchorage", 1, "rientro, sentiero costiero")],
+      "Auto a noleggio ad anello da Anchorage, circa 1.400 km su strade asfaltate (Girdwood-Denali è la tappa lunga, quasi 5 ore); dentro Denali oltre il miglio 15 si va solo con i bus del parco",
+      [], (3000, 4200), ["natura", "on the road", "trekking", "avventura"], "medio-intenso",
+      ["Ghiacciai e balene dei Kenai Fjords", "Denali in bus lungo la Park Road", "Volo sul Denali da Talkeetna"],
+      "Fine dell'estate in Alaska: 7-18°C, giornate ancora lunghe, tundra che vira al rosso a fine mese. Piove spesso: a Seward 17-20 giorni di pioggia nel mese, a Denali giugno-agosto sono i mesi più piovosi e la cima resta spesso tra le nuvole; da metà agosto il tempo peggiora, meglio le prime date della finestra. Denali Park Road: il ponte sulla frana di Pretty Rocks (miglio 45) è stato inaugurato il 2/9/2026 e nel 2027 i bus tornano a percorrere tutta la strada, per fasi (Kantishna dall'8 giugno secondo il parco; il centro visitatori di Eielson resta chiuso). Prenotazioni di bus e campeggi 2027 dal 1° dicembre 2026, tariffe non ancora pubblicate. Aurora: a metà agosto le notti sono ancora troppo chiare, qualche possibilità solo negli ultimi giorni del mese e con cielo sereno. Estensione: 2 notti a Homer (circa 4 ore da Seward) per la baia di Kachemak e il volo in giornata tra gli orsi di Katmai o Lake Clark, da circa 1.300 $ a testa, non compreso. Costo a terra stimato: crociera da 239-269 $, auto e lodge ai prezzi di punta (un self-drive di 10 giorni venduto in loco parte da 4.786 $ a testa); il volo panoramico da Talkeetna è un extra a tariffa non verificata. In Alaska nessun supplemento per non residenti.",
+      "buono", "7-18°C",
+      [("rt", "ANC", [], "")],
+      visited=True, seen="Molti stati USA, mai l'Alaska", flag="piogge frequenti, peggiora da metà agosto"),
+]
+CITY.update({"LAS": "Las Vegas", "PHX": "Phoenix", "SFO": "San Francisco", "ANC": "Anchorage"})
+SKIPPED.append("Utah dei cinque parchi con Great Basin: stesse rocce rosse e stessi 35-40°C del Grand Circle, che lo copre già")
+SRC.update({
+    "usa-grand-circle": ["https://www.nps.gov/arch/learn/news/news02182026.htm", "https://www.nps.gov/zion/learn/news/2026-02-11-angels-landing.htm", "https://www.nps.gov/zion/learn/news/2026-07-29-monsoon-season.htm",
+                         "https://www.nps.gov/grca/learn/news/north-rim-reopening-2026.htm", "https://www.nps.gov/grca/learn/news/grand-canyon-national-park-expands-inner-canyon-closures-following-august-29-flash-flood.htm",
+                         "https://www.nps.gov/aboutus/nonresident-fees.htm", "https://www.kenwoodtravel.co.uk/usa-holidays/west/fly-drives/canyon-adventure"],
+    "usa-california-utah": ["https://www.nps.gov/yose/planyourvisit/reservations.htm", "https://www.nps.gov/yose/planyourvisit/tioga.htm", "https://www.nps.gov/deva/planyourvisit/safety.htm",
+                            "https://www.nps.gov/zion/learn/news/2026-02-11-angels-landing.htm", "https://www.nps.gov/aboutus/nonresident-fees.htm",
+                            "https://www.gadventures.com/trips/zion-to-san-francisco-adventure/NUZS/itinerary/"],
+    "usa-sierra-nevada": ["https://www.nps.gov/yose/planyourvisit/reservations.htm", "https://www.nps.gov/yose/learn/news/yosemite-national-park-announces-summer-reopenings-full-campground-access-and-early-tioga-road-opening.htm",
+                          "https://www.nps.gov/seki/planyourvisit/road-conditions.htm", "https://www.nps.gov/aboutus/nonresident-fees.htm",
+                          "https://www.intrepidtravel.com/uk/united-states/best-californias-national-parks-174149"],
+    "alaska-kenai-denali": ["https://www.nps.gov/dena/learn/news/pretty-rocks-bridge-complete-090226.htm", "https://www.afar.com/magazine/denali-national-parks-only-road-to-fully-reopen", "https://www.nps.gov/dena/planyourvisit/weather.htm",
+                            "https://www.nps.gov/dena/learn/nature/aurora.htm", "https://majormarine.com/all-cruises/", "https://www.alaskatravel.com/tours/571/",
+                            "https://www.alaska.org/trip-ideas/10-day/alaska-highlights-of-southcentral-interior-by-car"],
+})
+
 for _t in TRIPS:
     _t.update(PATCH.get(_t["id"], {}))
     _t["src"] = list(SRC.get(_t["id"], _t["src"]))

@@ -389,6 +389,10 @@
 -31.94,
 115.97
 ],
+"PHX": [
+33.43,
+-112.01
+],
 "PLZ": [
 -33.99,
 25.62
@@ -416,6 +420,10 @@
 "SEZ": [
 -4.67,
 55.52
+],
+"SFO": [
+37.62,
+-122.38
 ],
 "SID": [
 16.74,
@@ -1606,6 +1614,15 @@
 "src": "nominatim",
 "type": "city"
 },
+"Bryce Canyon|Stati Uniti": {
+"km": 318,
+"lat": 37.6184,
+"lon": -112.1422,
+"name": "Bryce Canyon, Tropic, Garfield County, Utah, Stati Uniti d'America",
+"q": "Bryce Canyon",
+"src": "nominatim",
+"type": "valley"
+},
 "Buena Vista|Stati Uniti": {
 "flag": [
 "ambiguous"
@@ -2484,13 +2501,14 @@
 "type": "nature_reserve"
 },
 "Denali|Stati Uniti": {
-"km": 217,
-"lat": 63.0691,
-"lon": -151.0062,
-"name": "Denali, Denali Borough, Alaska, Stati Uniti d'America",
-"q": "Denali",
-"src": "nominatim",
-"type": "peak"
+"lat": 63.7325,
+"lon": -148.9144,
+"name": "ingresso del Denali National Park (la vetta sta 130 km a sud-ovest)",
+"src": "manual",
+"was": [
+63.0691,
+-151.0062
+]
 },
 "Denver e Boulder|Stati Uniti": {
 "flag": [
@@ -3321,6 +3339,19 @@
 "seen": "2026-11-25",
 "src": "nominatim",
 "type": "town"
+},
+"Grand Canyon South Rim (Tusayan)|Stati Uniti": {
+"flag": [
+"variant"
+],
+"km": 272,
+"lat": 35.9736,
+"lon": -112.1266,
+"name": "Tusayan, Coconino County, Arizona, Stati Uniti d'America",
+"q": "Tusayan",
+"seen": "2026-11-25",
+"src": "nominatim",
+"type": "village"
 },
 "Grand Teton (Colter Bay)|Stati Uniti": {
 "flag": [
@@ -4660,6 +4691,15 @@
 "q": "Kinabatangan",
 "src": "nominatim",
 "type": "river"
+},
+"Kings Canyon (Grant Grove)|Stati Uniti": {
+"km": 318,
+"lat": 36.7405,
+"lon": -118.9632,
+"name": "Grant Grove accommodation reception, Kings Canyon Scenic Byway, Grant Grove Village, Tulare County, California, 93628, Stati Uniti d'America",
+"q": "Kings Canyon (Grant Grove)",
+"src": "nominatim",
+"type": "tourism"
 },
 "Kings Canyon|Australia": {
 "flag": [
@@ -6279,6 +6319,19 @@
 "src": "nominatim",
 "type": "town"
 },
+"Moab|Stati Uniti": {
+"flag": [
+"ambiguous"
+],
+"km": 568,
+"lat": 38.5738,
+"lon": -109.5462,
+"name": "Moab, Grand County, Utah, 84532, Stati Uniti d'America",
+"q": "Moab",
+"seen": "2026-11-25",
+"src": "nominatim",
+"type": "city"
+},
 "Mombasa|Kenya": {
 "km": 9,
 "lat": -4.0505,
@@ -6336,6 +6389,15 @@
 "q": "Montréal",
 "src": "nominatim",
 "type": "city"
+},
+"Monument Valley|Stati Uniti": {
+"km": 461,
+"lat": 36.9824,
+"lon": -110.1111,
+"name": "Monument Valley Navajo Tribal Park, Navajo County, Arizona, Stati Uniti d'America",
+"q": "Monument Valley",
+"src": "nominatim",
+"type": "locality"
 },
 "Moorea|Polinesia Francese": {
 "km": 24,
@@ -7162,6 +7224,19 @@
 "q": "Padum",
 "src": "nominatim",
 "type": "town"
+},
+"Page|Stati Uniti": {
+"flag": [
+"ambiguous"
+],
+"km": 343,
+"lat": 36.9148,
+"lon": -111.4573,
+"name": "Page, Coconino County, Arizona, Stati Uniti d'America",
+"q": "Page",
+"seen": "2026-11-25",
+"src": "nominatim",
+"type": "city"
 },
 "Pagosa Springs|Stati Uniti": {
 "km": 353,
@@ -8326,6 +8401,15 @@
 "src": "nominatim",
 "type": "hamlet"
 },
+"San Francisco|Stati Uniti": {
+"km": 19,
+"lat": 37.7879,
+"lon": -122.4075,
+"name": "San Francisco, California, Stati Uniti d'America",
+"q": "San Francisco",
+"src": "nominatim",
+"type": "city"
+},
 "San Gerardo de Dota|Costa Rica": {
 "km": 65,
 "lat": 9.5573,
@@ -8633,6 +8717,19 @@
 "q": "Sepilok",
 "src": "nominatim",
 "type": "river"
+},
+"Sequoia (Giant Forest)|Stati Uniti": {
+"flag": [
+"variant"
+],
+"km": 342,
+"lat": 36.567,
+"lon": -118.7622,
+"name": "Giant Forest, Tulare County, California, Stati Uniti d'America",
+"q": "Giant Forest",
+"seen": "2026-11-25",
+"src": "nominatim",
+"type": "wood"
 },
 "Serengeti centrale|Tanzania": {
 "lat": -2.45,
@@ -9033,6 +9130,19 @@
 "seen": "2026-11-25",
 "src": "nominatim",
 "type": "town"
+},
+"Springdale (Zion)|Stati Uniti": {
+"flag": [
+"poi"
+],
+"km": 225,
+"lat": 37.1644,
+"lon": -113.0152,
+"name": "Zion Park Boulevard, Springdale, Washington County, Utah, 84767, Stati Uniti d'America",
+"q": "Springdale (Zion)",
+"seen": "2026-11-25",
+"src": "nominatim",
+"type": "primary"
 },
 "St Lucia|Sudafrica": {
 "km": 186,
@@ -9661,6 +9771,15 @@
 "q": "Tongren (Rebkong)",
 "src": "nominatim",
 "type": "town"
+},
+"Torrey (Capitol Reef)|Stati Uniti": {
+"km": 412,
+"lat": 38.2999,
+"lon": -111.4291,
+"name": "Casitas At Capitol Reef, West Main Street, Torrey, Wayne County, Utah, 84773, Stati Uniti d'America",
+"q": "Torrey (Capitol Reef)",
+"src": "nominatim",
+"type": "tourism"
 },
 "Tortuguero|Costa Rica": {
 "km": 99,

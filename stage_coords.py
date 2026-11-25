@@ -58,7 +58,7 @@ COUNTRY = {
 }
 # aeroporti dei giri che non sono tra le mete di dests.COORDS (lat, lon; fonte OurAirports)
 EXTRA_AIRPORTS = {"CPH": (55.62, 12.65), "GRU": (-23.43, -46.47), "GYE": (-2.16, -79.88), "KUT": (42.18, 42.48), "MDC": (1.55, 124.93),
-                  "MYY": (4.32, 113.99), "OSS": (40.61, 72.79), "YDF": (49.21, -57.39), "YVR": (49.19, -123.18)}
+                  "MYY": (4.32, 113.99), "OSS": (40.61, 72.79), "PHX": (33.43, -112.01), "SFO": (37.62, -122.38), "YDF": (49.21, -57.39), "YVR": (49.19, -123.18)}
 
 def km(a, b):
     la1, lo1, la2, lo2 = map(math.radians, (a[0], a[1], b[0], b[1]))
