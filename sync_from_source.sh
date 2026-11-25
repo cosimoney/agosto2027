@@ -26,7 +26,7 @@ for f in "$SRC"/*; do
   n="$(basename "$f")"
   case "$n" in
     probe*.py|*.bak|*.log|*.tmp|*.md|raw.jsonl|trips_raw.jsonl) continue ;;      # scarti e scansione v1
-    agosto-2027*.html|popular-preview.html|index.html|origins.json) continue ;;    # output generati
+    agosto-2027*.html|popular-preview.html|index.html|origins.json|data.json) continue ;;    # output generati
     pipeline.py|sync_from_source.sh|requirements.txt|.gitignore|.gitattributes) continue ;;  # file del repo
   esac
   cp -p "$f" "$DST/$n"
