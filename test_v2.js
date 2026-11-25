@@ -558,7 +558,7 @@ const ratesBody = extra => ({ok:true, me:"Anna", people:[{k:KA, name:"Anna", me:
   ok(priced.length > 10 && priced.every(p => p.bin === (p.pp <= 600 ? 0 : p.pp <= 900 ? 1 : p.pp <= 1200 ? 2 : p.pp <= 1600 ? 3 : 4)) && pts.filter(p => p.pp == null).every(p => p.bin === -1), "mappa: fasce di prezzo 600 / 900 / 1.200 / 1.600");
   const one = priced[0];
   ok(new RegExp(`<a class="mp m${one.bin}" href="#/d/${one.d.code}" aria-label="[^"]*: [\\d.]+ € a persona da [^"]+"><title>`).test(mk), "mappa: ogni punto è un link alla meta, con nome e prezzo");
-  ok(/class="mleg"/.test(mk) && /fino a 600 €/.test(mk) && /oltre 1\.600 €/.test(mk) && /voli non ancora in vendita/.test(mk) && /Più intenso = più economico/.test(mk) && mk.split('<i class="mk m').length - 1 >= 5, "mappa: legenda con le fasce");
+  ok(/class="mleg"/.test(mk) && /fino a 600 €/.test(mk) && /oltre 1\.600 €/.test(mk) && /voli non ancora in vendita/.test(mk) && /Verde = economico, rosso = caro/.test(mk) && mk.split('<i class="mk m').length - 1 >= 5, "mappa: legenda con le fasce");
   ok(/<details class="mlist"/.test(mk) && mk.slice(mk.indexOf("<details class=\"mlist\"")).split("<li><i class=\"mk ").length - 1 === good.length, "mappa: elenco testuale di tutte le mete in vista");
   ok(!/NaN|undefined|Infinity/.test((mk.match(/(cx|cy|r|x|y|viewBox|font-size)="[^"]*"/g) || []).join("")), "mappa: coordinate valide");
   audit("mappa", mk);

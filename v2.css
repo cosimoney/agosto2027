@@ -667,9 +667,9 @@ body:has(.cmpbar:not([hidden])) .foot{padding-bottom:76px}
 }
 
 /* ---------- mappa ---------- */
-:root{--m0:#06504d;--m1:#17807a;--m2:#4dab9f;--m3:#93cfc3;--m4:#d5eee7;--m-land:#dfe5dc;--m-sea:#f6f8f4;--m-ring:#13221e}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--m0:#8ff5e3;--m1:#4fc9b8;--m2:#2f968a;--m3:#226b63;--m4:#1b4843;--m-land:#22302c;--m-sea:#101b19;--m-ring:#e8efe9}}
-:root[data-theme="dark"]{--m0:#8ff5e3;--m1:#4fc9b8;--m2:#2f968a;--m3:#226b63;--m4:#1b4843;--m-land:#22302c;--m-sea:#101b19;--m-ring:#e8efe9}
+:root{--m0:#1a9850;--m1:#91cf60;--m2:#fdd835;--m3:#fb8c3c;--m4:#d7301f;--m-land:#dfe5dc;--m-sea:#f6f8f4;--m-ring:#13221e}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--m0:#3ccf7e;--m1:#a6d96a;--m2:#ffe066;--m3:#ff9a4d;--m4:#ff5a45;--m-land:#22302c;--m-sea:#101b19;--m-ring:#e8efe9}}
+:root[data-theme="dark"]{--m0:#3ccf7e;--m1:#a6d96a;--m2:#ffe066;--m3:#ff9a4d;--m4:#ff5a45;--m-land:#22302c;--m-sea:#101b19;--m-ring:#e8efe9}
 .m-ctl{display:grid;gap:10px;margin-top:24px}
 .mfig{margin-top:18px}
 .map{display:block;width:100%;height:auto;max-height:78vh;background:var(--m-sea);border:1px solid var(--line);border-radius:var(--r)}

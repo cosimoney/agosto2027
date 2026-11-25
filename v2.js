@@ -1124,7 +1124,7 @@ function votiHTML(){
 // Proiezione equirettangolare, la stessa di build_map.py. Il contorno delle terre (world.json, ~50 kB) si scarica solo qui.
 const WORLD = {state:"idle", d:"", w:1000, h:388.9, lat0:82, k:1000 / 360};
 const mapXY = (lat, lon) => [+((lon + 180) * WORLD.k).toFixed(1), +((WORLD.lat0 - lat) * WORLD.k).toFixed(1)];
-const MBINS = [600, 900, 1200, 1600];                       // soglie in euro pp: 5 fasce, piu' intenso = piu' economico
+const MBINS = [600, 900, 1200, 1600];                       // soglie in euro pp: 5 fasce, dal verde (economico) al rosso (caro)
 const mBin = p => { let i = 0; while(i < MBINS.length && p > MBINS[i]) i++; return i; };
 const mBinTxt = i => i === 0 ? `fino a ${eur(MBINS[0])}` : i === MBINS.length ? `oltre ${eur(MBINS[i - 1])}` : `${num(MBINS[i - 1] + 1)} – ${eur(MBINS[i])}`;
 // riquadri [lon0, lon1, lat0, lat1]
@@ -1172,7 +1172,7 @@ function mapBody(){
       <div class="chips" role="group" aria-label="Zona">${MZOOM.map(([v, l]) => `<button type="button" class="chip" data-act="mp" data-k="zoom" data-v="${esc(v)}" aria-pressed="${M.zoom === v}">${esc(l)}</button>`).join("")}</div>
     </div>
     <figure class="mfig"><div class="mscroll"><svg class="map z-${M.zoom === "world" ? "world" : "zone"}" viewBox="${x0} ${y0} ${vw} ${vh}" role="group" aria-label="Mappa: ${inView.length} mete, colore per prezzo a persona">${land}${home}${dots}</svg></div>
-      <figcaption>${legend}<p class="note">Prezzo A/R a persona più basso tra tutte le date, con al massimo 1 scalo per tratta (2 dove non c'è altro). <b>Più intenso = più economico.</b> Tocca un punto per aprire la meta${M.zoom === "world" ? "; sul telefono conviene scegliere una zona" : ""}.</p>${status}</figcaption></figure>
+      <figcaption>${legend}<p class="note">Prezzo A/R a persona più basso tra tutte le date, con al massimo 1 scalo per tratta (2 dove non c'è altro). <b>Verde = economico, rosso = caro.</b> Tocca un punto per aprire la meta${M.zoom === "world" ? "; sul telefono conviene scegliere una zona" : ""}.</p>${status}</figcaption></figure>
     ${list}`;
 }
 function mapHTML(){
