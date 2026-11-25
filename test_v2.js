@@ -6,7 +6,7 @@
    Indirizzo corto #/<alias>: schermata del PIN, errori, blocco per troppi tentativi, accesso, dispositivo già collegato, logout.
    Andamento del prezzo: grafico dello storico su mete e trip, Giorno / Settimana / Mese, serie per città, pochi dati, dato parziale.
    Dati fuori dalla pagina: data.json caricato all'avvio (stato di caricamento, errore e Riprova); nei test arriva da window.__DATA__.
-   Foto in piu' larghezze (srcset), badge prezzo basso/tipico/alto, voti di coppia, confronto affiancato, mappa. */
+   Foto in piu' larghezze (srcset), badge prezzo basso/tipico/alto, voti di coppia, confronto affiancato, mappa, mappa del giro. */
 const fs = require("fs"), path = require("path"), vm = require("vm");
 const ROOT = __dirname;
 const html = fs.readFileSync(path.join(ROOT, "agosto-2027-v2.html"), "utf8");
@@ -726,6 +726,79 @@ const ratesBody = extra => ({ok:true, me:"Anna", people:[{k:KA, name:"Anna", me:
   ok(/hdot[^"]* est"/.test(pg) && /Punto quadrato = stima/.test(pg), "stima: punto dello storico segnato");
   ok(!/undefined|NaN/.test(pg), "stima: niente undefined/NaN");
   ok(e.App.viewD(code, "all", 1).cheap.c.e === 1 && e.App.viewD(code, "all", 1).min === 987, "stima: entra nel minimo della meta con il suo segno");
+}
+
+// 18. mappa del giro: su ogni Popular trip e su ogni itinerario delle mete, tappe numerate, percorso, Google Maps; Leaflet solo quando serve
+{
+  const e = boot("", {api:false}), A = e.App, G = DATA0.raw.geo || {n:{}, x:{}, a:{}};
+  const SRC = fs.readFileSync(path.join(ROOT, "v2.js"), "utf8"), TPL = fs.readFileSync(path.join(ROOT, "template_v2.html"), "utf8");
+  const km = (a, b) => { const r = x => x * Math.PI / 180, h = Math.sin(r(b[0] - a[0]) / 2) ** 2 + Math.cos(r(a[0])) * Math.cos(r(b[0])) * Math.sin(r(b[1] - a[1]) / 2) ** 2; return 12742 * Math.asin(Math.min(1, Math.sqrt(h))); };
+  // libreria: versione fissa da cdnjs con integrity, tile OpenStreetMap con attribuzione, nessuna chiave Google, niente caricato nella pagina
+  ok(A.LEAF.base === "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/" && /^sha512-[A-Za-z0-9+/]{86}==$/.test(A.LEAF.js) && /^sha512-[A-Za-z0-9+/]{86}==$/.test(A.LEAF.css), "mappa del giro: Leaflet da cdnjs, versione fissa e integrity");
+  ok(A.TILES === "https://tile.openstreetmap.org/{z}/{x}/{y}.png" && /openstreetmap\.org\/copyright/.test(SRC) && /OpenStreetMap<\/a>/.test(SRC), "mappa del giro: tile OpenStreetMap con attribuzione");
+  ok(!/maps\.googleapis|maps\/api|[?&]key=/.test(SRC + TPL) && !/leaflet/i.test(TPL) && !/<script[^>]+src=|<link[^>]+leaflet/i.test(html), "mappa del giro: nessuna chiave Google e nessuna libreria caricata con la pagina (solo quando la mappa entra in vista)");
+  ok(/IntersectionObserver/.test(SRC) && /scrollWheelZoom:false/.test(SRC), "mappa del giro: caricamento pigro e rotella che non blocca lo scorrimento della pagina");
+  // dati: quasi tutte le tappe hanno coordinate, e nessuna e' finita in un altro continente
+  let all = 0, on = 0, far = [];
+  const trips = DATA0.raw.trips_popular.trips, dest = Object.fromEntries(DATA0.raw.dests.map(d => [d.code, d]));
+  for(const t of trips){
+    const r = A.routeOf("t", t.id), an = [r.arr, r.dep].filter(Boolean).map(a => a.ll);
+    ok(r.stages.length === t.stages.length && r.stages.every((s, i) => s.n === i + 1 && s.name === t.stages[i][0] && s.nights === t.stages[i][1]), "mappa del giro: tappe nell'ordine del giro → " + t.id);
+    ok(!!r.arr && !!r.dep && r.arr.code === t.arr && r.dep.code === (t.type === "oj" ? t.dep : t.arr), "mappa del giro: aeroporti di arrivo e rientro con coordinate → " + t.id);
+    for(const s of r.stages){ all++; if(s.ll){ on++; if(an.length && Math.min(...an.map(a => km(a, s.ll))) > 2600) far.push(t.id + ": " + s.name); } }
+  }
+  for(const [code, its] of Object.entries(DATA0.raw.trips)) its.forEach((it, ix) => {
+    const r = A.routeOf("d", code, ix);
+    if(!r) return;
+    for(const s of r.stages){ all++; if(s.ll){ on++; if(r.arr && km(r.arr.ll, s.ll) > 2600) far.push(code + ": " + s.name); } }
+  });
+  ok(all > 1500 && on / all > 0.97, `mappa del giro: tappe con coordinate ${on}/${all}`);
+  ok(far.length === 0, "mappa del giro: nessuna tappa a più di 2.600 km dal suo aeroporto → " + far.slice(0, 8).join(" | "));
+  ok(Object.values(G.n).concat(Object.values(G.x).filter(Array.isArray), Object.values(G.a)).every(c => c.length === 2 && Math.abs(c[0]) <= 90 && Math.abs(c[1]) <= 180), "mappa del giro: coordinate valide");
+  // pagina di ogni trip: riquadro, testo alternativo, elenco numerato, Google Maps
+  const GM = /href="(https:\/\/www\.google\.com\/maps\/dir\/-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?(?:\/-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?)+)" target="_blank" rel="noopener">Apri il percorso in Google Maps/;
+  let nmap = 0;
+  for(const t of trips){
+    const pg = A.pageHTML({page:"trip", id:t.id}), r = A.routeOf("t", t.id);
+    if(!r.stages.some(s => s.ll)){ ok(/non ci sono ancora coordinate affidabili/.test(pg), "trip senza coordinate: lo dice → " + t.id); continue; }
+    nmap++;
+    const m = pg.match(/<figure class="tmap-w">[\s\S]*?<\/figure>/);
+    ok(!!m && m[0].includes(`data-tmap="t:${t.id}"`) && /role="region" aria-label="Mappa del giro «[^"]+»\. [^"]*Tappe nell(?:'|&#39;|&#x27;)ordine: 1\. /.test(m[0]) && /data-act="tmap">Mostra la mappa/.test(m[0]), "trip: riquadro della mappa con testo alternativo → " + t.id);
+    if(!m) continue;
+    ok(m[0].split("<li").length - 1 === t.stages.length + (r.oj ? 2 : 1) && t.stages.every((s, i) => m[0].includes(`<span class="sr">Tappa ${i + 1}: </span>`)) && (m[0].match(/aria-label="([^"]+)"/)[1].match(/\d+\. /g) || []).length === t.stages.length, "trip: elenco di tutte le tappe con le notti → " + t.id);
+    const g = (m[0].match(GM) || [])[1], pts = g ? g.split("/dir/")[1].split("/") : [];
+    ok(!!g && pts.length >= 2 && pts.length <= 10, "trip: pulsante Google Maps con il percorso (2-10 punti) → " + t.id + " " + pts.length);
+    if(g && r.oj && r.stages.filter(s => s.ll).length <= 8) ok(pts[0] === r.arr.ll.join() && pts[pts.length - 1] === r.dep.ll.join() && pts[0] !== pts[pts.length - 1], "open-jaw: il percorso parte dall'aeroporto di arrivo e finisce in quello di rientro → " + t.id);
+    if(r.oj) ok(new RegExp(`arrivo a [^<]+<span class="iata">${t.arr}</span>`).test(m[0]) && new RegExp(`rientro da [^<]+<span class="iata">${t.dep}</span>`).test(m[0]) && /Volo di arrivo a .* volo di rientro da /.test(m[0]), "open-jaw: arrivo e rientro in due città, detti nell'elenco e nel testo alternativo → " + t.id);
+  }
+  ok(nmap >= trips.length - 2, `mappa del giro: presente su ${nmap} trip di ${trips.length}`);
+  ok(trips.some(t => t.type === "oj" && t.arr !== t.dep), "dati: c'è almeno un open-jaw");
+  // pagine delle mete: una mappa per ogni itinerario
+  let itAll = 0, itMap = 0;
+  for(const [code, its] of Object.entries(DATA0.raw.trips)){
+    if(!dest[code]) continue;
+    const pg = A.pageHTML({page:"dest", id:code});
+    its.forEach((it, ix) => {
+      itAll++;
+      const has = pg.includes(`data-tmap="d:${code}:${ix}"`), r = A.routeOf("d", code, ix);
+      if(has) itMap++;
+      ok(has === r.stages.some(s => s.ll), "meta: mappa su ogni itinerario che ha tappe con coordinate → " + code + " " + ix);
+    });
+    const figs = pg.match(/<figure class="tmap-w">[\s\S]*?<\/figure>/g) || [];
+    ok(figs.every(f => GM.test(f) || !/google\.com\/maps/.test(f)), "meta: link Google Maps ben formato → " + code);
+  }
+  ok(itAll > 200 && itMap / itAll > 0.98, `mappa del giro: presente su ${itMap} itinerari di ${itAll}`);
+  // tappa senza coordinate: resta nell'elenco, segnata, e fuori dal percorso
+  const D = JSON.parse(JSON.stringify(DATA0)), t0 = D.raw.trips_popular.trips.find(t => t.stages.length > 2 && t.type === "oj" && t.arr !== t.dep);
+  D.raw.geo.x[t0.stages[1][0] + "|" + t0.countries.join("+")] = 0;
+  const m2 = boot("", {api:false, dataObj:D}).App, r2 = m2.routeOf("t", t0.id), h2 = m2.tmapHTML("t", t0.id);
+  ok(r2.stages[1].ll === null && /class="off"/.test(h2) && /non sulla mappa/.test(h2) && /Una tappa non ha una posizione affidabile/.test(h2), "tappa senza coordinate: nell'elenco, segnata");
+  ok(m2.gmapsUrl(r2).split("/dir/")[1].split("/").length === r2.stages.filter((s, i) => s.ll && (!i || !r2.stages[i - 1].ll || s.ll.join() !== r2.stages[i - 1].ll.join())).length + 2 || m2.gmapsUrl(r2).split("/dir/")[1].split("/").length <= 10, "tappa senza coordinate: fuori dal percorso di Google Maps");
+  // senza coordinate (stage_coords.json assente): nessuna mappa, la pagina resta intera
+  const D0 = JSON.parse(JSON.stringify(DATA0)); delete D0.raw.geo;
+  const m0 = boot("", {api:false, dataObj:D0}).App, p0 = m0.pageHTML({page:"trip", id:trips[0].id}) + m0.pageHTML({page:"dest", id:Object.keys(DATA0.raw.trips)[0]});
+  ok(!/data-tmap/.test(p0) && /non ci sono ancora coordinate affidabili/.test(p0) && !/undefined|NaN/.test(p0), "senza coordinate: nessuna mappa e nessun errore");
+  audit("mappa del giro", A.tmapHTML("t", trips[0].id) + "x".repeat(500));
 }
 
 console.log(`${checks} controlli, ${fails} falliti · pagine: ${R.dests.length} mete, ${R.trips.length} trip · origini nei dati: ${R.origins.join(", ")} · img in home: ${RAWn.d}/${RAWn.v}/${RAWn.p}`);

@@ -1,6 +1,7 @@
 /* Agosto 2027 v2: sito di viaggio a pagine (hash routing). Dati: RAW (build.py + build_trips.py), foto: PH (img/manifest.json).
    Rotte: #/ (nuove mete) · #/visitati · #/trips · #/d/<IATA> · #/t/<trip.id> · #/preferiti · #/login/<token> · #/<alias> (PIN) · #/crediti
           #/voti (voti di coppia, solo sui giri completi) · #/confronto[/id,id,id] (fianco a fianco) · #/mappa
+   Mappa del giro (tappe numerate e percorso) su ogni Popular trip e su ogni itinerario delle mete: Leaflet + OpenStreetMap, caricati solo in vista.
    Preferiti: se API (base del Worker Cloudflare, da bot/config.json "worker_url") e' valorizzata e il dispositivo ha un
    token personale (link #/login/<token> mandato dal bot con /sito), la stella salva subito via Worker; altrimenti apre Telegram. */
 "use strict";
@@ -595,6 +596,134 @@ function vctl(st, origins, stopsItems){
 }
 const pageNotFound = what => topHTML("plain") + `<main class="wrap cr-head sec"><p class="eyebrow">Pagina non trovata</p><h1 class="h2" style="margin:8px 0 18px">${esc(what)} <i>non c'è</i></h1><p class="sub">Il collegamento potrebbe essere vecchio.</p><p style="margin-top:22px"><a class="btn" href="#/">Tutte le mete</a></p></main>` + footHTML();
 
+/* ------------------------------------------------------------------ mappa del giro: tappe numerate e percorso (Leaflet + OpenStreetMap) */
+// Coordinate delle tappe: RAW.geo (build_v2.py, da stage_coords.json). n = per nome, x = eccezioni "nome|paesi" (0 = non trovata), a = aeroporti.
+// Leaflet arriva da cdnjs (versione fissa, con integrity) solo quando una mappa entra in vista: chi non la guarda non scarica nulla.
+const GEO = RAW.geo || {n:{}, x:{}, a:{}};
+const LEAF = {base:"https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/", js:"sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==",
+  css:"sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==", p:null};
+const TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const HOME_LL = [45.55, 9.05];   // Milano: da qui partono (fuori quadro) le linee dei voli internazionali
+const TM = {maps:[], io:null};
+function stageGeo(name, ctx){
+  const x = (GEO.x || {})[name + "|" + ctx], c = x !== undefined ? x : (GEO.n || {})[name];
+  return Array.isArray(c) ? c : null;
+}
+const nightsTxt = n => `${n} ${n === 1 ? "notte" : "notti"}`;
+// giro = {title, stages:[{n, name, nights, ll}], arr, dep:{code, name, ll} | null, oj}.  kind "t" = Popular trip, "d" = itinerario ix della meta
+function routeOf(kind, id, ix){
+  if(kind === "t"){
+    const t = PT[id];
+    if(!t) return null;
+    const ctx = t.countries.join("+"), ap = c => (GEO.a || {})[c] ? {code:c, name:cityOf(c), ll:GEO.a[c]} : null, oj = t.type === "oj" && t.dep !== t.arr;
+    return {title:t.name, oj, arr:ap(t.arr), dep:ap(oj ? t.dep : t.arr), stages:t.stages.map((s, i) => ({n:i + 1, name:s[0], nights:s[1], ll:stageGeo(s[0], ctx)}))};
+  }
+  const d = DEST[id], it = d && (ITIN[id] || [])[ix];
+  if(!it) return null;
+  const ap = d.lat != null ? {code:d.code, name:d.city, ll:[d.lat, d.lon]} : null;
+  return {title:it.n, oj:false, arr:ap, dep:ap, stages:it.t.map((s, i) => ({n:i + 1, name:s[0], nights:s[1], ll:stageGeo(s[0], d.country)}))};
+}
+// Google Maps senza chiave: /maps/dir/<lat,lon>/<lat,lon>/... nell'ordine del giro (al massimo 10 punti: se non ci stanno si tolgono gli aeroporti)
+function gmapsUrl(r){
+  const st = r.stages.filter(s => s.ll).map(s => s.ll);
+  let pts = (r.arr ? [r.arr.ll] : []).concat(st, r.dep ? [r.dep.ll] : []);
+  if(pts.length > 10) pts = st.slice(0, 10);
+  pts = pts.filter((p, i) => !i || p.join() !== pts[i - 1].join());
+  return pts.length < 2 ? "" : "https://www.google.com/maps/dir/" + pts.map(p => p[0] + "," + p[1]).join("/");
+}
+function tmapHTML(kind, id, ix){
+  const r = routeOf(kind, id, ix);
+  if(!r) return "";
+  const on = r.stages.filter(s => s.ll), miss = r.stages.filter(s => !s.ll);
+  if(!on.length) return "";
+  const fly = r.arr ? (r.oj && r.dep ? `Volo di arrivo a ${r.arr.name} (${r.arr.code}), volo di rientro da ${r.dep.name} (${r.dep.code})` : `Voli di arrivo e di rientro su ${r.arr.name} (${r.arr.code})`) : "";
+  const alt = `Mappa del giro «${r.title}». ${fly ? fly + ". " : ""}Tappe nell'ordine: ${r.stages.map(s => `${s.n}. ${s.name}, ${nightsTxt(s.nights)}`).join("; ")}.`;
+  const gm = gmapsUrl(r), key = kind + ":" + id + (kind === "d" ? ":" + ix : "");
+  return `<figure class="tmap-w">
+    <div class="tmap" data-tmap="${esc(key)}" role="region" aria-label="${esc(alt)}"><p class="tmap-ph"><span>La mappa si carica quando arriva in vista.</span><button type="button" class="achip all" data-act="tmap">Mostra la mappa</button></p></div>
+    <figcaption class="tmap-c">
+      <ol class="tmap-l" aria-label="Tappe nell'ordine">${r.arr ? `<li class="air"><i aria-hidden="true">✈</i><span>${r.oj ? "arrivo a" : "arrivo e rientro:"} ${esc(r.arr.name)} <span class="iata">${esc(r.arr.code)}</span></span></li>` : ""}${r.stages.map(s => `<li${s.ll ? "" : ` class="off"`}><i aria-hidden="true">${s.n}</i><span><span class="sr">Tappa ${s.n}: </span>${esc(s.name)} <small>${nightsTxt(s.nights)}${s.ll ? "" : " · non sulla mappa"}</small></span></li>`).join("")}${r.oj && r.dep ? `<li class="air"><i aria-hidden="true">✈</i><span>rientro da ${esc(r.dep.name)} <span class="iata">${esc(r.dep.code)}</span></span></li>` : ""}</ol>
+      <p class="tmap-a">${gm ? `<a class="btn" href="${gm}" target="_blank" rel="noopener">Apri il percorso in Google Maps ↗</a>` : ""}<span class="note">Linea continua: il giro tra le tappe. Tratteggio: voli internazionali e trasferimenti da e per l'aeroporto.${miss.length ? ` ${miss.length === 1 ? "Una tappa non ha" : miss.length + " tappe non hanno"} una posizione affidabile e non ${miss.length === 1 ? "è" : "sono"} sulla mappa.` : ""} Posizioni indicative.</span></p>
+    </figcaption></figure>`;
+}
+function leafLoad(){
+  if(LEAF.p) return LEAF.p;
+  LEAF.p = new Promise((ok, ko) => {
+    if(window.L && window.L.map) return ok(window.L);
+    const head = document.head || document.body, tag = (name, at) => Object.assign(document.createElement(name), at, {crossOrigin:"anonymous", referrerPolicy:"no-referrer"});
+    const css = tag("link", {rel:"stylesheet", href:LEAF.base + "leaflet.min.css", integrity:LEAF.css});
+    const js = tag("script", {src:LEAF.base + "leaflet.min.js", integrity:LEAF.js, async:true});
+    js.onload = () => window.L && window.L.map ? ok(window.L) : ko(new Error("leaflet"));
+    js.onerror = () => ko(new Error("leaflet"));
+    head.appendChild(css); head.appendChild(js);
+  }).catch(e => { LEAF.p = null; throw e; });
+  return LEAF.p;
+}
+async function tmapOpen(el){
+  if(!el || el.dataset.on === "1") return;
+  el.dataset.on = "1";
+  const [kind, id, ix] = String(el.dataset.tmap || "").split(":"), r = routeOf(kind, id, ix == null ? null : +ix);
+  if(!r) return;
+  el.classList.add("load");
+  let L;
+  try { L = await leafLoad(); }
+  catch(e){
+    el.dataset.on = ""; el.classList.remove("load");
+    el.innerHTML = `<p class="tmap-ph"><span>Non riesco a caricare la mappa: l'elenco delle tappe è qui sotto.</span><button type="button" class="achip all" data-act="tmap">Riprova</button></p>`;
+    return;
+  }
+  if(el.isConnected === false) return;
+  el.classList.remove("load"); el.innerHTML = "";
+  try { tmapDraw(L, el, r); } catch(e){ el.dataset.on = ""; el.innerHTML = `<p class="tmap-ph"><span>La mappa non si è aperta: l'elenco delle tappe è qui sotto.</span></p>`; }
+}
+function tmapDraw(L, el, r){
+  const touch = !!(L.Browser && L.Browser.mobile);
+  // la rotella non zooma (la pagina deve scorrere); sul telefono un dito scorre la pagina e la mappa si muove dopo «Muovi la mappa»
+  const map = L.map(el, {scrollWheelZoom:false, dragging:!touch, zoomControl:true, attributionControl:true});
+  map.attributionControl.setPrefix(`<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>`);
+  L.tileLayer(TILES, {maxZoom:17, attribution:`© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>`}).addTo(map);
+  const pts = r.stages.filter(s => s.ll), line = (ll, cls) => L.polyline(ll, {className:cls, interactive:false}).addTo(map);
+  const same = (a, b) => a && b && a.code === b.code;
+  if(r.arr) line([HOME_LL, r.arr.ll], "tm-fly");
+  if(r.dep && !same(r.arr, r.dep)) line([r.dep.ll, HOME_LL], "tm-fly");
+  if(r.arr && pts.length) line([r.arr.ll, pts[0].ll], "tm-link");
+  if(r.dep && pts.length) line([pts[pts.length - 1].ll, r.dep.ll], "tm-link");
+  if(pts.length > 1) line(pts.map(p => p.ll), "tm-line");
+  const pin = (ll, cls, label, title, html, z) => L.marker(ll, {icon:L.divIcon({className:"tm-pin " + cls, html:`<span>${label}</span>`, iconSize:[label.length > 2 ? 16 + 9 * label.length : 30, 30]}), title, alt:title, keyboard:true, zIndexOffset:z})
+    .bindPopup(html, {maxWidth:240}).addTo(map);
+  for(const a of uniq([r.arr, r.dep].filter(Boolean).map(a => a.code))){
+    const ap = r.arr && r.arr.code === a ? r.arr : r.dep, what = same(r.arr, r.dep) ? "Arrivo e rientro" : r.arr && r.arr.code === a ? "Arrivo" : "Rientro";
+    pin(ap.ll, "air", "✈", `${what}: ${ap.name} (${ap.code})`, `<b>${esc(ap.name)}</b> <span class="iata">${esc(ap.code)}</span><br>${what === "Arrivo" ? "volo di arrivo" : what === "Rientro" ? "volo di rientro" : "voli di arrivo e di rientro"}`, 0);
+  }
+  // tappe nello stesso punto (es. si torna in città a fine giro): un solo segnaposto con tutti i numeri
+  const groups = new Map();
+  pts.forEach(p => { const k = p.ll.join(); if(!groups.has(k)) groups.set(k, []); groups.get(k).push(p); });
+  for(const g of groups.values())
+    pin(g[0].ll, g.length > 1 ? "multi" : "", g.map(p => p.n).join("·"), g.map(p => `${p.n}. ${p.name}, ${nightsTxt(p.nights)}`).join(" · "), g.map(p => `<b>${p.n}. ${esc(p.name)}</b><br>${nightsTxt(p.nights)}`).join("<br>"), 500);
+  const box = L.latLngBounds(pts.map(p => p.ll).concat([r.arr, r.dep].filter(Boolean).map(a => a.ll)));
+  map.fitBounds(box.pad(0.14), {maxZoom:11, animate:false});
+  if(touch){
+    const C = L.Control.extend({options:{position:"topright"}, onAdd(){
+      const b = L.DomUtil.create("button", "tm-drag"); b.type = "button"; b.textContent = "Muovi la mappa"; b.setAttribute("aria-pressed", "false");
+      L.DomEvent.disableClickPropagation(b);
+      b.onclick = () => { const on = !map.dragging.enabled(); map.dragging[on ? "enable" : "disable"](); b.textContent = on ? "Blocca la mappa" : "Muovi la mappa"; b.setAttribute("aria-pressed", String(on)); };
+      return b;
+    }});
+    map.addControl(new C());
+  }
+  TM.maps.push(map);
+}
+// a ogni pagina nuova: via le mappe di prima, e si osservano i riquadri nuovi (si aprono quando entrano in vista)
+function tmapWatch(){
+  TM.maps.splice(0).forEach(m => { try { m.remove(); } catch(e){ /* gia' tolta con la pagina */ } });
+  if(TM.io) TM.io.disconnect();
+  if(typeof IntersectionObserver === "undefined") return;   // resta il pulsante «Mostra la mappa»
+  const els = document.querySelectorAll("[data-tmap]");
+  if(!els.length) return;
+  if(!TM.io) TM.io = new IntersectionObserver(es => es.forEach(e => { if(e.isIntersecting){ TM.io.unobserve(e.target); tmapOpen(e.target); } }), {rootMargin:"150px 0px"});
+  els.forEach(el => TM.io.observe(el));
+}
+
 /* ------------------------------------------------------------------ pagina destinazione */
 function itinHTML(d){
   const all = ITIN[d.code] || [];
@@ -610,6 +739,7 @@ function itinHTML(d){
           <span class="it-x" aria-hidden="true">+</span></div>
         <div class="tl-w"><ol class="tl">${tl}</ol></div></summary>
       <div class="it-b">
+        ${tmapHTML("d", d.code, ix)}
         <div><span class="k">Da non perdere</span><ul>${(t.h || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
         <div><p><span class="k">Come ci si muove</span>${esc(t.m)}</p>
           <p style="margin-top:14px"><span class="k">Costo a terra · stima</span>${esc(t.c)}, mid-range per l'intero giro, volo internazionale escluso</p></div>
@@ -799,7 +929,8 @@ function tripHTML(id){
         <p class="eyebrow" style="margin:24px 0 10px">A terra <span class="est">stima</span></p><p><b class="num">${eur(t.land[0])} – ${eur(t.land[1])}</b> a persona, mid-range in camera doppia.</p>
         ${(t.src || []).length ? `<p class="eyebrow" style="margin:24px 0 10px">Fonti</p><p>${t.src.map(u => `<a href="${esc(safeUrl(u))}" target="_blank" rel="noopener">${esc(host(u))} ↗</a>`).join(" · ")}</p>` : ""}
         ${DEST[t.arr] ? `<p style="margin-top:24px"><a href="#/d/${esc(t.arr)}">Scheda di ${esc(DEST[t.arr].city)} →</a></p>` : ""}</div>
-    </div></section>
+    </div>
+    <div class="tmap-sec" id="mappa-giro"><p class="eyebrow">Mappa del giro</p><h2 class="h2" style="margin:6px 0 18px">Dove si <i>passa</i></h2>${tmapHTML("t", id) || `<p class="note">Per questo giro non ci sono ancora coordinate affidabili delle tappe.</p>`}</div></section>
     <section class="voli sec" id="voli"><div class="wrap" id="voli-in">${voliT(id)}</div>${histSec("t_" + id)}</section>
   </main>` + footHTML();
 }
@@ -1455,6 +1586,7 @@ function go(){
   if(hello !== null) toast(hello ? `Ciao ${hello}` : "Ciao! Dispositivo collegato");
   cmpBar();
   onScroll();
+  tmapWatch();
 }
 function startHero(){
   if(!S.hero || S.hero.length < 2) return;
@@ -1525,6 +1657,7 @@ function init(){
       if(a === "panel-close"){ setPanel(false); return; }
       if(a === "reset"){ if(S.tab === "pop") S.p = Object.assign({}, P0, {sort:S.p.sort}); else S.f = Object.assign({}, F0, {sort:S.f.sort}); updateHome(); return; }
       if(a === "rm"){ const st = S.tab === "pop" ? S.p : S.f; st[act.dataset.k] = (S.tab === "pop" ? P0 : F0)[act.dataset.k]; updateHome(); return; }
+      if(a === "tmap"){ tmapOpen(act.closest("[data-tmap]")); return; }
       if(a === "scroll"){ const el = $(act.dataset.to); if(el) el.scrollIntoView({behavior:"smooth", block:"start"}); return; }
       if(a === "hist"){
         if(act.dataset.hk === "per") S.h.per = act.dataset.hv; else S.h.off[act.dataset.hv] = !S.h.off[act.dataset.hv];
@@ -1568,7 +1701,7 @@ function init(){
   go();
 }
 const App = {S, parse, pageHTML, homeParts, aggD, aggT, viewD, viewT, go, favUrl, BOT_USERNAME, API, FAV, favsHTML, toggleFav, loadFavs, flightT, histHTML, histRows, histAgg, HIST,
-  PIN, pinHTML, pinSubmit, readWho, RATE, loadRates, setRate, rateBlockIn, rateChipIn, rateBlock, rateChip, votiHTML, votiList, votiPool, votiSort, eur, priceLevel, priceBadge, CMP, cmpToggle, cmpHTML, cmpBarHTML, item, mapHTML, mapBody, mapPoints, mapXY, loadWorld, WORLD, img, srcsetOf};
+  PIN, pinHTML, pinSubmit, readWho, RATE, loadRates, setRate, rateBlockIn, rateChipIn, rateBlock, rateChip, votiHTML, votiList, votiPool, votiSort, eur, GEO, LEAF, TILES, routeOf, tmapHTML, gmapsUrl, stageGeo, tmapOpen, tmapWatch, priceLevel, priceBadge, CMP, cmpToggle, cmpHTML, cmpBarHTML, item, mapHTML, mapBody, mapPoints, mapXY, loadWorld, WORLD, img, srcsetOf};
 if(typeof window !== "undefined") window.App = App;
 init();
   return App;

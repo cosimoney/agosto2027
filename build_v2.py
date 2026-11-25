@@ -10,6 +10,8 @@ pagina e i suoi dati restano allineati anche con la cache del browser). --inline
 file, apribile da disco senza server).
 Storico prezzi: bot/state/price_history.json (price_history.py) entra nel blob come RAW.hist, in forma compatta e solo
 per le mete e i trip della pagina; se il file manca il grafico dell'andamento non compare.
+Mappa del giro: stage_coords.json (stage_coords.py, coordinate delle tappe) entra nel blob come RAW.geo; una tappa senza
+coordinate resta nell'elenco ma fuori dalla mappa, e se il file manca la mappa del giro non compare.
 """
 import hashlib, io, json, os, re, sys, types, contextlib
 
@@ -99,12 +101,52 @@ def history(blob):
         print("storico prezzi non caricato:", repr(e))
         return {"days": [], "runs": [], "e": [], "t": {}}
 
+def geo(blob):
+    """RAW.geo = {"n": {nome tappa: [lat, lon]}, "x": {"nome|paesi": [lat, lon] | 0}, "a": {IATA: [lat, lon]}}.
+    n = la posizione piu' frequente di quel nome; x = solo i casi in cui lo stesso nome, in un altro paese, sta altrove
+    (0 = in quel paese la tappa non ha coordinate). a = aeroporti di arrivo e rientro dei giri."""
+    try:
+        doc = json.load(open("stage_coords.json", encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        print("coordinate delle tappe non caricate:", repr(e))
+        return {"n": {}, "x": {}, "a": {}}
+    places, dest = doc.get("places", {}), {d["code"]: d for d in blob["dests"]}
+    used = {}       # nome -> {paesi: [lat, lon] | None}
+    def add(name, ctx):
+        p = places.get("%s|%s" % (name, ctx)) or {}
+        used.setdefault(name, {})[ctx] = [p["lat"], p["lon"]] if p.get("lat") is not None and p.get("lon") is not None else None
+    for code, itins in (blob.get("trips") or {}).items():
+        for it in itins:
+            for s in it["t"]:
+                add(s[0], dest[code]["country"] if code in dest else "")
+    air = {}
+    for t in blob["trips_popular"]["trips"]:
+        for s in t["stages"]:
+            add(s[0], "+".join(t["countries"]))
+        for c in (t["arr"], t["dep"]):
+            if c in (doc.get("airports") or {}):
+                air[c] = doc["airports"][c]
+    n, x = {}, {}
+    for name, by in used.items():
+        got = [tuple(v) for v in by.values() if v]
+        if not got:
+            continue
+        top = max(sorted(set(got)), key=got.count)
+        n[name] = list(top)
+        for ctx, v in by.items():
+            if v is None:
+                x["%s|%s" % (name, ctx)] = 0
+            elif tuple(v) != top:
+                x["%s|%s" % (name, ctx)] = v
+    return {"n": n, "x": x, "a": air}
+
 def dump(o):
     return json.dumps(o, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
 
 def main():
     blob, src1 = pick()
     blob["hist"] = history(blob)
+    blob["geo"] = geo(blob)
     man = manifest()
     js = open("v2.js", encoding="utf-8").read()
     tpl = open("template_v2.html", encoding="utf-8").read()
@@ -124,6 +166,10 @@ def main():
     print("dati:", src1)
     print("storico prezzi:", len(blob["hist"]["days"]), "giorni,", len(blob["hist"]["t"]), "target,", len(dump(blob["hist"])), "caratteri")
     print("preferiti:", "Worker " + api if api else "solo link Telegram (worker_url non impostato)")
+    g = blob["geo"]
+    nogeo = sorted(k for k, v in g["x"].items() if v == 0)
+    print("mappa del giro:", len(g["n"]), "tappe con coordinate,", len(g["x"]) - len(nogeo), "omonimi in un altro paese,", len(g["a"]), "aeroporti,", len(dump(g)), "caratteri",
+          ("| senza coordinate: %d" % len(nogeo)) if nogeo else "")
     nocoord = sorted(d["code"] for d in blob["dests"] if d.get("lat") is None)
     if nocoord:
         print("ATTENZIONE: mete senza coordinate in dests.COORDS (fuori dalla mappa):", nocoord)
