@@ -233,10 +233,10 @@ DESTS = [
     # ================= PAESI GIA' VISITATI: NUOVI GIRI =================
     D("DEN", "Denver", "Stati Uniti", "Nord America", "vis", "15-31°C (5-22 in quota)", "temporali pomeridiani", "buono",
       "Rocky Mountain NP, San Juan e Great Sand Dunes in piena stagione; strade d'alta quota tutte aperte.",
-      seen="USA: molti stati, incluso Utah-Arizona", giro="Colorado Rockies: Rocky Mountain NP, Million Dollar Highway, Mesa Verde"),
+      seen="USA: molti stati (Arizona compresa); i parchi dello Utah mai fatti", giro="Colorado Rockies: Rocky Mountain NP, Million Dollar Highway, Mesa Verde"),
     D("SLC", "Salt Lake City", "Stati Uniti", "Nord America", "vis", "19-33°C", "secco", "buono",
       "Porta d'accesso da sud a Grand Teton e Yellowstone; nei parchi rossi dello Utah fa molto caldo.",
-      seen="Utah-Arizona già visti", giro="Da SLC verso nord: Grand Teton, Yellowstone, Idaho Sawtooth"),
+      seen="Stati USA già visitati, ma mai i parchi dello Utah", giro="Da SLC verso nord: Grand Teton, Yellowstone, Idaho Sawtooth"),
     D("LAS", "Las Vegas", "Stati Uniti", "Nord America", "vis", "26-40°C", "secco, monsone del deserto", "sconsigliato",
       "Caldo estremo nel deserto (Death Valley oltre 45°C); solo come porta per la Sierra Nevada in quota.",
       seen="Sud-ovest desertico già visto", giro="Eastern Sierra e Yosemite via Tioga Pass: fattibile, ma il deserto è rovente"),

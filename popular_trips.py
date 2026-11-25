@@ -275,7 +275,7 @@ TRIPS = [
       ["Lupi e bisonti nella Lamar Valley", "Grand Teton dal Jenny Lake", "Trail Ridge Road a 3.700 m"],
       "Parchi in piena stagione: strade tutte aperte, temporali pomeridiani, lodge nei parchi da prenotare un anno prima.", "buono", "5-30°C",
       [("oj", "DEN", "SLC"), ("rt", "DEN", [], "anello con rientro a Denver (una giornata di guida in più)"), ("rt", "SLC", [], "anello Teton-Yellowstone da Salt Lake City")],
-      visited=True, seen="Utah-Arizona e altri stati"),
+      visited=True, seen="Molti stati USA (Arizona compresa); mai i parchi dello Utah, del Wyoming e del Colorado"),
     T("usa-pacific-northwest", "USA: Washington tra Olympic, Rainier e North Cascades", ["Stati Uniti"], "Nord America", "rt", "SEA", "SEA",
       [("Seattle", 2, "Pike Place, Capitol Hill"), ("Olympic NP", 3, "Hoh Rain Forest, Hurricane Ridge, Rialto Beach"), ("Isole San Juan", 1, "orche in kayak"),
        ("North Cascades", 2, "Diablo Lake, Maple Pass"), ("Mount Rainier", 2, "Paradise, Skyline Trail")],
@@ -284,7 +284,7 @@ TRIPS = [
       ["Skyline Trail sul Rainier in fiore", "Foresta pluviale di Hoh", "Orche alle San Juan"],
       "Mese più secco dell'anno nel Pacific Northwest.", "ottimo", "12-26°C",
       [("rt", "SEA", [], "")],
-      visited=True, seen="Molti stati USA, mai lo stato di Washington"),
+      visited=True, seen="Molti stati USA, compreso Washington (Seattle); mai i suoi parchi nazionali"),
 ]
 
 # Classici d'agosto lasciati fuori e perché (mostrati in fondo alla tab)
