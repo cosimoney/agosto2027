@@ -5,6 +5,8 @@
   python pipeline.py scan     riscansiona tutto da zero (prezzi nuovi a ogni giro) e scrive scan_meta.json
   python pipeline.py build    build_trips.py, build.py, storico prezzi, build_v2.py -> _site/index.html, data.json, world.json, img/
   python pipeline.py fill     solo le query che mancano nei dati dell'ultimo giro (mete/trip appena aggiunti)
+  python pipeline.py retry    ripresa mirata: rifa' con GetShoppingResults e piu' tentativi solo le richieste rimaste senza
+                              voli nell'ultimo giro (retry.py): popular trips, poi A/R veri delle stime, poi le mete vuote
   python pipeline.py meta     ricalcola scan_meta.json dai file presenti (dopo un caricamento a mano dei dati)
 
 Dati:
@@ -370,6 +372,35 @@ def fill():
         fail("Google ha bloccato %d query durante la ricerca delle mete nuove: dati non pubblicati." % blocked)
 
 
+# ---------------------------------------------------------------- ripresa mirata
+
+def retry():
+    """Dai dati dell'ultimo giro (prev/) si rifanno solo le richieste rimaste senza voli: ordine e regole in retry.py.
+    La data dei prezzi resta quella del giro; i conteggi vanno nel blocco "retry" di scan_meta.json. Tetto di tempo:
+    RETRY_BUDGET_MIN (default 150). Se Google blocca (RETRY_MAX_BLOCKS) ci si ferma e si pubblica quello che e' arrivato:
+    le righe scritte sono voli veri, e quelle del giro restano intatte."""
+    for name in (RAW, TRIPS_RAW, META):
+        src = os.path.join(PREV, name)
+        if not os.path.exists(src):
+            fail("manca %s del giro precedente: lancia prima la scansione completa" % src)
+        shutil.copyfile(src, name)
+    import retry as R
+    assert (R.RAW, R.TRIPS_RAW) == (RAW, TRIPS_RAW), "nomi dei file dati cambiati: %s %s" % (R.RAW, R.TRIPS_RAW)
+    res = R.run(float(os.environ.get("RETRY_BUDGET_MIN") or 150))
+    r, t = load(RAW), load(TRIPS_RAW)
+    meta = json.load(open(META, encoding="utf-8"))
+    res["generated"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    res["runs"] = (meta.get("retry") or {}).get("runs", 0) + 1
+    meta.update({"queries": len(r) + len(t), "ok_total": sum(1 for d in (r, t) for x in d.values() if x.get("st") == "ok"), "retry": res})
+    with open(META, "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=1)
+    log("RIPRESA", json.dumps(res, ensure_ascii=False))
+    if res["stopped"]:
+        log("ATTENZIONE: ripresa fermata dopo %d blocchi di Google (429 / captcha): si pubblica quello che e' arrivato" % res["blocked"])
+    log("OK-RETRY righe nuove con voli=%d trip con prezzo %d -> %d mete %s -> %s minuti=%s" % (
+        res["new_ok"], res["trips"]["prima"], res["trips"]["dopo"], res["dests"]["prima"], res["dests"]["dopo"], res["minutes"]))
+
+
 # ---------------------------------------------------------------- build
 
 def build():
@@ -434,6 +465,8 @@ if __name__ == "__main__":
         build()
     elif stage == "fill":
         fill()
+    elif stage == "retry":
+        retry()
     elif stage == "meta":
         write_meta()
     else:
