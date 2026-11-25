@@ -37,6 +37,7 @@ Tutto su GitHub Actions, senza server.
 ## Protezioni
 
 - Se Google blocca il runner le pagine tornano vuote: quando i risultati con voli scendono sotto il 60% del giro precedente il giro si ferma, il sito resta quello di prima e non parte nessun avviso.
+- Mete senza A/R: la pagina di Google Flights che legge `gf.py` porta solo i risultati già pronti lato server; sulle rotte poco cercate arriva vuota e il browser carica i voli dopo, con `GetShoppingResults`. `estimate.py` interroga quella chiamata per le coppie aeroporto-meta rimaste vuote: prima i solo andata (veloci), la cui somma andata + ritorno compare sul sito e nel bot come "stima: somma di due solo andata"; poi l'A/R vero delle celle più economiche, che dove arriva sostituisce la stima. Tetto: `EST_BUDGET_MIN` (75 minuti).
 - Se la scansione supera il tetto di tempo, le rotte non rifatte restano quelle del giro precedente e vengono rifatte per prime la notte dopo.
 - Ogni giro fallito manda un messaggio Telegram all'amministratore.
 - Token e chat stanno solo nei secret di Actions e del Worker.

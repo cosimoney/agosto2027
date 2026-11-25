@@ -14,6 +14,14 @@ Dati:
   bot/state/price_history.json       storico del prezzo piu' basso per meta e trip (price_history.py): sta su main, lo
                                      aggiorna il build a ogni giro riuscito e lo committa il workflow della scansione
 
+Stime (estimate.py): dopo la verifica, per le coppie aeroporto-meta rimaste senza nessun A/R si cercano i solo andata
+con GetShoppingResults (la chiamata che il browser fa dopo aver caricato la pagina: vedi gf.py) e il sito mostra la somma
+andata + ritorno come stima dichiarata; poi, dalle celle piu' economiche, si chiede l'A/R vero alla stessa chiamata e
+dove arriva sostituisce la stima (resta anche per i 4 giri dopo se quel giorno non risponde). Tetto di tempo:
+EST_BUDGET_MIN (default 75 minuti, o un terzo di SCAN_BUDGET_MIN nelle prove corte), ridotto se il giro e' gia' lungo (TOTAL_BUDGET_MIN, default 235 in tutto). Le
+chiavi non rifatte in tempo restano quelle del giro prima e vanno per prime al giro dopo. EST_BUDGET_MIN=0 le spegne.
+Lo stesso ripiego e' acceso nel ricontrollo dei vuoti dei popular trips (fase C e verify_trips.py).
+
 Tempo: la fase A di ogni scansione ha un tetto (SCAN_BUDGET_MIN, default 240 minuti in tutto). Se il tetto scatta,
 le query non rifatte vengono riprese dal giro precedente, segnate come "stale" e rifatte per prime al giro dopo
 (rotazione): il job resta sotto le 6 ore e nessuna rotta resta vecchia per piu' di un giro.
@@ -34,6 +42,8 @@ os.chdir(ROOT); sys.path.insert(0, ROOT)
 RAW, TRIPS_RAW, META, PREV = "raw_v2.jsonl", "trips_raw_v2.jsonl", "scan_meta.json", "prev"
 BUDGET = float(os.environ.get("SCAN_BUDGET_MIN") or 240) * 60
 VERIFY_BUDGET = float(os.environ.get("VERIFY_BUDGET_MIN") or 150) * 60   # meta' ai trip (C + verify_trips.py), meta' a verify.py
+EST_BUDGET = float(os.environ.get("EST_BUDGET_MIN") or min(75, BUDGET / 180))              # minuti per le stime (solo andata + A/R vero delle celle migliori)
+TOTAL_BUDGET = float(os.environ.get("TOTAL_BUDGET_MIN") or 235)          # oltre questo totale le stime si accorciano
 MIN_OK_RATIO = float(os.environ.get("MIN_OK_RATIO") or 0.6)
 MIN_OK_ABS = int(os.environ.get("MIN_OK_ABS") or 100)
 MAX_BLOCKED = int(os.environ.get("MAX_BLOCKED") or 150)
@@ -99,6 +109,44 @@ def carry(path, prev, wanted, fresh):
     return stale
 
 
+def estimates(t0, prev_raw, prev_trips, first=()):
+    """Stime per le coppie senza A/R (estimate.py). -> (riepilogo per scan_meta.json, chiavi riprese dal giro prima).
+    Non fa mai fallire il giro: se qualcosa va storto restano i dati veri e le stime del giro prima."""
+    budget = min(EST_BUDGET, TOTAL_BUDGET - (time.time() - t0) / 60)
+    if EST_BUDGET <= 0:
+        return {"off": True}, []
+    budget = max(budget, min(15, EST_BUDGET))
+    try:
+        import estimate, gf
+        had = {k for k, r in prev_raw.items() if r.get("src") == "api" and r.get("st") == "ok" and k.endswith("|2")}   # A/R veri del giro prima
+        res = estimate.run(budget, known=estimate.ok_routes(prev_trips), first=first, skip=had)
+        keys, rt_keys = res.pop("keys"), res.pop("rt_keys")
+        res["api"] = dict(gf.api_stats)
+    except Exception as e:
+        log("ATTENZIONE: stime non aggiornate (%s: %s)" % (type(e).__name__, str(e)[:200]))
+        return {"error": type(e).__name__}, []
+    # chiavi non rifatte (tempo finito o errore): se il giro prima aveva i voli, restano quelli
+    now, stale = load(TRIPS_RAW), []
+    with open(TRIPS_RAW, "a", encoding="utf-8") as f:
+        for k in keys:
+            r, p = now.get(k), prev_trips.get(k)
+            if p and p.get("st") == "ok" and (r is None or (r.get("st") != "ok" and r.get("src") != "api")):
+                f.write(json.dumps(p, ensure_ascii=False, separators=(",", ":")) + "\n")
+                stale.append(k)
+    # A/R veri (GetShoppingResults) del giro prima sulle celle che oggi non hanno risposto: restano, per al massimo 4 giri
+    now, kept = load(RAW), 0
+    with open(RAW, "a", encoding="utf-8") as f:
+        for k2 in sorted(had):
+            if k2 in now and now[k2].get("st") != "ok" and now[k2].get("src") != "api" and prev_raw[k2].get("age", 0) < 4:
+                for k in (k2, k2[:-1] + "1"):
+                    if k in prev_raw and (k == k2 or prev_raw[k].get("src") == "api"):
+                        f.write(json.dumps(dict(prev_raw[k], age=prev_raw[k2].get("age", 0) + 1), ensure_ascii=False, separators=(",", ":")) + "\n")
+                kept += 1
+    res["stale"], res["rt_kept"] = len(stale), kept
+    log("STIME", json.dumps(res, ensure_ascii=False))
+    return res, stale
+
+
 def scan():
     t0 = time.time()
     for p in (RAW, TRIPS_RAW, META, "fail_reason.txt"):
@@ -157,7 +205,10 @@ def scan():
     tfresh.update(k for k in tb if k in done)
     tstale += carry(TRIPS_RAW, prev_trips, [k[:-1] + "1" for k in tstale if done.get(k, {}).get("st") == "ok"], set())
     deadline[0] = time.time() + VERIFY_BUDGET / 4
+    import gf
+    gf.API_ON = True     # pagina vuota -> GetShoppingResults: sulle rotte poco cercate i solo andata arrivano solo cosi'
     T.run(sorted(tfresh), "trips C(ricontrollo vuoti)", workers=2, v=1, slow=True)
+    gf.API_ON = False
     # verify_trips.py: secondo ricontrollo (v=2) dei vuoti sulle rotte che hanno gia' voli, poi fase B per le sbloccate
     deadline[0] = float("inf")
     tv0 = time.time()
@@ -167,7 +218,7 @@ def scan():
             break
         try:
             subprocess.run([sys.executable, "verify_trips.py", str(target)], timeout=left, check=False,
-                           env=dict(os.environ, WORKERS="2"))
+                           env=dict(os.environ, WORKERS="2", GF_API="1"))
         except subprocess.TimeoutExpired:
             log("verify_trips interrotta al tetto di tempo (le righe gia' scritte restano)")
         done = load(TRIPS_RAW)
@@ -200,6 +251,10 @@ def scan():
         if os.path.exists("raw.jsonl"):
             os.remove("raw.jsonl")
 
+    # stime per le coppie rimaste senza A/R (fuori dal controllo anti-blocco: sono un'altra fonte)
+    est, est_stale = estimates(t0, prev_raw, prev_trips, first)
+    tstale += est_stale
+
     # controllo anti-blocco sulle sole query rifatte adesso
     now_raw, now_trips = load(RAW), load(TRIPS_RAW)
     ok = lambda d, ks: sum(1 for k in ks if d.get(k, {}).get("st") == "ok")
@@ -211,7 +266,7 @@ def scan():
             "minutes": round((time.time() - t0) / 60, 1),
             "queries": len(now_raw) + len(now_trips), "fresh": n_fresh, "ok_fresh": ok_now, "ok_prev_same": ok_prev,
             "ok_total": ok(now_raw, now_raw) + ok(now_trips, now_trips), "blocked": blocked,
-            "dest": dest_stats, "trips": trip_stats, "stale": sorted(stale + tstale)}
+            "dest": dest_stats, "trips": trip_stats, "est": est, "stale": sorted(stale + tstale)}
     log("RIEPILOGO", json.dumps({k: v for k, v in meta.items() if k != "stale"}, ensure_ascii=False), "| stale:", len(meta["stale"]))
     if os.environ.get("FORCE_PUBLISH") in ("1", "true"):
         log("FORCE_PUBLISH: controllo anti-blocco saltato")
@@ -259,7 +314,7 @@ def fill():
     ta = [k for k in T.tasks(2) if k not in prev_trips]
     log("query nuove: %d mete, %d trip" % (len(a), len(ta)))
     if not a and not ta:
-        log("niente di nuovo da cercare"); return
+        log("niente di nuovo da cercare: solo le stime mancanti")
 
     def rewrite(path, drop):
         rows = load(path)
@@ -295,6 +350,7 @@ def fill():
             T.run(tb, "trip nuovi B(ms1)")
             T.run(tb, "trip nuovi B ricontrollo", workers=2, v=1, slow=True)
 
+    est, _ = estimates(t0, prev_raw, prev_trips)   # stime per le mete nuove rimaste senza A/R (e per le chiavi mancanti delle altre)
     r, t = load(RAW), load(TRIPS_RAW)
     for path, rows in ((RAW, r), (TRIPS_RAW, t)):
         rewrite(path, set())                 # una riga per chiave
@@ -306,7 +362,7 @@ def fill():
                  "ok_total": sum(1 for d in (r, t) for x in d.values() if x.get("st") == "ok"),
                  "fill": {"generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                           "minutes": round((time.time() - t0) / 60, 1), "new": len(new_keys), "ok_new": ok_new,
-                          "blocked": blocked}})
+                          "blocked": blocked, "est": est}})
     with open(META, "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=1)
     log("OK-FILL nuove=%d con voli=%d bloccate=%d minuti=%s" % (len(new_keys), ok_new, blocked, meta["fill"]["minutes"]))
