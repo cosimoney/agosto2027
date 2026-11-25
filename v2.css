@@ -588,7 +588,15 @@ body:has(.cmpbar:not([hidden])) .foot{padding-bottom:76px}
 /* ---------- pagina voti ---------- */
 .vt-page,.cmp-page,.m-page{min-height:70vh}
 .vt-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:26px}
-.vt-area select{height:38px}
+.vt-sel{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ink-2)}
+.vt-sel select{height:38px;max-width:100%}
+.vcost{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;margin:6px 0 4px;padding:9px 0;border-top:1px dashed var(--line);border-bottom:1px dashed var(--line)}
+.vcost dt{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.vcost dt span{font-weight:500;letter-spacing:0;text-transform:none}
+.vcost dd{margin:2px 0 0;font-size:13.5px;line-height:1.35}
+.vcost dd b{font-size:18px;color:var(--ink);white-space:nowrap}
+.vcost dd small{display:block;font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.vcost .est,.vcost .real{white-space:nowrap}
 .vt-views{display:flex;flex-wrap:wrap;gap:4px 22px;margin-top:22px;border-bottom:1px solid var(--line)}
 .vt-v{border:0;background:transparent;cursor:pointer;padding:8px 0 10px;font-family:var(--f-display);font-weight:800;text-transform:uppercase;font-size:clamp(20px,2.4vw,28px);line-height:1;color:var(--ink);opacity:.4;border-bottom:3px solid transparent;margin-bottom:-1px;display:inline-flex;align-items:flex-start;gap:4px}
 .vt-v sup{font-family:var(--f-body);font-size:12px;font-weight:700;margin-top:.1em}
@@ -619,7 +627,7 @@ body:has(.cmpbar:not([hidden])) .foot{padding-bottom:76px}
   .vrow-a{display:flex;justify-content:flex-end;margin-top:-4px}
   .vrow-n{font-size:23px}
 }
-@media (max-width:520px){.vrow-r .rt-row{grid-template-columns:minmax(0,1fr) auto}.vrow-r .rt button{width:34px;height:38px}}
+@media (max-width:520px){.vcost{grid-template-columns:minmax(0,1fr)}.vt-sel{flex:1 1 100%;justify-content:space-between}.vrow-r .rt-row{grid-template-columns:minmax(0,1fr) auto}.vrow-r .rt button{width:34px;height:38px}}
 
 /* ---------- confronto affiancato ---------- */
 .cmp{margin-top:26px;--lw:170px}

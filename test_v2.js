@@ -493,58 +493,67 @@ const favList = () => ({ok:true, me:"Cosimo", threshold:1000, generated:"2026-11
 const KA = "aaaaaaaaaaaaaaaa", KB = "bbbbbbbbbbbbbbbb";
 const pick = n => R.dests.filter(c => DATA0.raw.dests.find(x => x.code === c).g !== "sconsigliato").slice(0, n);
 const [c1, c2, c3, c4, c5] = pick(5);
+// si votano solo i giri completi: g1..g5 sono Popular trips; i voti rimasti sulle mete (d_...) arrivano ancora dal Worker ma il sito li ignora
+const [g1, g2, g3, g4, g5] = R.trips.filter(t => t !== firstTrip).map(t => "t_" + t);
 const ratesBody = extra => ({ok:true, me:"Anna", people:[{k:KA, name:"Anna", me:true}, {k:KB, name:"Bruno", me:false}],
-  rates:Object.assign({["d_" + c1]:{[KA]:5, [KB]:4}, ["d_" + c2]:{[KA]:1, [KB]:5}, ["d_" + c3]:{[KB]:0}, ["t_" + firstTrip]:{[KA]:4, [KB]:5}}, extra || {})});
+  rates:Object.assign({[g1]:{[KA]:5, [KB]:4}, [g2]:{[KA]:1, [KB]:5}, [g3]:{[KB]:0}, ["t_" + firstTrip]:{[KA]:4, [KB]:5}, ["d_" + c1]:{[KA]:5, [KB]:5}, ["d_" + c2]:{[KA]:0, [KB]:5}}, extra || {})});
 {
   ok(!/Cosimo|Lavi/.test(fs.readFileSync(path.join(ROOT, "v2.js"), "utf8") + fs.readFileSync(path.join(ROOT, "template_v2.html"), "utf8")), "voti: nessun nome di persona scritto nel sito (arrivano dal Worker)");
   // senza Worker: nessun blocco voti; con il Worker ma senza link personale: stelle disattivate e invito a /sito
-  ok(!/data-rateblock/.test(boot("", {api:false}).App.pageHTML({page:"dest", id:c1})), "voti senza Worker: nessun blocco");
-  const off = boot("#/d/" + c1, {api:true});
+  ok(!/data-rateblock/.test(boot("", {api:false}).App.pageHTML({page:"trip", id:firstTrip})), "voti senza Worker: nessun blocco");
+  const off = boot("#/t/" + g1.slice(2), {api:true});
   let mk = off.els.app.innerHTML;
-  ok(/data-rateblock="d_[A-Z]{3}"/.test(mk) && /class="rt off"/.test(mk) && mk.split('class="rt-s" disabled').length - 1 === 5 && /class="rt-0" disabled/.test(mk), "voti senza login: stelle disattivate");
+  ok(!/data-rateblock|I vostri voti/.test(off.App.pageHTML({page:"dest", id:c1})) && off.App.rateBlock("d_" + c1, "x") === "" && off.App.rateChip("d_" + c1) === "", "voti: nessun blocco stelle sulle pagine delle mete singole");
+  off.nav("#/"); off.App.S.f = Object.assign(off.App.S.f, {q:""});
+  ok(!/data-rate="d_/.test(off.els.grid.innerHTML) && /data-act="cmp" data-id="d_/.test(off.els.grid.innerHTML), "voti: niente etichetta dei voti sulle card delle mete (resta Confronta)");
+  off.nav("#/trips");
+  ok(/class="rc" data-rate="t_/.test(off.els.grid.innerHTML), "voti: etichetta dei voti sulle card dei giri");
+  ok(/data-rateblock="t_[a-z0-9-]+"/.test(mk) && /class="rt off"/.test(mk) && mk.split('class="rt-s" disabled').length - 1 === 5 && /class="rt-0" disabled/.test(mk), "voti senza login: stelle disattivate");
   ok(/scrivi <b>\/sito<\/b> a @Trip2027_bot/.test(mk) && /start=sito/.test(mk) && !/data-act="rate"/.test(mk), "voti senza login: invito a usare /sito, nessun voto possibile");
   off.nav("#/voti");
   ok(off.App.S.page === "rates" && /scrivi <b>\/sito<\/b>/.test(off.els.app.innerHTML) && !/class="vrow"/.test(off.els.app.innerHTML), "pagina voti senza login: solo l'invito");
   audit("voti senza login", off.els.app.innerHTML);
-  await off.App.setRate("d_" + c1, 5);
+  await off.App.setRate(g1, 5);
   ok(Object.keys(off.App.RATE.map).length === 0, "voti senza login: setRate non fa nulla");
 
   let answer = null; const posts = [], gets = [];
-  const d = boot("#/d/" + c1, {api:true, token:"tok.test", fetch:(url, init) => {
+  const d = boot("#/t/" + g1.slice(2), {api:true, token:"tok.test", fetch:(url, init) => {
     if(init.method === "GET"){ gets.push(url); return Promise.resolve(res(200, url.endsWith("/api/rates") ? ratesBody() : {ok:true, me:"Anna", favs:[]})); }
     posts.push([url, JSON.parse(init.body), init.headers.Authorization]);
     return new Promise(r => { answer = r; });
   }});
-  ok(/Carico i voti/.test(d.App.rateBlockIn("d_" + c1, "x")), "voti: stato di caricamento");
+  ok(/Carico i voti/.test(d.App.rateBlockIn(g1, "x")), "voti: stato di caricamento");
   await tick(); await tick(); await tick();
   const A = d.App;
   ok(gets.includes(API_TEST + "/api/rates") && A.RATE.state === "ok" && A.RATE.people.length === 2, "voti: GET /api/rates all'avvio");
-  mk = A.rateBlockIn("d_" + c1, "Meta");
+  mk = A.rateBlockIn(g1, "Meta");
   ok(/class="rt-row me"><span class="rt-who">Anna <small>tu<\/small>/.test(mk) && /role="radiogroup" aria-label="Il tuo voto per Meta"/.test(mk) && mk.split('data-act="rate"').length - 1 === 7, "voti: la mia riga è modificabile (0-5 + togli)");
   ok(/data-s="5" aria-checked="true"/.test(mk) && mk.split('class="rt-s on"').length - 1 === 5 && /data-s="0" aria-checked="false"/.test(mk), "voti: il mio 5 è selezionato");
   ok(/<span class="rt-who">Bruno<\/span><span class="rt ro" role="img" aria-label="Bruno: 4 stelle su 5">/.test(mk) && !/data-id="[^"]*"[^>]*>Bruno/.test(mk), "voti: il voto dell'altro si vede ma non si tocca");
   ok(/piace a entrambi/.test(mk) && /media <b class="num">4,5<\/b>/.test(mk), "voti: media e accordo");
-  ok(/divisiva/.test(A.rateBlockIn("d_" + c2, "x")) && /non ha ancora votato/.test(A.rateBlockIn("d_" + c4, "x")) && /tocca per votare/.test(A.rateBlockIn("d_" + c4, "x")), "voti: divisiva / non ancora votato");
-  ok(/aria-label="0 stelle: da scartare"/.test(mk) && !/class="rt-0 on"/.test(A.rateBlockIn("d_" + c3, "x")), "voti: lo 0 dell'altro non accende il mio 0");
-  ok(/Anna <b class="num">5<\/b><i aria-hidden="true">★<\/i> · Bruno <b class="num">4<\/b>/.test(A.rateChipIn("d_" + c1)) && A.rateChipIn("d_" + c5) === "" && /Anna <b class="num">–<\/b> · Bruno <b class="num">0<\/b>/.test(A.rateChipIn("d_" + c3)), "voti: etichetta sulle card");
+  ok(/divisiva/.test(A.rateBlockIn(g2, "x")) && /non ha ancora votato/.test(A.rateBlockIn(g4, "x")) && /tocca per votare/.test(A.rateBlockIn(g4, "x")), "voti: divisiva / non ancora votato");
+  ok(/aria-label="0 stelle: da scartare"/.test(mk) && !/class="rt-0 on"/.test(A.rateBlockIn(g3, "x")), "voti: lo 0 dell'altro non accende il mio 0");
+  ok(/Anna <b class="num">5<\/b><i aria-hidden="true">★<\/i> · Bruno <b class="num">4<\/b>/.test(A.rateChipIn(g1)) && A.rateChipIn(g5) === "" && /Anna <b class="num">–<\/b> · Bruno <b class="num">0<\/b>/.test(A.rateChipIn(g3)), "voti: etichetta sulle card");
+  await A.setRate("d_" + c4, 3);
+  ok(posts.length === 0 && !A.RATE.map["d_" + c4], "voti: una meta singola non si può votare (nessuna chiamata al Worker)");
   audit("voti blocco", mk + "x".repeat(500));
   // voto ottimistico, ritorno indietro, 0 stelle, togliere
-  const me = () => (A.RATE.map["d_" + c4] || {})[KA];
-  let p = A.setRate("d_" + c4, 3);
-  ok(me() === 3 && posts.length === 1 && posts[0][0] === API_TEST + "/api/rate" && posts[0][1].id === "d_" + c4 && posts[0][1].s === 3 && posts[0][2] === "Bearer tok.test" && Object.keys(posts[0][1]).length === 2, "voto: subito sullo schermo, POST /api/rate {id, s} senza indicare per chi");
-  A.setRate("d_" + c4, 5);
+  const me = () => (A.RATE.map[g4] || {})[KA];
+  let p = A.setRate(g4, 3);
+  ok(me() === 3 && posts.length === 1 && posts[0][0] === API_TEST + "/api/rate" && posts[0][1].id === g4 && posts[0][1].s === 3 && posts[0][2] === "Bearer tok.test" && Object.keys(posts[0][1]).length === 2, "voto: subito sullo schermo, POST /api/rate {id, s} senza indicare per chi");
+  A.setRate(g4, 5);
   ok(posts.length === 1, "voto: un secondo clic durante il salvataggio non parte");
   answer(res(500, {})); await p;
   ok(me() === undefined && /Non sono riuscito a salvare il voto/.test(d.els.toast.textContent), "voto: errore → torna com'era, con avviso");
-  p = A.setRate("d_" + c4, 0);
-  answer(res(200, ratesBody({["d_" + c4]:{[KA]:0}}))); await p;
-  ok(me() === 0 && /Voto salvato: 0 stelle/.test(d.els.toast.textContent) && /class="rt-0 on"/.test(A.rateBlockIn("d_" + c4, "x")), "voto: 0 stelle è un voto vero");
+  p = A.setRate(g4, 0);
+  answer(res(200, ratesBody({[g4]:{[KA]:0}}))); await p;
+  ok(me() === 0 && /Voto salvato: 0 stelle/.test(d.els.toast.textContent) && /class="rt-0 on"/.test(A.rateBlockIn(g4, "x")), "voto: 0 stelle è un voto vero");
   // clic delegato: stesso valore = toglie
   const click = ds => d.listeners.click.forEach(f => f({target:{id:"", closest:s => s === "[data-act]" ? {dataset:ds, setAttribute(){}, classList:{toggle(){}}, querySelector(){ return null; }} : null}, preventDefault(){}}));
-  click({act:"rate", id:"d_" + c4, s:"0"});
+  click({act:"rate", id:g4, s:"0"});
   ok(posts[posts.length - 1][1].s === null && me() === undefined, "voto: clic sul valore già dato → toglie il voto (s:null)");
   answer(res(200, ratesBody())); await tick(); await tick();
-  click({act:"rate", id:"d_" + c4, s:"2"});
+  click({act:"rate", id:g4, s:"2"});
   ok(posts[posts.length - 1][1].s === 2, "voto: clic su una stella → POST con quel valore");
   answer(res(401, {})); await tick(); await tick(); await tick();
   ok(!d.ls["agosto2027.token"] && A.RATE.state === "off" && A.RATE.people.length === 0 && /non vale più/.test(d.els.toast.textContent), "voto: link personale rifiutato → scollegato");
@@ -557,30 +566,65 @@ const ratesBody = extra => ({ok:true, me:"Anna", people:[{k:KA, name:"Anna", me:
   mk = v.els.app.innerHTML;
   ok(V.S.page === "rates" && /<b>Anna<\/b> \(tu\) e <b>Bruno<\/b>/.test(mk) && /id="voti-in"/.test(mk), "pagina voti: intestazione con i profili del Worker");
   const names = h => [...h.matchAll(/class="vrow-n" href="#\/([dt])\/([^"]+)"/g)].map(x => x[1] + "_" + x[2]);
-  ok(names(mk).join() === ["d_" + c1, "t_" + firstTrip, "d_" + c2, "d_" + c3].join() || names(mk).join() === ["t_" + firstTrip, "d_" + c1, "d_" + c2, "d_" + c3].join(), "classifica: per media decrescente → " + names(mk).join());
+  const first = "t_" + firstTrip;
+  ok(names(mk).every(id => id[0] === "t") && !/href="#\/d\//.test(mk.split('id="voti-in"')[1]), "pagina voti: solo giri completi, nessuna meta singola (i voti vecchi sulle mete sono ignorati)");
+  ok(names(mk).join() === [g1, first, g2, g3].join() || names(mk).join() === [first, g1, g2, g3].join(), "classifica: per media decrescente → " + names(mk).join());
   ok(/media <b class="num">4,5<\/b>/.test(mk) && /class="vrow-i num">1</.test(mk) && /Classifica<sup class="num">4<\/sup>/.test(mk) && /Entrambi ≥ 4<sup class="num">2<\/sup>/.test(mk) && /Divisivi<sup class="num">1<\/sup>/.test(mk), "pagina voti: conteggi delle viste");
-  ok(/Da votare: tu<sup class="num">\d+<\/sup>/.test(mk) && /Da votare: Bruno<sup/.test(mk) && /hai votato <b>3<\/b> di \d+/.test(mk), "pagina voti: 'da votare' per ciascuno e avanzamento");
-  const ids = l => l.map(x => x.id), pool = [...new Set(R.dests.map(c => "d_" + c).concat(R.trips.map(t => "t_" + t)))].map(V.item).filter(Boolean);
-  ok(ids(V.votiList("both", pool)).sort().join() === ["d_" + c1, "t_" + firstTrip].sort().join(), "vista 'entrambi ≥ 4'");
-  ok(ids(V.votiList("div", pool)).join() === "d_" + c2, "vista 'divisivi' (differenza ≥ 2)");
-  const todoA = ids(V.votiList("todo:" + KA, pool)), todoB = ids(V.votiList("todo:" + KB, pool));
-  ok(todoA.includes("d_" + c3) && !todoA.includes("d_" + c1) && !todoB.includes("d_" + c3) && todoB.includes("d_" + c5), "vista 'non ancora votati da X'");
+  ok(/Da votare: tu<sup class="num">\d+<\/sup>/.test(mk) && /Da votare: Bruno<sup/.test(mk) && new RegExp(`hai votato <b>3</b> di ${R.trips.length}<`).test(mk), "pagina voti: 'da votare' per ciascuno e avanzamento sui soli giri");
+  const ids = l => l.map(x => x.id), pool = V.votiPool();
+  ok(pool.length === R.trips.length && pool.every(x => x.kind === "t"), "pagina voti: le voci sono tutti e soli i Popular trips");
+  // anche passando le mete, le viste le scartano
+  const mixed = R.dests.map(c => V.item("d_" + c)).filter(Boolean).concat(pool);
+  ok(ids(V.votiList("both", mixed)).sort().join() === [g1, first].sort().join(), "vista 'entrambi ≥ 4'");
+  ok(ids(V.votiList("div", mixed)).join() === g2, "vista 'divisivi' (differenza ≥ 2)");
+  const todoA = ids(V.votiList("todo:" + KA, mixed)), todoB = ids(V.votiList("todo:" + KB, mixed));
+  ok(todoA.includes(g3) && !todoA.includes(g1) && !todoB.includes(g3) && todoB.includes(g5) && todoA.every(id => id[0] === "t"), "vista 'non ancora votati da X'");
+  // costi su ogni riga: voli pp (aeroporto, reale o stima) e totale del viaggio pp (voli + interni + a terra), durata
+  const rows = mk.split('<li class="vrow">').slice(1);
+  ok(rows.length === 4 && rows.every(r => /<dt>Voli <span>a persona<\/span><\/dt>/.test(r) && /<dt>Totale del viaggio <span>a persona<\/span><\/dt>/.test(r) && /<b class="num">\d+ notti<\/b>/.test(r)), "pagina voti: ogni riga ha voli pp, totale del viaggio pp e durata");
+  for(const id of names(mk)){
+    const x = V.item(id), r = rows[names(mk).indexOf(id)], e = n => n.toLocaleString("it-IT").replace(/ /g, " ");
+    if(x.pp == null){ ok(/<b>n\.d\.<\/b><small>nessun volo trovato/.test(r) && /senza voli internazionali: /.test(r), "pagina voti: giro senza voli dichiarato → " + id); continue; }
+    ok(x.totLo === x.voli + x.interni + x.land[0] && x.totHi === x.voli + x.interni + x.land[1], "pagina voti: totale = voli + interni + a terra → " + id);
+    ok(r.includes(`<b class="num">${V.eur(x.voli)}</b> <span class="${x.est ? "est" : "real"}">${x.est ? "stima" : "prezzo reale"}</span>`) && new RegExp(`da (Linate|Malpensa|Roma|Pisa)[^<]* <span class="iata">${x.o}</span> · ${x.est ? "somma di 2 solo andata" : "A/R"}`).test(r), "pagina voti: voli pp con aeroporto e reale/stima → " + id);
+    ok(r.includes(`<b class="num">${V.eur(x.totLo)} – ${V.eur(x.totHi)}</b> <span class="est">stima</span>`) && r.includes(`a terra ${V.eur(x.land[0])}–${V.eur(x.land[1])} · coppia ${V.eur(x.totLo * 2)} – ${V.eur(x.totHi * 2)}`), "pagina voti: totale del viaggio pp e in coppia → " + id);
+  }
+  ok(pool.some(x => x.est) && pool.some(x => x.pp != null && !x.est), "dati: tra i giri ci sono sia voli reali (A/R) sia stime (2 solo andata)");
   audit("pagina voti", mk);
   const vclick = ds => v.listeners.click.forEach(f => f({target:{id:"", closest:s => s === "[data-act]" ? {dataset:ds, setAttribute(){}} : null}, preventDefault(){}}));
+  const vsel = (k, val) => v.listeners.change.forEach(f => f({target:{closest:s => s === "select[data-vk]" ? {dataset:{vk:k}, value:val} : null}}));
+  const inHTML = () => v.els["voti-in"].innerHTML;
+  ok(!/data-k="tab"/.test(mk) && /data-vk="area"/.test(mk) && /data-vk="sort"/.test(mk) && /data-vk="max"/.test(mk), "pagina voti: niente sezioni delle mete; filtri area, ordine e tetto di costo");
   vclick({act:"vt", k:"view", v:"div"});
-  ok(names(v.els["voti-in"].innerHTML).join() === "d_" + c2 && /data-v="div" aria-pressed="true"/.test(v.els["voti-in"].innerHTML), "pagina voti: clic su Divisivi");
-  vclick({act:"vt", k:"view", v:"rank"}); vclick({act:"vt", k:"tab", v:"pop"});
-  ok(names(v.els["voti-in"].innerHTML).join() === "t_" + firstTrip, "pagina voti: filtro Popular trips");
-  vclick({act:"vt", k:"tab", v:"all"}); vclick({act:"vt", k:"view", v:"todo:" + KA});
-  const tm = v.els["voti-in"].innerHTML;
+  ok(names(inHTML()).join() === g2 && /data-v="div" aria-pressed="true"/.test(inHTML()), "pagina voti: clic su Divisivi");
+  vclick({act:"vt", k:"view", v:"todo:" + KA});
+  const tm = inHTML();
   ok(tm.split('class="vrow"').length - 1 === 30 && /data-act="vt-more"/.test(tm) && !/class="vrow-i/.test(tm), "pagina voti: 'da votare' a pagine di 30");
   vclick({act:"vt-more"});
-  ok(v.els["voti-in"].innerHTML.split('class="vrow"').length - 1 === 60, "pagina voti: Mostra altre");
-  const area = pool.find(x => x.id === "d_" + c2).area;
-  v.listeners.change.forEach(f => f({target:{closest:s => s === "select[data-vk]" ? {dataset:{vk:"area"}, value:area} : null}}));
+  ok(inHTML().split('class="vrow"').length - 1 === 60, "pagina voti: Mostra altri");
+  // ordine per costo totale, voli, durata (i giri senza voli in fondo)
+  const key = {tot:x => x.pp == null ? 1e9 : x.totLo, voli:x => x.pp == null ? 1e9 : x.voli, nights:x => x.nights};
+  for(const s of ["tot", "voli", "nights"]){
+    vsel("sort", s);
+    const got = names(inHTML()).map(id => key[s](V.item(id)));
+    ok(got.length === 30 && got.every((x, i) => !i || got[i - 1] <= x) && !/class="vrow-i/.test(inHTML()) && /in ordine di (costo totale|costo dei voli|durata)/.test(inHTML()), "pagina voti: ordine per " + s);
+  }
+  vsel("sort", "tot"); vclick({act:"vt", k:"view", v:"rank"});
+  const byTot = names(inHTML()).map(id => V.item(id));
+  ok(byTot.length === 4 && byTot.every((x, i) => !i || key.tot(byTot[i - 1]) <= key.tot(x)), "pagina voti: anche la classifica si può mettere in ordine di costo totale");
+  vsel("sort", "auto");
+  // tetto di costo totale a persona
+  const withTot = pool.filter(x => x.pp != null), cap = [2000, 3000, 4000, 5000].find(m => withTot.some(x => x.totLo <= m) && withTot.some(x => x.totLo > m));
+  ok(cap != null, "dati: un tetto di costo che separa i giri");
+  vsel("max", String(cap)); vclick({act:"vt", k:"view", v:"todo:" + KB});
+  const capped = names(inHTML()).map(id => V.item(id));
+  ok(capped.length > 0 && capped.every(x => x.pp != null && x.totLo <= cap) && new RegExp(`hai votato <b>\\d+</b> di ${withTot.filter(x => x.totLo <= cap).length}<`).test(inHTML()), "pagina voti: filtro «fino a " + cap + " € a persona» sul totale stimato");
+  vsel("max", "0");
+  const area = pool.find(x => x.id === g2).area;
+  vsel("area", area);
   vclick({act:"vt", k:"view", v:"rank"});
-  ok(V.S.v.area === area && names(v.els["voti-in"].innerHTML).every(id => pool.find(x => x.id === id).area === area) && names(v.els["voti-in"].innerHTML).includes("d_" + c2), "pagina voti: filtro per area");
-  audit("pagina voti filtrata", v.els["voti-in"].innerHTML + "x".repeat(500));
+  ok(V.S.v.area === area && names(inHTML()).every(id => pool.find(x => x.id === id).area === area) && names(inHTML()).includes(g2), "pagina voti: filtro per area");
+  audit("pagina voti filtrata", inHTML() + "x".repeat(500));
   ok(/href="#\/voti"/.test(v.els.app.innerHTML.match(/<nav id="topnav"[\s\S]*?<\/nav>/)[0]) && /aria-current="page">Voti/.test(v.els.app.innerHTML), "menu: voce Voti");
 }
 

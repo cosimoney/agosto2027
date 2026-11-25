@@ -1,6 +1,6 @@
 /* Agosto 2027 v2: sito di viaggio a pagine (hash routing). Dati: RAW (build.py + build_trips.py), foto: PH (img/manifest.json).
    Rotte: #/ (nuove mete) · #/visitati · #/trips · #/d/<IATA> · #/t/<trip.id> · #/preferiti · #/login/<token> · #/<alias> (PIN) · #/crediti
-          #/voti (voti di coppia) · #/confronto[/id,id,id] (fianco a fianco) · #/mappa
+          #/voti (voti di coppia, solo sui giri completi) · #/confronto[/id,id,id] (fianco a fianco) · #/mappa
    Preferiti: se API (base del Worker Cloudflare, da bot/config.json "worker_url") e' valorizzata e il dispositivo ha un
    token personale (link #/login/<token> mandato dal bot con /sito), la stella salva subito via Worker; altrimenti apre Telegram. */
 "use strict";
@@ -97,7 +97,7 @@ const noPhoto = txt => `<span class="nophoto" aria-hidden="true">${esc(txt)}</sp
 const F0 = {q:"", origin:"all", area:"all", country:"all", budget:0, stops:1, dur:"all", dep:"all", clima:"all", sort:"score"};
 const P0 = {q:"", origin:"all", kind:"all", area:"all", style:"all", budget:0, stops:1, sort:"tot"};
 const S = {tab:"new", f:Object.assign({}, F0), p:Object.assign({}, P0), panel:false, cell:null, homeY:0, depth:0, route:null, page:null, lb:[], lbi:0, heroT:null, h:{per:"day", off:{}},
-  c:{hide:2}, v:{view:"rank", tab:"all", area:"all", n:30}, m:{tab:"all", zoom:"world"}};
+  c:{hide:2}, v:{view:"rank", area:"all", sort:"auto", max:"0", n:30}, m:{tab:"all", zoom:"world"}};
 const TABS = {new:{hash:"#/", label:"Nuove mete", sub:"Paesi dove non siete mai stati, scelti per il clima di agosto."},
               vis:{hash:"#/visitati", label:"Già visitati", sub:"Paesi che conoscete già, con un giro diverso da quello fatto."},
               pop:{hash:"#/trips", label:"Popular trips", sub:"Itinerari completi, anche open-jaw: tappe, voli e costo a terra."}};
@@ -346,7 +346,7 @@ function cardD(a, i, feat){
       <p class="meta"><b>${fmtD(b.c.dep)} → ${fmtD(ret)}</b> · ${b.c.n} giorni · da ${esc(oName(b.c.o))} · ${stopsTxt(b.o.f)}${a.max > a.min ? ` · altre date fino a ${eur(a.max)}` : ""}</p>
       ${d.giro ? `<p class="giro"><s>${esc(d.seen)}</s> → <b>${esc(d.giro)}</b></p>` : ""}
       <div class="bs">${alsoBadge(b.c.o, a.origins)}<span class="b plain">${esc(d.temp)}</span>${priceBadge("d_" + d.code)}${d.flag ? `<span class="b warn wrapb">${esc(d.flag)}</span>` : ""}${twoBadge(b.o)}${estBadge(b.c)}</div>
-      <div class="card-ft">${rateChip("d_" + d.code)}${cmpBtn("d_" + d.code, d.city)}</div>
+      <div class="card-ft">${cmpBtn("d_" + d.code, d.city)}</div>
     </div>
     <a class="card-link" href="#/d/${esc(d.code)}"><span class="sr">Apri ${esc(d.city)}, da ${eur(a.min)} a persona</span></a>
     ${favBtn("d_" + d.code, d.city)}
@@ -688,7 +688,6 @@ function destHTML(code){
     </div>
   </header>
   <main>
-    ${rateBlock("d_" + code, d.city)}
     <section class="sec wrap"><div class="why">
       <div><p class="eyebrow" style="margin-bottom:14px">Perché ad agosto</p><blockquote>${esc(d.why)}</blockquote></div>
       <div class="clima" role="group" aria-label="Clima ad agosto">
@@ -970,7 +969,9 @@ function priceBadge(id, glass){
 /* ------------------------------------------------------------------ voti di coppia (Worker: /api/rates, /api/rate) */
 // RATE.map = {id: {k: stelle 0-5}}, RATE.people = [{k, name, me}] (nomi e chiavi arrivano dal Worker, qui non c'e' nessun nome).
 // RATE.state: off (nessun Worker o nessun token) | loading | ok | error
+// Si votano solo i giri completi (Popular trips, id "t_..."): i voti dati in passato alle mete singole restano nel Worker ma il sito li ignora.
 const RATE = {map:{}, people:[], state:"off", busy:new Set()};
+const rated = id => /^t_/.test(String(id));
 const rateOf = (id, k) => { const r = RATE.map[id]; return r && Number.isInteger(r[k]) ? r[k] : null; };
 const rateMe = () => RATE.people.find(p => p.me) || null;
 const rateVals = id => RATE.people.map(p => rateOf(id, p.k));
@@ -989,7 +990,7 @@ async function loadRates(){
 // ottimistico come la stella dei preferiti; s = 0..5, null = toglie il voto
 async function setRate(id, s){
   const me = rateMe();
-  if(!favLive() || !me || RATE.busy.has(id)) return;
+  if(!favLive() || !me || !rated(id) || RATE.busy.has(id)) return;
   const was = rateOf(id, me.k);
   if(was === s) return;
   RATE.busy.add(id);
@@ -1023,20 +1024,20 @@ function rateBlockIn(id, name){
   const head = `<div class="rate-h"><p class="eyebrow">I vostri voti</p><span class="rate-x">${RATE.state === "ok" ? rateVerdict(id) : ""}</span></div>`;
   if(!favLive()){
     const off = `<span class="rt off" role="img" aria-label="Voto non disponibile senza il link personale"><button type="button" class="rt-0" disabled>0</button>${[1, 2, 3, 4, 5].map(() => `<button type="button" class="rt-s" disabled>★</button>`).join("")}</span>`;
-    return head + `<div class="rt-row"><span class="rt-who">Il tuo voto</span>${off}</div><p class="note rate-ask">${loginAsk("votare da 0 a 5 stelle e vedere i voti dell'altro")}</p>`;
+    return head + `<div class="rt-row"><span class="rt-who">Il tuo voto</span>${off}</div><p class="note rate-ask">${loginAsk("votare questo giro da 0 a 5 stelle e vedere i voti dell'altro")}</p>`;
   }
   if(RATE.state === "error") return head + `<p class="note">Non riesco a leggere i voti in questo momento. <button type="button" class="achip all" data-act="rate-retry">Riprova</button></p>`;
   if(RATE.state !== "ok") return head + `<p class="note">Carico i voti…</p>`;
   const ps = RATE.people.slice().sort((a, b) => (b.me ? 1 : 0) - (a.me ? 1 : 0));
-  return head + ps.map(p => rateRow(p, id, name)).join("") + `<p class="note">Da 0 a 5 stelle, 5 = ci voglio andare. Ognuno vota per sé; <a href="#/voti">tutti i voti a confronto</a>.</p>`;
+  return head + ps.map(p => rateRow(p, id, name)).join("") + `<p class="note">Da 0 a 5 stelle, 5 = ci voglio andare. Ognuno vota per sé; <a href="#/voti">tutti i giri votati a confronto</a>.</p>`;
 }
-const rateBlock = (id, name) => API ? `<section class="wrap rate-sec"><div class="rate" data-rateblock="${esc(id)}" data-name="${esc(name)}">${rateBlockIn(id, name)}</div></section>` : "";
+const rateBlock = (id, name) => API && rated(id) ? `<section class="wrap rate-sec"><div class="rate" data-rateblock="${esc(id)}" data-name="${esc(name)}">${rateBlockIn(id, name)}</div></section>` : "";
 // etichetta compatta per le card: "Nome 4★ · Nome –" (solo se c'e' almeno un voto)
 function rateChipIn(id){
   if(RATE.state !== "ok" || !RATE.map[id] || !rateVals(id).some(v => v != null)) return "";
   return `<span class="b plain rc-b" title="I vostri voti">${RATE.people.map(p => { const v = rateOf(id, p.k); return `${esc(p.name)} <b class="num">${v == null ? "–" : v}</b>${v == null ? "" : `<i aria-hidden="true">★</i>`}`; }).join(" · ")}</span>`;
 }
-const rateChip = id => API ? `<span class="rc" data-rate="${esc(id)}">${rateChipIn(id)}</span>` : "";
+const rateChip = id => API && rated(id) ? `<span class="rc" data-rate="${esc(id)}">${rateChipIn(id)}</span>` : "";
 function ratePaint(){
   document.querySelectorAll("[data-rate]").forEach(el => { el.innerHTML = rateChipIn(el.dataset.rate); });
   document.querySelectorAll("[data-rateblock]").forEach(el => { el.innerHTML = rateBlockIn(el.dataset.rateblock, el.dataset.name || ""); });
@@ -1064,6 +1065,7 @@ function item(id){
     return {id, kind, name:t.name, sub:t.countries.join(" + "), href:"#/t/" + key, k:coverT(t), tab:"pop", area:t.area, g:t.g, temp:t.temp, rain:"", flag:t.flag || "", code:t.arr,
       pp:v ? v.voli + v.extra : null, unit:"voli", o:b ? b.c.o : null, lin:!!a && a.origins.has("LIN"), dep:b ? b.c.dep : null, n:b ? b.c.n : null, dur:v ? v.out[2] : null,
       stops:v ? Math.max(v.out[3], v.back ? v.back[3] : v.out[3]) : null, via:v ? v.out[7] : "",
+      nights:t.nights, oj:t.type === "oj", voli:v ? v.voli : null, est:!!v && v.a.k === "ow", interni:v ? v.interni : t.itot, land:t.land,
       totLo:v ? v.lo : t.land[0] + t.itot, totHi:v ? v.hi : t.land[1] + t.itot, totNote:v ? `voli + interni + a terra, ${t.nights} notti` : "senza voli internazionali", score:a ? a.bestS : null};
   }
   return null;
@@ -1110,11 +1112,12 @@ function cmpHTML(){
     <p style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap"><a class="btn" href="#/">Tutte le mete</a>${API ? `<a class="btn" href="#/preferiti">Dai preferiti</a>` : ""}</p></main>` + footHTML();
   const hide = n === 3 ? Math.min(Math.max(S.c.hide, 0), 2) : -1;
   const lo = (f) => { const v = its.map(f).filter(x => x != null); return v.length > 1 && Math.min(...v) < Math.max(...v) ? Math.min(...v) : null; };
-  const loPP = lo(x => x.pp), loTot = lo(x => x.totLo), loDur = lo(x => x.dur), hiAvg = (() => { const v = its.map(x => rateAvg(x.id)).filter(x => x != null); return v.length > 1 && Math.max(...v) > Math.min(...v) ? Math.max(...v) : null; })();
+  const loPP = lo(x => x.pp), loTot = lo(x => x.totLo), loDur = lo(x => x.dur), hiAvg = (() => { const v = its.filter(x => rated(x.id)).map(x => rateAvg(x.id)).filter(x => x != null); return v.length > 1 && Math.max(...v) > Math.min(...v) ? Math.max(...v) : null; })();
   const row = (label, cell, cls) => `<div class="cmp-r${cls ? " " + cls : ""}" role="row"><div class="cmp-l" role="rowheader">${label}</div>${its.map((x, i) => `<div class="cmp-c c${i}" role="cell">${cell(x, i)}</div>`).join("")}</div>`;
   const nd = `<span class="cmp-nd">n.d.</span>`;
   const best = t => ` <span class="b ok">${t}</span>`;
   const votes = x => {
+    if(!rated(x.id)) return `<span class="cmp-s">si votano solo i giri completi</span>`;
     if(!favLive()) return `<span class="cmp-s">${loginAsk("votare e vedere i voti")}</span>`;
     if(RATE.state !== "ok") return `<span class="cmp-s">${RATE.state === "error" ? "voti non disponibili" : "carico i voti…"}</span>`;
     const a = rateAvg(x.id);
@@ -1137,13 +1140,17 @@ function cmpHTML(){
     <p style="margin-top:22px"><button type="button" class="achip all" data-act="cmp-clear">Svuota il confronto</button></p></main>` + footHTML();
 }
 
-/* ------------------------------------------------------------------ pagina voti: le preferenze dei due a confronto */
-const VTABS = [["all", "Tutto"], ["new", "Nuove mete"], ["vis", "Già visitati"], ["pop", "Popular trips"]];
+/* ------------------------------------------------------------------ pagina voti: le preferenze dei due a confronto, solo sui giri completi */
+// Voci = Popular trips (giri con tappe, voli e costo totale stimato). Le mete singole non si votano.
+const VSORT = [["auto", "Voti"], ["tot", "Costo totale"], ["voli", "Costo dei voli"], ["nights", "Durata"]];
+const VMAX = [2000, 3000, 4000, 5000];
+const votiPool = () => POP.trips.map(t => item("t_" + t.id)).filter(Boolean);
 function votiViews(){
   return [["rank", "Classifica", "per media dei voti"], ["both", "Entrambi ≥ 4", "piace a tutti e due"], ["div", "Divisivi", "almeno 2 stelle di differenza"]]
     .concat(RATE.people.map(p => ["todo:" + p.k, p.me ? "Da votare: tu" : "Da votare: " + p.name, "non ancora votati da " + p.name]));
 }
 function votiList(view, pool){
+  pool = pool.filter(x => rated(x.id));
   const vals = x => rateVals(x.id), all = v => v.length > 1 && v.every(y => y != null);
   let list;
   if(view === "both") list = pool.filter(x => { const v = vals(x); return all(v) && Math.min(...v) >= 4; });
@@ -1152,46 +1159,64 @@ function votiList(view, pool){
   else list = pool.filter(x => vals(x).some(y => y != null));
   const cnt = x => vals(x).filter(y => y != null).length;
   if(view === "div") return list.sort((x, y) => { const a = vals(x), b = vals(y); return (Math.max(...b) - Math.min(...b)) - (Math.max(...a) - Math.min(...a)) || rateAvg(y.id) - rateAvg(x.id); });
-  return list.sort((x, y) => rateAvg(y.id) - rateAvg(x.id) || cnt(y) - cnt(x) || (x.pp == null ? 1e9 : x.pp) - (y.pp == null ? 1e9 : y.pp));
+  return list.sort((x, y) => rateAvg(y.id) - rateAvg(x.id) || cnt(y) - cnt(x) || (x.pp == null ? 1e9 : x.totLo) - (y.pp == null ? 1e9 : y.totLo));
+}
+// ordine scelto a mano: i giri senza voli (totale incompleto) vanno in fondo
+function votiSort(list, sort){
+  const by = {tot:x => x.pp == null ? 1e9 : x.totLo, voli:x => x.pp == null ? 1e9 : x.voli, nights:x => x.nights}[sort];
+  return by ? list.slice().sort((x, y) => by(x) - by(y) || (x.pp == null ? 1e9 : x.totLo) - (y.pp == null ? 1e9 : y.totLo) || x.name.localeCompare(y.name, "it")) : list;
+}
+// voli pp (migliore, con aeroporto, reale o stima) + totale del viaggio pp (voli + interni + a terra)
+function votiCost(x){
+  const fl = x.pp == null ? `<b>n.d.</b><small>nessun volo trovato per ora</small>`
+    : `<b class="num">${eur(x.voli)}</b> <span class="${x.est ? "est" : "real"}">${x.est ? "stima" : "prezzo reale"}</span><small>da ${esc(oName(x.o))} <span class="iata">${esc(x.o)}</span> · ${x.est ? "somma di 2 solo andata" : "A/R"}${x.lin && x.o !== "LIN" ? " · anche da Linate" : ""}</small>`;
+  const parts = [x.pp == null ? "" : `voli ${eur(x.voli)}`, x.interni ? `interni ${eur(x.interni)}` : "", `a terra ${eur(x.land[0])}–${eur(x.land[1])}`].filter(Boolean).join(" + ");
+  const tot = `<b class="num">${eur(x.totLo)} – ${eur(x.totHi)}</b> <span class="est">stima</span><small>${x.pp == null ? "senza voli internazionali: " : ""}${parts} · coppia ${eur(x.totLo * 2)} – ${eur(x.totHi * 2)}</small>`;
+  return `<dl class="vcost"><div><dt>Voli <span>a persona</span></dt><dd>${fl}</dd></div><div><dt>Totale del viaggio <span>a persona</span></dt><dd>${tot}</dd></div></dl>`;
 }
 function votiRow(x, i, rank){
   const a = rateAvg(x.id), ps = RATE.people.slice().sort((p, q) => (q.me ? 1 : 0) - (p.me ? 1 : 0));
   return `<li class="vrow"><a class="vrow-ph" href="${x.href}" tabindex="-1" aria-hidden="true">${x.k ? img(x.k, {sz:"thumb", alt:""}) : noPhoto(x.code)}</a>
     <div class="vrow-t">${rank ? `<span class="vrow-i num">${i + 1}</span>` : ""}<a class="vrow-n" href="${x.href}">${esc(x.name)}</a>
-      <span class="vrow-s">${x.kind === "t" ? "giro" : "meta"} · ${esc(x.sub)} · ${x.pp == null ? "voli n.d." : `<b class="num">${eur(x.pp)}</b> ${x.unit === "voli" ? "voli pp" : "pp"}`}</span>
+      <span class="vrow-s">${esc(x.sub)} · <b class="num">${x.nights} notti</b>${x.oj ? " · open-jaw" : ""}${x.dep ? ` · ${fmtD(x.dep)} → ${fmtD(addD(x.dep, x.n))}` : ""}</span>
+      ${votiCost(x)}
       <span class="bs">${a != null ? `<span class="b sun">media <b class="num">${avgTxt(a)}</b></span>` : ""}${rateVerdict(x.id).replace(/<span class="rt-avg">.*$/, "")}${priceBadge(x.id)}</span></div>
     <div class="vrow-r">${ps.map(p => rateRow(p, x.id, x.name)).join("")}</div>
     <div class="vrow-a">${cmpBtn(x.id, x.name, "cmpb sm")}</div></li>`;
 }
 function votiBody(){
-  const V = S.v, all = itemIds().map(item).filter(Boolean);
-  const inTab = all.filter(x => V.tab === "all" || x.tab === V.tab);
-  const areas = uniq(inTab.map(x => x.area)).sort((a, b) => a.localeCompare(b, "it"));
+  const V = S.v, all = votiPool(), max = +V.max || 0;
+  const areas = uniq(all.map(x => x.area)).sort((a, b) => a.localeCompare(b, "it"));
   if(V.area !== "all" && !areas.includes(V.area)) V.area = "all";
-  const pool = inTab.filter(x => V.area === "all" || x.area === V.area);
+  if(!VSORT.some(s => s[0] === V.sort)) V.sort = "auto";
+  const pool = all.filter(x => (V.area === "all" || x.area === V.area) && (!max || (x.pp != null && x.totLo <= max)));
   const views = votiViews();
   if(!views.some(v => v[0] === V.view)) V.view = "rank";
-  const list = votiList(V.view, pool), cur = views.find(v => v[0] === V.view), me = rateMe();
+  const list = votiSort(votiList(V.view, pool), V.sort), cur = views.find(v => v[0] === V.view), me = rateMe();
   const mine = me ? pool.filter(x => rateOf(x.id, me.k) != null).length : 0;
-  const empty = {rank:"Ancora nessun voto qui. Parti da «Da votare: tu».", both:"Nessuna voce con 4 o più stelle da entrambi, per ora.", div:"Nessun disaccordo: non ci sono voci con almeno 2 stelle di differenza."}[V.view] || "Tutto votato in questa sezione.";
+  const ranked = V.sort === "auto" && (V.view === "rank" || V.view === "both");
+  const empty = {rank:"Ancora nessun voto qui. Parti da «Da votare: tu».", both:"Nessun giro con 4 o più stelle da entrambi, per ora.", div:"Nessun disaccordo: non ci sono giri con almeno 2 stelle di differenza."}[V.view] || "Tutto votato in questa sezione.";
+  const sel = (k, label, opts) => `<label class="vt-sel"><span class="l">${label}</span><select class="pill" data-vk="${k}">${opts.map(([v, l]) => `<option value="${esc(v)}"${String(V[k]) === String(v) ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`;
   return `<div class="vt-ctl">
-      <div class="chips" role="group" aria-label="Sezione">${VTABS.map(([v, l]) => `<button type="button" class="chip" data-act="vt" data-k="tab" data-v="${v}" aria-pressed="${V.tab === v}">${l}</button>`).join("")}</div>
-      <label class="vt-area"><span class="sr">Area</span><select class="pill" data-vk="area" aria-label="Area">${[["all", "Tutte le aree"], ...areas.map(a => [a, a])].map(([v, l]) => `<option value="${esc(v)}"${V.area === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>
+      ${sel("area", "Area", [["all", "Tutte le aree"], ...areas.map(a => [a, a])])}
+      ${sel("sort", "Ordina per", VSORT)}
+      ${sel("max", "Totale a persona", [["0", "Qualsiasi"], ...VMAX.map(m => [String(m), "fino a " + eur(m)])])}
     </div>
     <div class="vt-views" role="group" aria-label="Cosa mostrare">${views.map(([v, l]) => `<button type="button" class="vt-v" data-act="vt" data-k="view" data-v="${esc(v)}" aria-pressed="${V.view === v}">${esc(l)}<sup class="num">${votiList(v, pool).length}</sup></button>`).join("")}</div>
-    <p class="count" aria-live="polite"><b>${list.length}</b> ${list.length === 1 ? "voce" : "voci"} · ${esc(cur[2])}${me ? ` · hai votato <b>${mine}</b> di ${pool.length}` : ""}</p>
-    ${list.length ? `<ol class="vlist">${list.slice(0, V.n).map((x, i) => votiRow(x, i, V.view === "rank" || V.view === "both")).join("")}</ol>${list.length > V.n ? `<p style="margin-top:18px"><button type="button" class="pill" data-act="vt-more">Mostra altre ${Math.min(30, list.length - V.n)}</button></p>` : ""}` : `<p class="empty">${empty}</p>`}`;
+    <p class="count" aria-live="polite"><b>${list.length}</b> ${list.length === 1 ? "giro" : "giri"} · ${esc(cur[2])}${V.sort !== "auto" ? ` · in ordine di ${esc(VSORT.find(s => s[0] === V.sort)[1].toLowerCase())}` : ""}${me ? ` · hai votato <b>${mine}</b> di ${pool.length}` : ""}</p>
+    ${list.length ? `<ol class="vlist">${list.slice(0, V.n).map((x, i) => votiRow(x, i, ranked)).join("")}</ol>${list.length > V.n ? `<p style="margin-top:18px"><button type="button" class="pill" data-act="vt-more">Mostra altri ${Math.min(30, list.length - V.n)}</button></p>` : ""}` : `<p class="empty">${empty}</p>`}`;
 }
 function votiHTML(){
-  const head = topHTML("nav") + `<main class="wrap cr-head sec vt-page" id="voti"><p class="eyebrow">Voti</p><h1 class="h2" style="margin:8px 0 14px">Dove vuole andare <i>chi</i></h1>`;
+  const head = topHTML("nav") + `<main class="wrap cr-head sec vt-page" id="voti"><p class="eyebrow">Voti · solo giri completi</p><h1 class="h2" style="margin:8px 0 14px">Dove vuole andare <i>chi</i></h1>`;
+  const what = `Si votano solo i giri completi (i Popular trips): per ognuno trovi il costo dei voli e la stima del costo totale del viaggio a persona, voli + interni + a terra.`;
   let body;
   if(!API) body = `<p class="sub">I voti non sono attivi su questa copia del sito.</p>`;
   else if(!favLive()) body = (FAV.state === "expired" ? `<p class="sub fv-warn">Il link usato su questo dispositivo non vale più.</p>` : "") +
-    `<p class="sub">Ognuno dà da 0 a 5 stelle a mete e giri, dal proprio profilo; qui i voti si incrociano: classifica, cosa piace a entrambi, dove non siete d'accordo, cosa manca da votare.</p>
-     <p class="sub" style="margin-top:12px">${loginAsk("votare")}</p>`;
+    `<p class="sub">Ognuno dà da 0 a 5 stelle ai giri completi, dal proprio profilo; qui i voti si incrociano: classifica, cosa piace a entrambi, dove non siete d'accordo, cosa manca da votare.</p>
+     <p class="sub" style="margin-top:12px">${what} ${loginAsk("votare")}</p>`;
   else if(RATE.state === "error") body = `<p class="sub">Non riesco a leggere i voti in questo momento.</p><p style="margin-top:22px"><button class="btn" data-act="rate-retry">Riprova</button></p>`;
   else if(RATE.state !== "ok") body = `<p class="sub">Carico i voti…</p>`;
-  else body = `<p class="sub">Da 0 a 5 stelle, 5 = ci voglio andare. Ognuno vota per sé e vede il voto dell'altro: ${RATE.people.map(p => `<b>${esc(p.name)}</b>${p.me ? " (tu)" : ""}`).join(" e ")}.</p><div id="voti-in">${votiBody()}</div>`;
+  else body = `<p class="sub">Da 0 a 5 stelle, 5 = ci voglio andare. Ognuno vota per sé e vede il voto dell'altro: ${RATE.people.map(p => `<b>${esc(p.name)}</b>${p.me ? " (tu)" : ""}`).join(" e ")}. ${what}</p><div id="voti-in">${votiBody()}</div>`;
   return head + body + `</main>` + footHTML();
 }
 
@@ -1543,7 +1568,7 @@ function init(){
   go();
 }
 const App = {S, parse, pageHTML, homeParts, aggD, aggT, viewD, viewT, go, favUrl, BOT_USERNAME, API, FAV, favsHTML, toggleFav, loadFavs, flightT, histHTML, histRows, histAgg, HIST,
-  PIN, pinHTML, pinSubmit, readWho, RATE, loadRates, setRate, rateBlockIn, rateChipIn, votiHTML, votiList, priceLevel, priceBadge, CMP, cmpToggle, cmpHTML, cmpBarHTML, item, mapHTML, mapBody, mapPoints, mapXY, loadWorld, WORLD, img, srcsetOf};
+  PIN, pinHTML, pinSubmit, readWho, RATE, loadRates, setRate, rateBlockIn, rateChipIn, rateBlock, rateChip, votiHTML, votiList, votiPool, votiSort, eur, priceLevel, priceBadge, CMP, cmpToggle, cmpHTML, cmpBarHTML, item, mapHTML, mapBody, mapPoints, mapXY, loadWorld, WORLD, img, srcsetOf};
 if(typeof window !== "undefined") window.App = App;
 init();
   return App;
