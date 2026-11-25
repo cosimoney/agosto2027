@@ -12,7 +12,7 @@ Il bot esiste già: **@Trip2027_bot** (`bot_username` in `config.json`). Il toke
 - **Avvisi** (`alerts.py`, alla fine di ogni scansione), in due formati (vedi "Formato dei messaggi"):
   - **alert singolo** con suono per un preferito che cala (o un'offerta molto sotto il prezzo tipico): una card per messaggio;
   - **digest** silenzioso con le mete sotto soglia (default 1.000 € A/R a persona) raggruppate per aeroporto di partenza e le rotte prima vuote su cui Google ha pubblicato i primi voli.
-- **Comandi** (Worker, risposta immediata): `/start`, `/top`, `/meta`, `/preferiti`, `/aggiungi`, `/rimuovi`, `/soglia`, `/silenzia`, `/digest`, `/pausa`, `/riprendi`, `/sito`, `/help`.
+- **Comandi** (Worker, risposta immediata): `/start`, `/top`, `/meta`, `/preferiti`, `/aggiungi`, `/rimuovi`, `/soglia`, `/silenzia`, `/digest`, `/pausa`, `/riprendi`, `/sito`, `/pin`, `/voti`, `/help`.
 - **Preferiti dal sito**: con il link personale di `/sito` la stella sulle card salva subito e c'è la pagina `#/preferiti` (vedi "Worker Cloudflare e preferiti dal sito").
 - I weekend entrano negli avvisi solo se messi tra i preferiti (es. `/aggiungi w_BCN`), con soglia default 100 €. Per averli anche nel digest generale: `"weekend_global_alerts": true` in `config.json`.
 - **Perimetro**: digest, `/top`, "rotte prima vuote" e card "sotto il tipico" includono solo le destinazioni della tab **Nuove mete** (`"digest_tabs": ["new"]`) e i **Popular trips** (`"digest_include_popular": true`). Le destinazioni della tab "Già visitati" e quelle con clima "sconsigliato" in `dests.py` (Delhi, Bangkok, Dubai..., `digest_exclude_clima`) compaiono solo se le metti tra i preferiti, con le normali regole dei preferiti. Per riavere tutto: `"digest_tabs": ["new", "vis"]` (o lista vuota).
@@ -122,6 +122,7 @@ Codice in `worker/` (JavaScript senza dipendenze): `src/index.js` (rotte, firma 
 |---|---|---|
 | `POST /api/fav` `{id, on}` | aggiunge o toglie un preferito | sito, con il token personale |
 | `GET /api/favs` | preferiti con chi li ha aggiunti, quando, prezzo all'aggiunta e prezzo di oggi | sito, con il token personale |
+| `POST /api/pin` `{alias, pin}` | indirizzo corto + PIN di 4 cifre: restituisce lo stesso token personale di `/sito` e il nome | sito, senza token |
 | `GET /api/prefs` | preferenze complete (stessa struttura di `state/prefs.json`) | `alerts.py`, con `PREFS_SECRET` |
 | `POST /tg/<WEBHOOK_SECRET>` | webhook di Telegram | Telegram (header `X-Telegram-Bot-Api-Secret-Token`) |
 
@@ -131,6 +132,11 @@ Codice in `worker/` (JavaScript senza dipendenze): `src/index.js` (rotte, firma 
   - `/sito nuovo` annulla i link già creati per chi lo scrive e ne manda uno nuovo.
   - Per annullare tutti i link di tutti: `ROTATE_HMAC=1 bash worker/deploy.sh`.
   - Senza token la stella resta il link `t.me/Trip2027_bot?start=fav_<ID>` e la pagina Preferiti mostra solo come ottenere il link: l'elenco non è pubblico.
+- **Indirizzo corto con PIN**: ogni profilo ha un indirizzo `https://cosimoney.github.io/agosto2027/#/<alias>` che si apre da qualsiasi browser e chiede un PIN di 4 cifre, senza passare da Telegram.
+  - Gli alias stanno solo nel secret `ALIASES` del Worker (`alias:chat_id,alias:chat_id`, alias di 2-12 lettere minuscole): nel repo non compaiono. Per impostarlo: `printf '%s' 'alias:chat,alias:chat' | npx wrangler secret put ALIASES` dalla cartella `worker`. Il sito tratta ogni `#/<parola>` che non è una sua rotta come possibile alias e lascia decidere al Worker.
+  - Il PIN lo sceglie ciascuno dal bot: `/pin 4827` lo imposta o lo cambia (il messaggio viene cancellato dalla chat), `/pin` mostra indirizzo e stato, `/pin off` lo disattiva. Nel KV finisce `pin:<chat_hash>` con l'HMAC del PIN (chiave `HMAC_SECRET`, sale = chat), mai il PIN. Sono rifiutati i PIN con cifre uguali o in fila.
+  - `POST /api/pin` risponde 200 `{token, name}`, 401 `bad_pin` (stessa risposta per PIN errato, PIN non impostato e alias inesistente) o 429 `locked` con `retry` in secondi. Dopo 5 errori di fila l'alias si blocca per 15 minuti, poi 1 ora, 4 ore, 24 ore (`pinlock:<alias>` nel KV, con scadenza); al blocco parte un avviso Telegram al proprietario, che si sblocca subito reimpostando il PIN dal bot. Un accesso riuscito azzera gli errori.
+  - Il token è quello di `/sito`: `/sito nuovo` scollega anche i dispositivi entrati con il PIN. Sul sito "Scollega questo dispositivo" (pagina Preferiti) cancella token e profilo dal browser.
 - **CORS**: le API rispondono al browser solo per l'origine `https://cosimoney.github.io`.
 - **Avvisi**: `alerts.py` legge i preferiti da `GET <WORKER_URL>/api/prefs`. Se il Worker non risponde usa l'ultima copia ricevuta (in `state/notified.json`, campo `prefs_cache`) e poi `state/prefs.json`. Lo stato degli avvisi resta in `bot/state/`. La chiave è `PREFS_SECRET` se il workflow la passa, altrimenti una chiave derivata dal token del bot che il Worker accetta allo stesso modo: così funziona anche senza toccare `scan.yml`.
 - **Sito**: l'indirizzo del Worker sta in `bot/config.json` (`worker_url`); `build_v2.py` lo mette nella pagina. Vuoto = stella solo via Telegram, nessuna voce Preferiti nel menu.
@@ -151,8 +157,8 @@ Per aggiornare solo il codice basta `npx wrangler deploy` dalla cartella `worker
 ### Prove
 
 ```bash
-cd worker && npm test          # firma dei link, API, CORS, webhook con update finti, chat non autorizzata, confronto con commands.py
-node test_v2.js                # sito: stella, pagina preferiti, login (dalla radice del repo, dopo python build_v2.py)
+cd worker && npm test          # firma dei link, API, CORS, webhook con update finti, chat non autorizzata, PIN e blocco, confronto con commands.py
+node test_v2.js                # sito: stella, pagina preferiti, login, indirizzo corto con PIN (dalla radice del repo, dopo python build_v2.py)
 ```
 
 ### Tornare al polling

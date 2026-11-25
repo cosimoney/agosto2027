@@ -31,7 +31,7 @@ Tutto su GitHub Actions, senza server.
 - Foto in più larghezze: `python photo_variants.py` crea `img/<nome>-480.webp`, `-800`, `-1200` dalle foto già presenti (da rilanciare dopo `photos.py`); la pagina le usa con `srcset`.
 - Pagine: `#/voti` (voti da 0 a 5 di ciascuno, incrociati), `#/confronto` (2-3 mete o giri fianco a fianco), `#/mappa` (mete colorate per prezzo; contorno in `world.json`, rigenerabile con `python build_map.py`; coordinate in `dests.py`, `COORDS`).
 - Badge «prezzo basso / tipico / alto»: ultimo giro contro la mediana dello storico, visibile da 5 giorni di dati per quella voce.
-- Voti e preferiti passano dal Worker (`/api/rate`, `/api/rates`, `/api/fav`, `/api/favs`) con il link personale di `/sito`; nel bot c'è anche `/voti`.
+- Voti e preferiti passano dal Worker (`/api/rate`, `/api/rates`, `/api/fav`, `/api/favs`) con il link personale di `/sito` oppure con l'indirizzo corto `#/<alias>` e il PIN di 4 cifre scelto con `/pin` (`/api/pin`; alias nel secret `ALIASES` del Worker); nel bot c'è anche `/voti`.
 - Test: `python build_v2.py && node test_v2.js`, `cd worker && npm test`.
 
 ## Protezioni
