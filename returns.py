@@ -13,8 +13,9 @@ Come si ricava (una richiesta per cella, sempre e solo la PAGINA html, mai GetSh
      biglietto A/R puo' cambiare.
 
 Quante richieste: non tutte le celle. Prima l'opzione migliore di ogni meta / popular trip per citta' di partenza (quella
-che la pagina apre da sola), poi le altre celle dalla piu' economica, fino a RET_MAX richieste (default 300) e
-RET_BUDGET_MIN minuti (default 20) per giro. Le righe gia' lette restano valide finche' andata e prezzo non cambiano
+che la pagina apre da sola), poi le altre celle dalla piu' economica, fino a RET_MAX richieste (default 2500) e
+RET_BUDGET_MIN minuti (default 45) per giro: sono pagine come quelle della scansione (che ne legge circa 21.000 a giro
+senza blocchi), quindi un decimo in piu'; al terzo blocco ci si ferma comunque. Le righe gia' lette restano valide finche' andata e prezzo non cambiano
 (al massimo RET_KEEP giri, default 6), quindi la copertura cresce di giro in giro senza rifare le stesse richieste.
 
 Dati: returns_v2.jsonl, una riga per chiave (sta sul branch "data" con gli altri file del giro):
@@ -29,10 +30,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 
 RET = os.environ.get("RETURNS", "returns_v2.jsonl")
-MAX_REQ = int(os.environ.get("RET_MAX") or 300)
-BUDGET_MIN = float(os.environ.get("RET_BUDGET_MIN") or 20)
+MAX_REQ = int(os.environ.get("RET_MAX") or 2500)
+BUDGET_MIN = float(os.environ.get("RET_BUDGET_MIN") or 45)
 KEEP = int(os.environ.get("RET_KEEP") or 6)          # giri per cui una riga letta resta valida senza rifarla
-WORKERS = int(os.environ.get("RET_WORKERS") or 2)
+WORKERS = int(os.environ.get("RET_WORKERS") or 3)
 MAX_BLOCKED = 3
 ONLY = set(filter(None, (os.environ.get("RET_ONLY") or "").split(",")))   # prove: solo queste mete / hub (codici IATA)
 lock = threading.Lock()
@@ -103,14 +104,20 @@ def _cheapest(fl, ms=None):
 def lookup(rows, ow, o, d, dep, ret, ms, f):
     """Ritorno da mostrare per l'andata f dell'A/R o->d. -> (volo, kind) | None.
     kind 1 = ritorno dello stesso biglietto A/R (pagina con l'andata scelta, stesso prezzo totale);
-    kind 2 = indicativo: il piu' economico del giorno come solo andata, o letto quando il prezzo dell'A/R era un altro.
+    kind 2 = indicativo: il piu' economico del giorno come solo andata, o letto quando il prezzo dell'A/R era un altro;
+    kind 3 = ritorno dello stesso biglietto con PIU' scali del limite ms: l'opzione non rispetta la regola scali, chi
+             costruisce il sito la scarta (build.py, build_trips.py). Non dovrebbe capitare, perche' la ricerca porta il
+             limite su entrambe le tratte: e' una rete di sicurezza se Google lo ignorasse sul ritorno.
     rows = returns_v2.jsonl; ow = righe "OW|..." gia' presenti nei dati del giro (stime e open-jaw), usate come ripiego."""
     k = sel_key(o, d, dep, ret, ms, f)
     r = rows.get(k) if k else None
     if r and r.get("st") == "ok":
         x = _cheapest(r.get("fl"))
+        if x and x["price"] == f["price"]:
+            return x, (1 if len(x["segs"]) - 1 <= ms else 3)
+        x = _cheapest(r.get("fl"), ms)
         if x:
-            return x, (1 if x["price"] == f["price"] else 2)
+            return x, 2
     for src in (rows, ow or {}):
         for m in ((ms,) if src is rows else (ms, 2, 1)):
             x = _cheapest((src.get(ow_key(o, d, ret, m)) or {}).get("fl"), ms)

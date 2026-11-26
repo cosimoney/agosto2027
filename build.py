@@ -50,10 +50,16 @@ def trips_ow():
 def back_of(f, kind):
     return compact(f) + [ITIN.add(f), kind]
 
+DROPPED = []    # opzioni scartate: il ritorno letto di quel biglietto ha piu' scali del limite
 def opt(f, o, dc, dep, ret, ms):
-    """Opzione A/R: i 10 campi dell'andata + ritorno (se letto) + 0 + indice dell'itinerario."""
+    """Opzione A/R: i 10 campi dell'andata + ritorno (se letto) + 0 + indice dell'itinerario.
+    None se il ritorno letto di quel biglietto supera il limite di scali: l'opzione non si mostra (resta fra le PICKS,
+    cosi' la sua riga in returns_v2.jsonl non viene richiesta di nuovo a ogni giro)."""
     PICKS.append({"o": o, "d": dc, "dep": dep, "ret": ret, "ms": ms, "f": f, "tot": f["price"], "tgt": "d_" + dc})
     r = returns.lookup(RET_ROWS, trips_ow(), o, dc, dep, ret, ms, f)
+    if r and r[1] == 3:
+        DROPPED.append("%s|%s|%s|%s|%d %d EUR: ritorno con %d scali" % (o, dc, dep, ret, ms, f["price"], len(r[0]["segs"]) - 1))
+        return None
     return compact(f) + [back_of(r[0], r[1]) if r else 0, 0, ITIN.add(f)]
 
 def compact(f):
@@ -92,7 +98,10 @@ for k, r in raw.items():
     for f in f1:
         key = (f["price"], f["segs"][0]["dt"], tuple(f["al"]))
         if key in seen: continue
-        seen.add(key); a.append(opt(f, o, dc, dep, ret, 1))
+        seen.add(key)
+        x1 = opt(f, o, dc, dep, ret, 1)
+        if x1 is None: continue
+        a.append(x1)
         if len(a) == 4: break
     b = None; x = None
     if f2:
@@ -102,6 +111,7 @@ for k, r in raw.items():
             p1 = a[0][0]
             if p1 - p2 >= MIN_EUR and (p1 - p2) / p1 >= MIN_PCT:
                 b = opt(f2[0], o, dc, dep, ret, 2)
+                if b is None: x = p2
             else:
                 x = p2
         else:
@@ -152,5 +162,7 @@ tpl = open(os.environ.get("TPL", "template.html"), encoding="utf-8").read()
 assert "/*__DATA__*/" in tpl
 open(os.environ.get("OUT", "agosto-2027.html"), "w", encoding="utf-8").write(tpl.replace("/*__DATA__*/", js))
 valid = {c["d"] for c in combos if c["a"]}
+if DROPPED:
+    print("scartate %d opzioni A/R con il ritorno oltre il limite di scali:" % len(DROPPED), "; ".join(DROPPED[:8]))
 print("query", q_tot, "ok", q_ok, "empty", q_empty, "| combos", len(combos), "di cui stime", n_est, "| dest con <=1 scalo:", len(valid), "| html bytes", len(tpl) + len(js),
       "| itinerari:", sum(len(v) for v in trips.values()), "su", len(trips), "destinazioni; con voli senza itinerari:", sorted(valid - set(trips)))
