@@ -236,6 +236,9 @@ def compute(snap, prev, prefs, notified, cfg, now=None, history=None):
             tt = typical_txt(typical(history, tid, cfg, today), price)
             if tt:
                 reasons.append(tt)
+            it = C.int_txt(snap.get("targets", {}).get(tid))    # giro con voli interni: si dice, con prezzo e tratte
+            if it:
+                reasons.append(it)
             fav_events.append((sec(best), best, C.offer_block(best, cfg) + "\n" + "\n".join("   " + r for r in reasons), dropped))
     fav_events.sort(key=lambda b: (not b[3], b[1]["price_pp"], b[1]["name"]))
 
@@ -253,6 +256,9 @@ def compute(snap, prev, prefs, notified, cfg, now=None, history=None):
     room -= len(messages)
     for best, typ in hot[:max(0, room)]:
         block = C.offer_block(best, cfg) + "\n   " + typical_txt(typ, best["price_pp"])
+        it = C.int_txt(snap.get("targets", {}).get(best["target"]))
+        if it:
+            block += "\n   " + it
         messages.append({"kind": "card", "text": "🔥 " + block, "buttons": card_buttons(best, cfg, False), "silent": quiet, "preview": cover(best)})
     n_cards = len(messages)
     if n_cards:
@@ -278,6 +284,9 @@ def compute(snap, prev, prefs, notified, cfg, now=None, history=None):
                     tail.append("🆕 primi voli su questa rotta")
                 for nm in also.get(best["id"], [])[:2]:
                     tail.append("vale anche per il giro «%s»" % C.esc(nm))
+                it = C.int_txt(snap.get("targets", {}).get(best["target"]), short=True)
+                if it:
+                    tail.append(it)
                 lines.append("• " + C.offer_line(best, cfg, show_origin=multi) + "".join(" · " + x for x in tail))
             if len(rws) > mx:
                 lines.append("e altre %d mete (da %s pp)" % (len(rws) - mx, C.euro(rws[mx][0]["price_pp"])))

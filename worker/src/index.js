@@ -408,6 +408,14 @@ async function apiRate(req, env) {
   return json(req, env, 200, Object.assign(ratesPayload(user, R), { changed }));
 }
 const stars = (n) => "★".repeat(n) + "☆".repeat(5 - n);
+/** Voli interni di un giro (targets[id].int dello snapshot: {n, pp, real: 2 tutti reali | 1 in parte | 0 stima, legs}).
+ *  -> "✈ 2 voli interni ~320 € pp (stima): Lima → Cusco, La Paz → Uyuni A/R", oppure "" se il giro non ne ha. Come bot/common.py int_txt. */
+export function intTxt(t) {
+  const i = (t && t.int) || {}, n = i.n || 0;
+  if (!n) return "";
+  const real = i.real || 0, legs = Array.isArray(i.legs) ? i.legs.map(String) : [];
+  return `✈ ${n} ${n === 1 ? "volo interno" : "voli interni"} ${real === 2 ? "" : "~"}${euro(i.pp || 0)} pp (${real === 2 ? "prezzo reale" : real === 1 ? "in parte stima" : "stima"})${legs.length ? ": " + esc(legs.join(", ")) : ""}`;
+}
 /** Costo di un giro dallo snapshot: voli pp migliori (al massimo 1 scalo, come sul sito) e totale pp = voli + interni + a terra. */
 export function tripCost(snap, id) {
   let t = ((snap && snap.targets) || {})[id] || {};
@@ -426,7 +434,8 @@ export function tripCost(snap, id) {
   if (land && fl) bits.push(`totale ${euro(fl.p + itot + land[0])}–${euro(fl.p + itot + land[1])} pp`);
   else if (land) bits.push(`a terra ${euro(land[0] + itot)}–${euro(land[1] + itot)} pp, senza voli`);
   if (t.nights) bits.push(`${t.nights} notti`);
-  return { voli: fl ? fl.p : null, lo: land && fl ? fl.p + itot + land[0] : null, hi: land && fl ? fl.p + itot + land[1] : null, text: bits.join(" · ") };
+  const it = intTxt(t);       // giro con voli interni: una riga in piu', con quanti sono, quanto costano e le tratte
+  return { voli: fl ? fl.p : null, lo: land && fl ? fl.p + itot + land[0] : null, hi: land && fl ? fl.p + itot + land[1] : null, text: bits.join(" · ") + (it ? "\n   " + it : ""), int: it };
 }
 /** /voti: solo i giri completi (trip), in ordine di media, con voli e costo totale pp; dove manca un voto; link alla pagina del sito.
  *  I voti dati in passato alle mete singole (d_...) restano su KV ma qui, come sul sito, non si mostrano. */
@@ -447,7 +456,7 @@ async function cmdVoti(env, chat, name, snap) {
   let text = "⭐ <b>I vostri voti</b> · solo giri completi";
   if (both.length) text += "\n\n<b>Votati da entrambi</b>\n" + both.slice(0, 15).map(line).join("\n") + (both.length > 15 ? `\n… e altri ${both.length - 15}` : "");
   if (part.length) text += "\n\n<b>Manca un voto</b>\n" + part.slice(0, 10).map(line).join("\n") + (part.length > 10 ? `\n… e altri ${part.length - 10}` : "");
-  text += "\n\n<i>Totale a persona = voli + voli interni + a terra (stima).</i>";
+  text += "\n\n<i>Totale a persona = voli + voli interni + a terra (stima). ✈ = giro con voli interni, già nel totale.</i>";
   return [text, btn];
 }
 

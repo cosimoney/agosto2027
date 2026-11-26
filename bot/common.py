@@ -289,9 +289,52 @@ def fmt_dates(dep, ret):
     return "%s %s %d → %s %s %d" % (da, MESI[a.month - 1], a.year, db, MESI[b.month - 1], b.year)
 
 
-def gf_url(o, d, dep, ret):
-    q = "Flights from %s to %s on %s through %s" % (o, d, dep, ret)
-    return "https://www.google.com/travel/flights?q=%s&curr=EUR&hl=it" % urllib.parse.quote(q)
+def _ld(tag, b):
+    """Campo protobuf a lunghezza delimitata (lunghezza varint)."""
+    n, v = len(b), b""
+    while True:
+        v += bytes([(n & 0x7F) | (0x80 if n > 0x7F else 0)]); n >>= 7
+        if not n:
+            return bytes([tag]) + v + b
+
+
+def gf_tfs(legs, trip):
+    """Parametro tfs di Google Flights, lo stesso della scansione (gf.py) e del sito (v2.js).
+    legs = [(data, da, a, max scali | None)]; trip: 1 = A/R, 2 = solo andata. Il limite di scali va su ogni tratta."""
+    import base64
+    e = lambda s: str(s).encode()
+    raw = b"".join(_ld(0x1A, _ld(0x12, e(day)) + (bytes([0x28, ms]) if ms is not None else b"") + _ld(0x6A, _ld(0x12, e(a))) + _ld(0x72, _ld(0x12, e(b))))
+                   for day, a, b, ms in legs)
+    return base64.urlsafe_b64encode(raw + bytes([0x42, 1, 1, 0x48, 1, 0x98, 1, trip])).decode()
+
+
+def gf_url(o, d, dep, ret, ms=None):
+    """Ricerca A/R su Google Flights. Con ms (max scali) il link porta lo stesso filtro con cui e' stato letto il prezzo,
+    su andata e ritorno: senza, Google mostrerebbe anche i voli con piu' scali (e spesso un ritorno diverso)."""
+    if ms is None:
+        q = "Flights from %s to %s on %s through %s" % (o, d, dep, ret)
+        return "https://www.google.com/travel/flights?q=%s&curr=EUR&hl=it" % urllib.parse.quote(q)
+    return "https://www.google.com/travel/flights/search?tfs=%s&hl=it&curr=EUR" % gf_tfs([(dep, o, d, ms), (ret, d, o, ms)], 1)
+
+
+def gf_ow_url(f, t, day, ms):
+    """Ricerca solo andata con il limite di scali."""
+    return "https://www.google.com/travel/flights/search?tfs=%s&hl=it&curr=EUR" % gf_tfs([(day, f, t, ms)], 2)
+
+
+def int_txt(t, short=False):
+    """Voli interni di un giro (targets[id]["int"] dello snapshot: {n, pp, real: 2 tutti reali | 1 in parte | 0 stima, legs}).
+    -> "✈ 2 voli interni ~320 € pp (stima): Lima → Cusco, La Paz → Uyuni A/R", oppure "" se il giro non ne ha."""
+    i = (t or {}).get("int") or {}
+    n = i.get("n") or 0
+    if not n:
+        return ""
+    real = i.get("real") or 0
+    head = "✈ %d %s %s%s pp" % (n, "volo interno" if n == 1 else "voli interni", "" if real == 2 else "~", euro(i.get("pp") or 0))
+    if short:
+        return head
+    legs = [str(x) for x in (i.get("legs") or [])]
+    return "%s (%s)%s" % (head, {2: "prezzo reale", 1: "in parte stima"}.get(real, "stima"), ": " + esc(", ".join(legs)) if legs else "")
 
 
 def stops_txt(o):

@@ -179,7 +179,7 @@ def adapt_raw(paths, cfg, dests):
                 best, extra = f2[0], {"price_1stop": p1, "stops": 2}
         off = {"id": "%s:%s:%s:%s" % (tid, o, dep, ret), "target": tid, "source": "agosto2027", "kind": "roundtrip", "code": dc,
                "name": t["name"], "country": t["country"], "origin": o, "dep": dep, "ret": ret, "nights": days(dep, ret),
-               "price_pp": best["price"], "url": C.gf_url(o, dc, dep, ret)}
+               "price_pp": best["price"], "url": C.gf_url(o, dc, dep, ret, 2 if extra else 1)}   # stesso filtro scali del prezzo
         off.update(flight_fields(best))
         off.update(extra)
         offers.append(off)
@@ -192,7 +192,7 @@ def adapt_raw(paths, cfg, dests):
         out, back = e["b"] or e["a"]
         off = {"id": "%s:%s:%s:%s" % (tid, e["o"], e["dep"], e["ret"]), "target": tid, "source": "agosto2027", "kind": "roundtrip", "code": e["d"],
                "name": t["name"], "country": t["country"], "origin": e["o"], "dep": e["dep"], "ret": e["ret"], "nights": e["n"],
-               "price_pp": out["price"] + back["price"], "url": C.gf_url(e["o"], e["d"], e["dep"], e["ret"]),
+               "price_pp": out["price"] + back["price"], "url": C.gf_url(e["o"], e["d"], e["dep"], e["ret"], 2 if e["b"] else 1),
                "est": True, "price_out": out["price"], "price_ret": back["price"]}
         off.update(flight_fields(out))
         off["stops"] = max(off["stops"], len(back["segs"]) - 1)
@@ -289,8 +289,33 @@ def adapt_trips(path, cfg, dests):
     return list(best.values()), targets, st
 
 
-def ow_url(f, t, d):
+def ow_url(f, t, d, ms=None):
+    if ms is not None:
+        return C.gf_ow_url(f, t, d, ms)
     return "https://www.google.com/travel/flights?q=%s&curr=EUR&hl=it" % urllib.parse.quote("Flights from %s to %s on %s one way" % (f, t, d))
+
+
+LAND_RE = re.compile(r"terra|treno|bus|traghett|auto\b", re.I)
+
+
+def trip_internal(t, air):
+    """Voli interni di un giro per lo snapshot: quelli che servono comunque (t["internal"]) piu' le tratte extra del modo
+    di volare migliore (t["best"]). Voce di trips_data.json = [etichetta, euro pp, 1 = prezzo reale | 0 = stima, stima,
+    giorno, compagnie, quanti voli (0 = via terra)]; i dati vecchi hanno solo etichetta e stima.
+    -> {"n": voli, "pp": euro pp, "real": 2 tutti reali | 1 in parte | 0 stima, "legs": [tratte]} oppure None."""
+    ents = list(t.get("internal") or [])
+    b = t.get("best") or {}
+    for a in air:
+        if b and a.get("k") == b.get("kind") and a.get("a") == b.get("hub"):
+            ents += list(a.get("add") or [])
+            break
+    cnt = lambda e: e[6] if len(e) > 6 else (0 if LAND_RE.search(str(e[0])) else 1)
+    fl = [e for e in ents if cnt(e)]
+    if not fl:
+        return None
+    real = sum(1 for e in fl if len(e) > 2 and e[2])
+    return {"n": sum(cnt(e) for e in fl), "pp": int(round(sum(e[1] for e in fl))), "real": 2 if real == len(fl) else 1 if real else 0,
+            "legs": [str(e[0]).replace("-", " → ") for e in fl]}
 
 
 def adapt_trips_data(path, cfg):
@@ -313,6 +338,9 @@ def adapt_trips_data(path, cfg):
                 targets[tid]["itot"] = int(round(t.get("itot") or 0))
             if isinstance(t.get("nights"), int):
                 targets[tid]["nights"] = t["nights"]
+            it = trip_internal(t, air)       # voli interni: quanti, quanto costano, quali tratte, prezzo reale o stima
+            if it:
+                targets[tid]["int"] = it
             if sl != str(t["id"]):
                 targets[tid]["page_id"] = str(t["id"])  # il link #/t/<id> usa l'id originale del trip
         except Exception:
@@ -325,6 +353,7 @@ def adapt_trips_data(path, cfg):
                 op, extra = c["a"][0], {}
                 if c.get("b"):
                     extra, op = {"price_1stop": op[1] + op[2], "stops": 2}, c["b"]
+                ms = 2 if extra else 1       # i link portano lo stesso filtro scali del prezzo
                 a = air[op[0]]
                 out = legs[op[3]]
                 back = legs[op[4]] if len(op) > 4 and op[4] is not None and op[4] >= 0 else None
@@ -339,10 +368,10 @@ def adapt_trips_data(path, cfg):
                        "code": a["a"], "name": t["name"], "country": country, "origin": c["o"], "dep": dep, "ret": ret, "nights": c["n"],
                        "price_pp": int(round(op[1] + op[2])), "stops": max(out[3], back[3] if back else 0), "airlines": al,
                        "via": [x for x in str(out[7]).split("·") if x], "dur": out[2], "dep_time": out[4],
-                       "url": ow_url(c["o"], a["a"], dep) if oj else C.gf_url(c["o"], a["a"], dep, ret)}
+                       "url": ow_url(c["o"], a["a"], dep, ms) if oj else C.gf_url(c["o"], a["a"], dep, ret, ms)}
                 if oj:
                     off["ret_from"] = a["b"]
-                    off["url_ret"] = ow_url(a["b"], back[9] if back else c["o"], ret)
+                    off["url_ret"] = ow_url(a["b"], back[9] if back else c["o"], ret, ms)
                 if op[2]:
                     off["extra_est"] = op[2]
                 if "page_id" in targets[tid]:

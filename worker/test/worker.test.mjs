@@ -1,7 +1,7 @@
 // Test del Worker senza rete: KV finto, fetch finto (Telegram e snapshot), update Telegram finti.  node --test test/
 import test from "node:test";
 import assert from "node:assert/strict";
-import worker, { signToken, verifyToken, chatHash, derivedPrefsKey, pinHash, aliasMap, tripCost, _resetSnapshotCache, _resetPinMemory } from "../src/index.js";
+import worker, { signToken, verifyToken, chatHash, derivedPrefsKey, pinHash, aliasMap, tripCost, intTxt, _resetSnapshotCache, _resetPinMemory } from "../src/index.js";
 
 const ME = 111111111, LAVI = 9222222222, STRANGER = 999999999;
 const ORIGIN = "https://cosimoney.github.io";
@@ -16,7 +16,8 @@ const SNAPSHOT = {
     d_EVN: { name: "Erevan", country: "Armenia", code: "EVN", source: "agosto2027", tab: "new", clima: "buono", n: 1, min: 230 },
     d_AKL: { name: "Auckland", country: "Nuova Zelanda", code: "AKL", source: "agosto2027", tab: "new", clima: "accettabile", n: 0, min: null },
     "t_georgia-armenia": { name: "Georgia e Armenia", country: "Georgia", code: "TBS", source: "popular", n: 1, min: 410, land: [1100, 1600], itot: 0, nights: 10 },
-    t_peru: { name: "Perù classico", country: "Perù", code: "LIM", source: "popular", n: 2, min: 1450, land: [1500, 2100], itot: 180, nights: 11 },
+    t_peru: { name: "Perù classico", country: "Perù", code: "LIM", source: "popular", n: 2, min: 1450, land: [1500, 2100], itot: 180, nights: 11,
+      int: { n: 3, pp: 180, real: 1, legs: ["Lima → Cusco", "La Paz → Uyuni A/R"] } },
     t_islanda: { name: "Islanda", country: "Islanda", code: "KEF", source: "popular", n: 0, min: null, land: [2000, 2600], itot: 0, nights: 9 },
     "t_vecchio": { name: "Giro di uno snapshot vecchio", country: "X", code: "XXX", source: "popular", n: 1, min: 300 },
   },
@@ -368,9 +369,14 @@ test("webhook: /voti e riga in /help", async () => {
   assert.doesNotMatch(t, /Tbilisi|Erevan/, "le mete singole non compaiono");
   assert.match(t, /^⭐ <b>I vostri voti<\/b> · solo giri completi/);
   // a parita' di media prima il giro che costa meno in totale; voli migliori con al massimo 1 scalo (price_1stop), open-jaw = stima
-  assert.match(t, /<b>Votati da entrambi<\/b>\n1\. <b>Georgia e Armenia<\/b> · Cosimo ★★★★★ · Lavi ★★★★☆ · media 4,5\n   voli 410 € pp da MXP · totale 1\.510 €–2\.010 € pp · 10 notti\n2\. <b>Perù classico<\/b> · Cosimo ★★★★★ · Lavi ★★★★☆ · media 4,5\n   voli 1\.450 € pp da MXP \(stima, 2 solo andata\) · totale 3\.130 €–3\.730 € pp · 11 notti/);
+  assert.match(t, /<b>Votati da entrambi<\/b>\n1\. <b>Georgia e Armenia<\/b> · Cosimo ★★★★★ · Lavi ★★★★☆ · media 4,5\n   voli 410 € pp da MXP · totale 1\.510 €–2\.010 € pp · 10 notti\n2\. <b>Perù classico<\/b> · Cosimo ★★★★★ · Lavi ★★★★☆ · media 4,5\n   voli 1\.450 € pp da MXP \(stima, 2 solo andata\) · totale 3\.130 €–3\.730 € pp · 11 notti\n   ✈ 3 voli interni ~180 € pp \(in parte stima\): Lima → Cusco, La Paz → Uyuni A\/R/);
+  // voli interni: segnalati solo dove ci sono, con ~ sulle stime e senza sui prezzi reali
+  assert.equal(intTxt({ int: { n: 1, pp: 58, real: 2, legs: ["Lima → Cusco"] } }), "✈ 1 volo interno 58 € pp (prezzo reale): Lima → Cusco");
+  assert.equal(intTxt({ int: { n: 2, pp: 1320, real: 0, legs: ["A → B", "B → <C>"] } }), "✈ 2 voli interni ~1.320 € pp (stima): A → B, B → &lt;C&gt;");
+  assert.equal(intTxt({}), ""); assert.equal(intTxt(null), ""); assert.equal(tripCost(SNAPSHOT, "t_georgia-armenia").int, "");
+  assert.doesNotMatch(tripCost(SNAPSHOT, "t_georgia-armenia").text, /✈/);
   assert.match(t, /<b>Manca un voto<\/b>\n1\. <b>Islanda<\/b> · Cosimo ★★☆☆☆ · Lavi –\n   voli n\.d\. · a terra 2\.000 €–2\.600 € pp, senza voli · 9 notti\n2\. <b>Giro di uno snapshot vecchio<\/b> · Cosimo – · Lavi ☆☆☆☆☆\n   voli 300 € pp da MXP$/m);
-  assert.match(t, /Totale a persona = voli \+ voli interni \+ a terra/);
+  assert.match(t, /Totale a persona = voli \+ voli interni \+ a terra \(stima\)\. ✈ = giro con voli interni, già nel totale\./);
   assert.deepEqual([tripCost(SNAPSHOT, "t_peru").voli, tripCost(SNAPSHOT, "t_peru").lo, tripCost(SNAPSHOT, "t_peru").hi], [1450, 1450 + 180 + 1500, 1450 + 180 + 2100]);
   assert.equal(tripCost(SNAPSHOT, "t_non-esiste").text, "voli n.d.");
   // snapshot senza i costi del giro (scritto prima di questa modifica): si usa la tabella di ripiego del Worker

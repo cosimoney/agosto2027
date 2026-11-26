@@ -476,7 +476,8 @@ def main():
     (fxd / "trips_data.json").write_text(json.dumps({"legs": [[300, "Wizz Air", 240, 0, "06:10", "12:00", 0, "", "FCO", "TBS", D1], [260, "Pegasus", 400, 1, "09:00", "15:00", 0, "SAW", "EVN", "FCO", R1],
                                                               [450, "easyJet", 250, 0, "07:00", "13:00", 0, "", "MXP", "TBS", D1]],
         "trips": [{"id": "georgia-armenia", "name": "Georgia + Armenia", "countries": ["Georgia", "Armenia"], "arr": "TBS", "cov": [[4, 2, 0]], "land": [1100, 1600], "itot": 40, "nights": 10,
-                   "air": [{"k": "ow", "a": "TBS", "b": "EVN"}, {"k": "rt", "a": "TBS", "b": "TBS"}],
+                   "internal": [["Tbilisi-Mestia", 40, 0, 40, "", "", 1]], "best": {"kind": "rt", "hub": "TBS"},
+                   "air": [{"k": "ow", "a": "TBS", "b": "EVN"}, {"k": "rt", "a": "TBS", "b": "TBS", "add": [["Erevan-Tbilisi A/R", 96, 1, 120, "2027-08-12", "Georgian Airways", 2], ["Erevan-Tbilisi via terra", 25, 0, 25, "", "", 0]]}],
                    "cells": [{"dep": D1, "n": 11, "o": "FCO", "a": [[0, 560, 0, 0, 1]], "b": None, "x": None}, {"dep": D1, "n": 11, "o": "MXP", "a": [[1, 450, 25, 2, -1]], "b": None, "x": None},
                              {"dep": D1, "n": 12, "o": "PSA", "a": [], "b": None, "x": 900}]}]}), encoding="utf-8")
     stp = S.build(root=fxd, weekend="none", cfg=cfg)
@@ -486,6 +487,26 @@ def main():
     tgp = stp["targets"]["t_georgia-armenia"]
     check(tgp.get("land") == [1100, 1600] and tgp.get("itot") == 40 and tgp.get("nights") == 10 and S.lite(stp)["targets"]["t_georgia-armenia"].get("land") == [1100, 1600],
           "popular trips: a terra, voli interni e notti nel target (servono a /voti per il costo totale pp), anche nello snapshot ridotto", tgp)
+    ti = tgp.get("int") or {}
+    check(ti == {"n": 3, "pp": 136, "real": 1, "legs": ["Tbilisi → Mestia", "Erevan → Tbilisi A/R"]} and S.lite(stp)["targets"]["t_georgia-armenia"].get("int") == ti,
+          "popular trips: voli interni nel target (quanti, euro pp, reale o stima, tratte; la tratta via terra non conta)", ti)
+    check(C.int_txt(tgp) == "✈ 3 voli interni ~136 € pp (in parte stima): Tbilisi → Mestia, Erevan → Tbilisi A/R" and C.int_txt(tgp, short=True) == "✈ 3 voli interni ~136 € pp"
+          and C.int_txt({"int": {"n": 1, "pp": 58, "real": 2, "legs": ["Lima → Cusco"]}}) == "✈ 1 volo interno 58 € pp (prezzo reale): Lima → Cusco" and C.int_txt({}) == "" and C.int_txt(None) == "",
+          "voli interni: testo per digest e card (stima con ~, prezzo reale senza)", C.int_txt(tgp))
+    check(S.trip_internal({"internal": [["Lima-Cusco", 70]], "best": None}, []) == {"n": 1, "pp": 70, "real": 0, "legs": ["Lima → Cusco"]}
+          and S.trip_internal({"internal": [], "best": {"kind": "rt", "hub": "TBS"}}, [{"k": "rt", "a": "TBS", "add": [["Erevan-Tbilisi via terra", 25]]}]) is None,
+          "voli interni: dati vecchi a due campi letti come stima; solo tratte via terra = nessun volo interno")
+    import base64 as _b64
+    tf = lambda u: _b64.urlsafe_b64decode(u.split("tfs=")[1].split("&")[0])
+    u1 = C.gf_url("MXP", "TBS", D1, R1, 1)
+    check(u1.startswith("https://www.google.com/travel/flights/search?tfs=") and tf(u1).count(bytes([0x28, 1])) == 2 and tf(u1).count(b"MXP") == 2 and D1.encode() in tf(u1) and R1.encode() in tf(u1),
+          "link Google Flights A/R: stesso filtro scali del prezzo (max 1) su andata e ritorno", u1)
+    check(tf(C.gf_url("MXP", "TBS", D1, R1, 2)).count(bytes([0x28, 2])) == 2 and tf(C.gf_ow_url("EVN", "FCO", R1, 1)).count(bytes([0x28, 1])) == 1 and "travel/flights?q=" in C.gf_url("MXP", "TBS", D1, R1),
+          "link Google Flights: filtro a 2 scali per le opzioni a 2 scali, solo andata con filtro; senza limite resta la ricerca a testo")
+    check(C.gf_tfs([("2027-08-14", "LIN", "EZE", 1), ("2027-08-24", "EZE", "LIN", 1)], 1) == "GhwSCjIwMjctMDgtMTQoAWoFEgNMSU5yBRIDRVpFGhwSCjIwMjctMDgtMjQoAWoFEgNFWkVyBRIDTElOQgEBSAGYAQE=",
+          "link Google Flights: tfs uguale a quello del sito e della scansione")
+    check(po["MXP"]["url"] == C.gf_url("MXP", "TBS", D1, R1, 1) and "tfs=" in po["FCO"]["url"] and "tfs=" in po["FCO"]["url_ret"] and tf(po["FCO"]["url_ret"]).count(bytes([0x28, 1])) == 1,
+          "popular trips: link dei voli con il filtro scali (A/R e le due tratte degli open-jaw)", po["MXP"]["url"])
     pl = C.offer_line(po["FCO"], cfg, show_origin=True)
     check('<a href="https://example.org/dashboard/#/t/georgia-armenia"><b>Georgia + Armenia</b></a>' in pl and "da Roma FCO" in pl and "rientro da EVN" in pl and "andata</a>/<a" in pl,
           "popular trip: link #/t/georgia-armenia, origine e rientro open-jaw nella riga", pl[:200])
