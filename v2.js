@@ -231,6 +231,14 @@ function aggD(){
 }
 const viewD = (code, origin, stops) => fold(DEST[code], (BYD[code] || []).filter(c => oMatch(c.o, origin)), stops);
 const stopsTxt = f => f[3] === 0 ? "diretto" : `${f[3]} ${f[3] === 1 ? "scalo" : "scali"}${f[7] ? " · " + esc(f[7]) : ""}`;
+// scali di un'opzione A/R, andata e ritorno: il ritorno si dichiara sempre, anche quando non e' ancora stato letto
+// (f[10] = ritorno letto, con [11] 1 = stesso biglietto, 2 = indicativo; nelle stime f[3] e' gia' la tratta peggiore)
+function stopsAR(f, est){
+  if(est) return stopsTxt(f);
+  const r = f[10];
+  if(!r) return `andata ${stopsTxt(f)} · ritorno: scali non ancora letti`;
+  return `andata ${stopsTxt(f)} · ritorno ${stopsTxt(r)}${r[11] === 2 ? " (indicativo)" : ""}`;
+}
 const climaCls = g => g === "ottimo" ? "ok" : g === "buono" ? "info" : "warn";
 const EST_TXT = META.estNote || "stima: somma di due solo andata";
 const estBadge = c => c && c.e ? `<span class="est" title="Google Flights non restituisce l'A/R su questa rotta: il prezzo è la somma del miglior solo andata e del miglior ritorno nelle stesse date. L'A/R vero di solito costa meno.">${esc(EST_TXT)}</span>` : "";
@@ -249,23 +257,42 @@ function originBadges(set){
   const os = [...set].sort((x, y) => oRank(x) - oRank(y)), rest = uniq(os.filter(o => o !== "LIN").map(oName));
   return (set.has("LIN") ? `<span class="b ok">da Linate</span>` : "") + (rest.length ? `<span class="b plain">${set.has("LIN") ? "anche " : "da "}${esc(rest.join(", "))}</span>` : "");
 }
-const gfD = (o, code, dep, ret) => `https://www.google.com/travel/flights?q=${encodeURIComponent(`Flights from ${o} to ${code} on ${dep} through ${ret}`)}&curr=EUR&hl=it`;
 
 /* ------------------------------------------------------------------ popular trips: logica */
 const L = POP.legs, PCL = POP.clima || CL;
 const cityOf = c => (POP.city || {})[c] || c;
 const mid = t => (t.land[0] + t.land[1]) / 2;
+// Ricerca di Google Flights (parametro tfs, lo stesso che scrive il browser e che usano scan.py e returns.py).
+// tratte = [[data, da, a, max scali | null, voli gia' scelti | null], ...]; trip: 1 = A/R, 2 = solo andata, 3 = multi-city.
+// max scali va su OGNI tratta: e' il filtro con cui e' stato letto il prezzo (1, oppure 2 nelle opzioni a 2 scali), cosi'
+// la pagina che si apre mostra gli stessi voli e non quelli con piu' scali. voli gia' scelti = [[da, giorno, a, sigla,
+// numero], ...]: l'andata di quel biglietto; con quella Google apre direttamente la scelta del ritorno.
 function tfs(segs, trip){
-  const str = s => [...s].map(c => c.charCodeAt(0));
-  const ld = (tag, bytes) => [tag, bytes.length, ...bytes];
+  const str = s => [...String(s)].map(c => c.charCodeAt(0));
+  const vint = n => { const o = []; do { o.push((n & 0x7f) | (n > 0x7f ? 0x80 : 0)); n >>= 7; } while(n); return o; };
+  const ld = (tag, bytes) => [tag, ...vint(bytes.length), ...bytes];
   let out = [];
-  for(const [date, from, to] of segs)
-    out = out.concat(ld(0x1a, [...ld(0x12, str(date)), ...ld(0x6a, ld(0x12, str(from))), ...ld(0x72, ld(0x12, str(to)))]));
+  for(const [date, from, to, ms, sel] of segs){
+    let b = ld(0x12, str(date));
+    for(const s of sel || []) b = b.concat(ld(0x22, [...ld(0x0a, str(s[0])), ...ld(0x12, str(s[1])), ...ld(0x1a, str(s[2])), ...ld(0x2a, str(s[3])), ...ld(0x32, str(s[4]))]));
+    if(ms != null) b.push(0x28, ms);
+    out = out.concat(ld(0x1a, b.concat(ld(0x6a, ld(0x12, str(from))), ld(0x72, ld(0x12, str(to))))));
+  }
   out = out.concat([0x42, 1, 1, 0x48, 1, 0x98, 0x01, trip]);
   const b64 = typeof btoa === "function" ? btoa(String.fromCharCode.apply(null, out)) : Buffer.from(out).toString("base64");
   return b64.replace(/\+/g, "-").replace(/\//g, "_");
 }
 const gfUrl = (segs, trip) => `https://www.google.com/travel/flights/search?tfs=${tfs(segs, trip)}&hl=it&curr=EUR`;
+// voli dell'andata per il link (tratte dell'itinerario con sigla e numero di volo); null se mancano
+const gfSel = (segs, dep) => segs && segs.length && segs.every(s => s[7] && s[8]) ? segs.map(s => [s[0], addD(dep, s[4] || 0), s[1], s[7], s[8]]) : null;
+// A/R o -> d con il limite di scali su andata e ritorno; con sel l'andata e' gia' scelta e la pagina mostra i ritorni di quel biglietto
+const gfAR = (o, d, dep, ret, ms, sel) => gfUrl([[dep, o, d, ms, sel], [ret, d, o, ms]], 1);
+const msTxt = ms => ms === 0 ? "solo diretti" : ms === 1 ? "max 1 scalo" : `max ${ms} scali`;
+// link di un'opzione A/R: "vedi il ritorno" (andata scelta) quando si conoscono i voli, e sempre la ricerca con il filtro scali
+function arLinks(o, d, dep, ret, ms, segs){
+  const sel = gfSel(segs, dep), all = `<a href="${gfAR(o, d, dep, ret, ms)}" target="_blank" rel="noopener">${sel ? "Tutti gli A/R" : "Google Flights A/R"} · ${msTxt(ms)} ↗</a>`;
+  return (sel ? `<a href="${gfAR(o, d, dep, ret, ms, sel)}" target="_blank" rel="noopener">Vedi il ritorno su Google Flights ↗</a>` : "") + all;
+}
 // opzione = [indice air, prezzo voli Google pp, extra stimato pp, leg andata, leg ritorno | -1]
 function pview(t, op, two, ref){
   const a = t.air[op[0]], fl = op[1], extra = op[2], out = L[op[3]], back = op[4] >= 0 ? L[op[4]] : null;
@@ -333,6 +360,23 @@ function howTxt(t, v){
   return `A/R su ${esc(cityOf(v.a.a))} ${esc(v.a.a)}` + (v.extra ? ` + ${v.a.add.map(e => esc(e[0])).join(", ")}` : "");
 }
 const ptwoBadge = v => v.two ? `<span class="b warn wrapb">2 scali: risparmi ${eur(v.save)} pp (${v.pct}%)</span>` : "";
+// Voli interni di un giro. Voce (build_trips.py, internal.py) = [etichetta, euro pp, 1 = prezzo reale letto su Google
+// Flights | 0 = stima del catalogo, stima del catalogo, giorno del volo letto, compagnie, quanti voli (0 = via terra)].
+const LAND_RE = /terra|treno|bus|traghett|auto\b/i;
+const intN = e => e[6] != null ? e[6] : LAND_RE.test(e[0]) ? 0 : 1;
+const intRoute = e => esc(String(e[0]).replace(/-/g, " → "));
+const intEur = e => (e[2] ? "" : "~") + eur(e[1]);
+const intTag = e => e[2] ? `<span class="real">prezzo reale</span>` : `<span class="est">stima</span>`;
+const intLi = e => `<li><span>${intRoute(e)} ${intTag(e)}${e[2] && (e[5] || e[4]) ? `<small>${[e[5] ? esc(e[5]) : "", e[4] ? "Google Flights, volo del " + fmtD(e[4]) : ""].filter(Boolean).join(" · ")}</small>` : ""}</span><b class="num">${intEur(e)}</b></li>`;
+// t = giro, v = opzione di volo scelta (le sue tratte extra per chiudere il giro contano come voli interni), o niente
+function intInfo(t, v){
+  const list = t.internal.concat(v && v.a ? v.a.add : []).filter(e => intN(e) > 0);
+  const n = list.reduce((s, e) => s + intN(e), 0), sum = list.reduce((s, e) => s + e[1], 0), real = list.filter(e => e[2]).length, all = n > 0 && real === list.length;
+  return {list, n, sum, real, all, src:!n ? "" : all ? "prezzo reale" : real ? "in parte stima" : "stima", cls:all ? "real" : "est",
+    txt:n ? `✈ ${n} ${n === 1 ? "volo interno" : "voli interni"} · ${all ? "" : "~"}${eur(sum)} pp` : "", routes:list.map(intRoute)};
+}
+const intBadge = (t, v, cls) => { const x = intInfo(t, v); return x.n ? `<span class="b ${cls || "info"} wrapb intb" title="${x.routes.join(" · ")} (${x.src})">${x.txt}</span>` : ""; };
+const intRoutes = (t, v) => { const x = intInfo(t, v); return x.n ? `<p class="meta intl"><b>${x.n === 1 ? "Volo interno" : "Voli interni"}</b> <span class="${x.cls}">${x.src}</span> ${x.routes.join(" · ")}</p>` : ""; };
 
 /* ------------------------------------------------------------------ componenti: card */
 function cardD(a, i, feat){
@@ -345,7 +389,7 @@ function cardD(a, i, feat){
     </div>
     <div class="card-bd">
       <div class="pr"><span class="pp num">${eur(a.min)}</span><span class="u">${priceU(b.c)}</span><span class="cp num">coppia ${eur(a.min * 2)}</span></div>
-      <p class="meta"><b>${fmtD(b.c.dep)} → ${fmtD(ret)}</b> · ${b.c.n} giorni · da ${esc(oName(b.c.o))} · ${stopsTxt(b.o.f)}${a.max > a.min ? ` · altre date fino a ${eur(a.max)}` : ""}</p>
+      <p class="meta"><b>${fmtD(b.c.dep)} → ${fmtD(ret)}</b> · ${b.c.n} giorni · da ${esc(oName(b.c.o))} · ${stopsAR(b.o.f, b.c.e)}${a.max > a.min ? ` · altre date fino a ${eur(a.max)}` : ""}</p>
       ${d.giro ? `<p class="giro"><s>${esc(d.seen)}</s> → <b>${esc(d.giro)}</b></p>` : ""}
       <div class="bs">${alsoBadge(b.c.o, a.origins)}<span class="b plain">${esc(d.temp)}</span>${priceBadge("d_" + d.code)}${d.flag ? `<span class="b warn wrapb">${esc(d.flag)}</span>` : ""}${twoBadge(b.o)}${estBadge(b.c)}</div>
       <div class="card-ft">${cmpBtn("d_" + d.code, d.city)}</div>
@@ -367,7 +411,8 @@ function cardT(a, i, feat){
       <div class="pr2"><span>Totale stimato <b class="num">${eur(a.min)} pp</b> <span class="est">stima</span></span><span class="num">coppia ${eur(a.min * 2)}</span></div>
       <p class="meta"><b>${fmtD(c.dep)} → ${fmtD(ret)}</b> · ${c.n} giorni · da ${esc(oName(c.o))} · ${howTxt(t, o)}</p>
       <p class="meta">${t.stages.map(s => esc(s[0])).join(" → ")}</p>
-      <div class="bs">${alsoBadge(c.o, a.origins)}<span class="b plain">ritmo ${esc(t.pace)}</span>${priceBadge("t_" + t.id)}${t.visited ? `<span class="b plain">giro nuovo</span>` : ""}${t.flag ? `<span class="b warn wrapb">${esc(t.flag)}</span>` : ""}${ptwoBadge(o)}</div>
+      ${intRoutes(t, o)}
+      <div class="bs">${intBadge(t, o)}${alsoBadge(c.o, a.origins)}<span class="b plain">ritmo ${esc(t.pace)}</span>${priceBadge("t_" + t.id)}${t.visited ? `<span class="b plain">giro nuovo</span>` : ""}${t.flag ? `<span class="b warn wrapb">${esc(t.flag)}</span>` : ""}${ptwoBadge(o)}</div>
       <div class="card-ft">${rateChip("t_" + t.id)}${cmpBtn("t_" + t.id, t.name)}</div>
     </div>
     <a class="card-link" href="#/t/${esc(t.id)}"><span class="sr">Apri ${esc(t.name)}, voli da ${eur(o.voli)} a persona</span></a>
@@ -546,7 +591,7 @@ function listsT(){
 }
 function notesT(){
   const m = POP.meta || {};
-  return `<p><b>Cosa è reale e cosa è stima.</b> Reali: i prezzi dei singoli voli letti su Google Flights il ${esc(m.date || "")} (economy, 1 adulto, tariffa base). Stime: la somma di due solo-andata usata per gli open-jaw, i voli interni e il costo a terra (fascia mid-range in camera doppia, alta stagione). Il totale coppia è il doppio.</p>
+  return `<p><b>Cosa è reale e cosa è stima.</b> Reali: i prezzi dei singoli voli letti su Google Flights il ${esc(m.date || "")} (economy, 1 adulto, tariffa base) e i voli interni segnati «prezzo reale», letti allo stesso modo nel giorno giusto dell'itinerario. Stime: la somma di due solo-andata usata per gli open-jaw, i voli interni segnati «stima» e il costo a terra (fascia mid-range in camera doppia, alta stagione). Il totale coppia è il doppio.</p>
   <p><b>Open-jaw.</b> Ogni open-jaw è confrontato con l'alternativa «A/R su un solo aeroporto + tratta interna stimata» e vince la combinazione più economica. Il link multi-city apre la ricerca vera su Google Flights, dove il biglietto unico di solito costa meno della somma.</p>
   <p><b>Scali.</b> Al massimo 1 scalo per tratta; un'opzione con 2 scali compare solo con «Max scali: 2» e solo se fa risparmiare almeno il ${Math.round((m.minPct || .25) * 100)}% e ${m.minEur || 150} € a persona.</p>
   <p><b>Punteggio (0-100).</b> 50% totale stimato pp (100 a 1.500 €, 0 a 5.500 €), 25% comodità dei voli, 25% clima di agosto.</p>
@@ -758,7 +803,7 @@ function voliD(code){
   const origins = new Set((BYD[code] || []).map(c => oKey(c.o)));
   const ctl = vctl(S.f, origins, [[0, "Diretto"], [1, "1"], [2, "2 (se conviene)"]]);
   const head = `<p class="eyebrow">Voli · A/R per persona</p><h2 class="h2" style="margin:6px 0 0">Quando <i>partire</i></h2>` +
-    byCity(g => viewD(code, g, S.f.stops), S.f.origin, x => [x.min, `${esc(oName(x.cheap.c.o))} · ${fmtD(x.cheap.c.dep)} · ${x.cheap.c.n} giorni · ${stopsTxt(x.cheap.o.f)}`]);
+    byCity(g => viewD(code, g, S.f.stops), S.f.origin, x => [x.min, `${esc(oName(x.cheap.c.o))} · ${fmtD(x.cheap.c.dep)} · ${x.cheap.c.n} giorni · ${stopsAR(x.cheap.o.f, x.cheap.c.e)}`]);
   if(!a){
     const cov = COV[code] || [0, 0, null], any = (BYD[code] || []).length;
     const msg = any ? "Nessun volo con questi filtri: prova un altro aeroporto o più scali." : cov[1] > 0 ? `Per ora solo voli con 2 scali per tratta${cov[2] ? ", da " + eur(cov[2]) + " pp" : ""}.` : `Al ${esc(META.date || "")} Google Flights non restituisce voli per agosto 2027 su questa rotta, né come A/R né come due solo andata. Capita sulle rotte poco cercate o non ancora in vendita: si ricontrolla a ogni giro.`;
@@ -770,11 +815,11 @@ function voliD(code){
   let fl = "";
   const cs = (BYD[code] || []).filter(c => c.dep === dep && c.n === +n && oMatch(c.o, S.f.origin)).sort((x, y) => oRank(x.o) - oRank(y.o));
   for(const c of cs) for(const o of options(c, S.f.stops)){
-    const f = o.f, est = !!(c.e && f[10]), r = f[10] || null;
-    const legs = legBlock("Andata", f, ITD.rows[f[12]], ITD, {date:dep, price:est ? f[11] : null}) +
-      (r ? legBlock("Ritorno", r, ITD.rows[r[10]], ITD, {date:ret, price:est ? r[0] : null, tag:est ? "" : retTag(r[11]), note:est ? "" : retNote(r[11])}) : retNA(ret, apCity(code, ITD)));
-    const links = est ? `<a href="${gfUrl([[dep, c.o, code]], 2)}" target="_blank" rel="noopener">Andata ↗</a> <a href="${gfUrl([[ret, code, c.o]], 2)}" target="_blank" rel="noopener">Ritorno ↗</a>`
-      : `<a href="${gfD(c.o, code, dep, ret)}" target="_blank" rel="noopener">Google Flights ↗</a>`;
+    const f = o.f, est = !!(c.e && f[10]), r = f[10] || null, ms = o.two ? 2 : 1, segs = ITD.rows[f[12]];
+    const legs = legBlock("Andata", f, segs, ITD, {date:dep, price:est ? f[11] : null}) +
+      (r ? legBlock("Ritorno", r, ITD.rows[r[10]], ITD, {date:ret, price:est ? r[0] : null, tag:est ? "" : retTag(r[11]), note:est ? "" : retNote(r[11])}) : retNA(ret, apCity(code, ITD), ms, gfAR(c.o, code, dep, ret, ms, gfSel(segs, dep))));
+    const links = est ? `<a href="${gfUrl([[dep, c.o, code, ms]], 2)}" target="_blank" rel="noopener">Andata · ${msTxt(ms)} ↗</a> <a href="${gfUrl([[ret, code, c.o, ms]], 2)}" target="_blank" rel="noopener">Ritorno · ${msTxt(ms)} ↗</a>`
+      : arLinks(c.o, code, dep, ret, ms, segs);
     fl += `<div class="fl"><div class="fl-l legs">
       <div class="lg-sec"><b>${est ? "Due biglietti solo andata" : "Biglietto A/R"}</b>${est ? estBadge(c) : `<span class="real">prezzo reale Google</span>`}${c.o === "LIN" ? `<span class="b ok">da Linate</span>` : ""}${twoBadge(o)}</div>
       ${legs}
@@ -783,8 +828,8 @@ function voliD(code){
   }
   return head + ctl + `<div class="v-cols"><div><h3 class="h3">Andata × durata</h3>${mx}<p class="note" style="margin-top:10px">Prezzo A/R per persona più basso della combinazione, con l'aeroporto sotto. Più intenso = più economico, il punto giallo segna il minimo. Tocca una cella per i voli.</p></div>
     <div><h3 class="h3">${fmtD(dep)} → ${fmtD(ret)} · ${n} giorni</h3>${fl}
-    <p class="note">Il prezzo è il totale A/R per persona. Il ritorno «stesso biglietto A/R» è quello che Google abbina a quell'andata allo stesso prezzo; «indicativo» è il volo più economico di quel giorno e sul biglietto A/R potrebbe cambiare. Dove gli orari del ritorno mancano arrivano nei prossimi giri. Punteggio: prezzo, comodità dell'andata e clima.${Object.values(a.cellBest).some(x => x.c.e) ? ` <b>Le celle segnate «stima» non sono un A/R</b>: su questa rotta Google Flights non lo restituisce, quindi il prezzo è la somma del miglior solo andata e del miglior ritorno (due biglietti separati, stessa regola scali per ciascuna tratta). L'A/R vero di solito costa meno.` : ""}</p>
-    <p style="margin-top:16px"><a class="btn sun" href="${gfD(a.cellBest[S.cell].c.o, code, dep, ret)}" target="_blank" rel="noopener">Apri su Google Flights ↗</a></p></div></div>`;
+    <p class="note">Il prezzo è il totale A/R per persona, cercato con lo stesso limite di scali all'andata e al ritorno (al massimo 1, oppure 2 dove indicato). Il ritorno «stesso biglietto A/R» è quello che Google abbina a quell'andata allo stesso prezzo; «indicativo» è il volo più economico di quel giorno e sul biglietto A/R potrebbe cambiare; «non ancora letto» vuol dire che orari e scali del ritorno non li conosciamo ancora e arrivano nei prossimi giri. I link aprono Google Flights con lo stesso filtro scali e, dove si può, con l'andata già scelta. Punteggio: prezzo, comodità dell'andata e clima.${Object.values(a.cellBest).some(x => x.c.e) ? ` <b>Le celle segnate «stima» non sono un A/R</b>: su questa rotta Google Flights non lo restituisce, quindi il prezzo è la somma del miglior solo andata e del miglior ritorno (due biglietti separati, stessa regola scali per ciascuna tratta). L'A/R vero di solito costa meno.` : ""}</p>
+    <p style="margin-top:16px"><a class="btn sun" href="${gfAR(a.cellBest[S.cell].c.o, code, dep, ret, a.cellBest[S.cell].o.two ? 2 : 1)}" target="_blank" rel="noopener">Apri su Google Flights · ${msTxt(a.cellBest[S.cell].o.two ? 2 : 1)} ↗</a></p></div></div>`;
 }
 function destHTML(code){
   const d = DEST[code];
@@ -803,7 +848,7 @@ function destHTML(code){
       <div class="hero-row rise" style="--i:2">
         <div class="d-cta">
           ${b ? `<div class="tag"><span class="pp num">${eur(a.min)}</span><span class="u">${priceU(b.c)}<small class="num">coppia ${eur(a.min * 2)}</small></span></div>` : `<div class="tag"><span class="pp">n.d.</span><span class="u">voli<small>nessuno trovato per ora</small></span></div>`}
-          <div class="d-when">${b ? `<b>${fmtD(b.c.dep)} → ${fmtD(ret)}</b><span>${b.c.n} giorni · da ${esc(oName(b.c.o))} · ${stopsTxt(b.o.f)}${b.c.e ? " · somma di due solo andata" : ""}</span>` : `<span>Si ricontrolla a ogni giro</span>`}</div>
+          <div class="d-when">${b ? `<b>${fmtD(b.c.dep)} → ${fmtD(ret)}</b><span>${b.c.n} giorni · da ${esc(oName(b.c.o))} · ${stopsAR(b.o.f, b.c.e)}${b.c.e ? " · somma di due solo andata" : ""}</span>` : `<span>Si ricontrolla a ogni giro</span>`}</div>
         </div>
         <div class="d-cta">${b ? `<button class="btn sun" data-act="scroll" data-to="voli">Vedi i voli</button>` : ""}${favCta("d_" + code)}${cmpBtn("d_" + code, d.city, "btn ghost")}</div>
       </div>
@@ -869,31 +914,32 @@ function legBlock(kind, f, segs, T, o){
 // ritorno di un A/R: 1 = quello dello stesso biglietto (pagina di Google con l'andata scelta, stesso prezzo), 2 = indicativo
 const retTag = k => k === 1 ? `<span class="real">stesso biglietto A/R</span>` : `<span class="est">indicativo</span>`;
 const retNote = k => k === 1 ? "" : "Ritorno indicativo: il più economico del giorno. Sul biglietto A/R potrebbe cambiare.";
-const retNA = (ret, from) => `<div class="lg lg-na" role="group" aria-label="Ritorno ${fmtD(ret)}">
-    <div class="lg-h"><span class="lg-k">Ritorno</span><span class="lg-d">${fmtD(ret)}</span></div>
-    <div class="lg-m">Da ${esc(from)}: orari non ancora letti. Il prezzo è già il totale A/R; gli orari del ritorno arrivano un po' a ogni giro, dalle combinazioni più economiche. Intanto si vedono su Google Flights.</div></div>`;
+// ritorno non ancora letto: si dice chiaro, con il limite di scali con cui e' stato cercato il prezzo e il link per vederlo
+const retNA = (ret, from, ms, url) => `<div class="lg lg-na" role="group" aria-label="Ritorno ${fmtD(ret)}, non ancora letto">
+    <div class="lg-h"><span class="lg-k">Ritorno</span><span class="lg-d">${fmtD(ret)}</span><span class="na">non ancora letto</span></div>
+    <div class="lg-m"><b>Orari e scali del ritorno da ${esc(from)} non li abbiamo ancora letti.</b> Il prezzo è già il totale A/R ed è stato cercato con ${ms === 1 ? "al massimo 1 scalo" : `al massimo ${ms} scali`} anche al ritorno; il volo preciso arriva nei prossimi giri.${url ? ` <a href="${url}" target="_blank" rel="noopener">Controlla il ritorno su Google Flights ↗</a>` : ""}</div></div>`;
 
 /* ------------------------------------------------------------------ pagina popular trip */
 function optHTML(t, c, v){
-  const ret = addD(c.dep, c.n), ow = v.a.k === "ow", it = f => ITP.rows[f[11]];
-  let legs, link, lt;
+  const ret = addD(c.dep, c.n), ow = v.a.k === "ow", it = f => ITP.rows[f[11]], ms = v.two ? 2 : 1;
+  let legs, link;
   if(ow){
     legs = legBlock("Andata", v.out, it(v.out), ITP, {date:v.out[10], price:v.out[0]}) + legBlock("Ritorno", v.back, it(v.back), ITP, {date:v.back[10], price:v.back[0]});
-    link = gfUrl([[c.dep, v.out[8], v.a.a], [ret, v.a.b, v.back[9]]], 3); lt = "Google Flights multi-city ↗";
+    link = `<a href="${gfUrl([[c.dep, v.out[8], v.a.a, ms], [ret, v.a.b, v.back[9], ms]], 3)}" target="_blank" rel="noopener">Google Flights multi-city · ${msTxt(ms)} ↗</a>`;
   } else {
     legs = legBlock("Andata", v.out, it(v.out), ITP, {date:c.dep}) +
-      (v.ret ? legBlock("Ritorno", v.ret, it(v.ret), ITP, {date:ret, tag:retTag(v.rk), note:retNote(v.rk)}) : retNA(ret, cityOf(v.a.a)));
-    link = gfUrl([[c.dep, c.o, v.a.a], [ret, v.a.a, c.o]], 1); lt = "Google Flights A/R ↗";
+      (v.ret ? legBlock("Ritorno", v.ret, it(v.ret), ITP, {date:ret, tag:retTag(v.rk), note:retNote(v.rk)}) : retNA(ret, cityOf(v.a.a), ms, gfAR(c.o, v.a.a, c.dep, ret, ms, gfSel(it(v.out), c.dep))));
+    link = arLinks(c.o, v.a.a, c.dep, ret, ms, it(v.out));
   }
-  const land = v.extra && v.a.add.every(e => /terra|treno|bus|traghett|auto\b/i.test(e[0]));
-  const add = v.extra ? `<div class="lg lg-int" role="group" aria-label="${land ? "Tratte interne" : "Voli interni"}, stima">
-      <div class="lg-h"><span class="lg-k">${land ? "Tratte interne" : "Voli interni"}</span><span class="est">stima</span>${v.a.add.length > 1 ? `<span class="lg-p num">~${eur(v.extra)}</span>` : ""}</div>
-      <ul class="ints">${v.a.add.map(e => `<li><span>${esc(e[0])}</span><b class="num">~${eur(e[1])}</b></li>`).join("")}</ul>
+  const land = v.extra && v.a.add.every(e => !intN(e)), nreal = v.a.add.filter(e => e[2]).length, allReal = nreal > 0 && nreal === v.a.add.length;
+  const add = v.extra ? `<div class="lg lg-int${allReal ? " real" : ""}" role="group" aria-label="${land ? "Tratte interne" : "Voli interni"}, ${allReal ? "prezzo reale" : "stima"}">
+      <div class="lg-h"><span class="lg-k">${land ? "Tratte interne" : "Voli interni"}</span>${allReal ? `<span class="real">prezzo reale</span>` : `<span class="est">${nreal ? "in parte stima" : "stima"}</span>`}${v.a.add.length > 1 ? `<span class="lg-p num">${allReal ? "" : "~"}${eur(v.extra)}</span>` : ""}</div>
+      <ul class="ints">${v.a.add.map(e => nreal ? intLi(e) : `<li><span>${intRoute(e)}</span><b class="num">${intEur(e)}</b></li>`).join("")}</ul>
       <div class="lg-m">${v.a.note ? esc(String(v.a.note).replace(/[.\s]+$/, "")) + ". " : ""}Per persona, fuori dal prezzo dei voli internazionali: entrano nel totale stimato.</div></div>` : (v.a.note ? `<div class="fl-m">${esc(v.a.note)}</div>` : "");
   return `<div class="fl"><div class="fl-l legs">
       <div class="lg-sec"><b>Voli internazionali</b>${ow ? `<span class="est">somma di 2 solo-andata · stima</span>` : `<span class="real">A/R · prezzo reale Google</span>`}${ptwoBadge(v)}</div>
       ${legs}${add}
-    </div><div class="fl-r"><div class="pp num">${eur(v.voli)} <small>PP VOLI</small></div><div class="cp num">coppia ${eur(v.voli * 2)}</div><div class="cp num">totale stimato ${eur(v.tot)} pp</div><a href="${link}" target="_blank" rel="noopener">${lt}</a></div></div>`;
+    </div><div class="fl-r"><div class="pp num">${eur(v.voli)} <small>PP VOLI</small></div><div class="cp num">coppia ${eur(v.voli * 2)}</div><div class="cp num">totale stimato ${eur(v.tot)} pp</div>${link}</div></div>`;
 }
 function voliT(id){
   const t = PT[id], a = viewT(t, S.p.origin, S.p.stops);
@@ -906,22 +952,22 @@ function voliT(id){
     const msg = t.cells.length && t.best ? "Nessun volo con questi filtri: prova un altro aeroporto o più scali." : esc(t.why || "Nessun volo valido per ora.");
     return head + (t.cells.length ? ctl : "") + `<div class="v-cols" style="margin-top:20px"><div><h3 class="h3">Costo stimato</h3><table class="cost"><tbody>
       <tr><td>Voli internazionali<small>${msg}</small></td><td>n.d.</td></tr>
-      <tr><td>Voli interni <span class="est">stima</span><small>${t.internal.length ? t.internal.map(e => `${esc(e[0])} ~${eur(e[1])}`).join(" · ") : "nessuno"}</small></td><td>${eur(t.itot)}</td></tr>${land}</tbody></table></div><div><p class="empty">${msg}</p></div></div>`;
+      <tr><td>Voli interni${t.internal.length ? ` <span class="${intInfo(t).cls}">${intInfo(t).src || "stima"}</span>` : ""}<small>${t.internal.length ? t.internal.map(e => `${intRoute(e)} ${intEur(e)}`).join(" · ") : "nessuno"}</small></td><td>${eur(t.itot)}</td></tr>${land}</tbody></table></div><div><p class="empty">${msg}</p></div></div>`;
   }
   if(!S.cell || !a.cellBest[S.cell]) S.cell = a.cheap.c.dep + "|" + a.cheap.c.n;
   const [dep, n] = S.cell.split("|"), ret = addD(dep, +n), v = a.cellBest[S.cell].o;
   const mx = mxHTML(a.cellBest, S.cell, x => x.o.voli + x.o.extra, x => oName(x.c.o) + (x.o.a.k === "ow" ? " · 2×OW" : " · A/R " + x.o.a.a) + (x.o.extra ? " +" + x.o.extra : "") + (x.o.two ? " · 2 sc." : ""));
   let fl = "";
   for(const c of a.cs.filter(c => c.dep === dep && c.n === +n).sort((x, y) => oRank(x.o) - oRank(y.o))) for(const o of poptions(t, c, S.p.stops)) fl += optHTML(t, c, o);
-  const interni = t.internal.concat(v.extra ? v.a.add : []);
+  const interni = t.internal.concat(v.extra ? v.a.add : []), inr = interni.filter(e => e[2]).length;
   const cost = `<table class="cost"><tbody>
     <tr><td>Voli internazionali <span class="${v.a.k === "ow" ? "est" : "real"}">${v.a.k === "ow" ? "somma di 2 solo-andata · stima" : "prezzo reale Google"}</span><small>${howTxt(t, v)} · ${fmtD(dep)} → ${fmtD(ret)}</small></td><td>${eur(v.voli)}</td></tr>
-    <tr><td>Voli interni <span class="est">stima</span><small>${interni.length ? interni.map(e => `${esc(e[0])} ~${eur(e[1])}`).join(" · ") : "nessuno"}</small></td><td>${interni.length ? eur(v.interni) : "0 €"}</td></tr>${land}
+    <tr><td>Voli interni${interni.length ? (inr === interni.length ? ` <span class="real">prezzo reale</span>` : ` <span class="est">${inr ? "in parte stima" : "stima"}</span>`) : ""}<small>${interni.length ? interni.map(e => `${intRoute(e)} ${intEur(e)}${e[2] && inr < interni.length ? " (reale)" : ""}`).join(" · ") : "nessuno"}</small></td><td>${interni.length ? eur(v.interni) : "0 €"}</td></tr>${land}
     <tr class="t"><td>Totale stimato per persona<small class="num">coppia ${eur(v.lo * 2)} – ${eur(v.hi * 2)}</small></td><td>${eur(v.lo)} – ${eur(v.hi)}</td></tr></tbody></table>`;
   return head + ctl + `<div class="v-cols"><div><h3 class="h3">Costo stimato · ${fmtD(dep)}, ${n} giorni</h3>${cost}
       <h3 class="h3" style="margin-top:30px">Andata × durata · voli</h3>${mx}<p class="note" style="margin-top:10px">Voli internazionali per persona nella combinazione più economica; sotto, aeroporto e modo di volare («+N» = tratta extra stimata per chiudere il giro, in euro). Tocca una cella per i voli.</p></div>
     <div><h3 class="h3">${fmtD(dep)} → ${fmtD(ret)} · ${n} giorni</h3>${fl}
-      <p class="note">Negli open-jaw il prezzo è la somma di due biglietti solo-andata letti su Google Flights: è una stima prudente, il biglietto multi-city unico di solito costa meno sul lungo raggio. Negli A/R il ritorno «stesso biglietto A/R» è quello che Google abbina a quell'andata allo stesso prezzo; «indicativo» è il volo più economico di quel giorno e sul biglietto potrebbe cambiare.</p></div></div>`;
+      <p class="note">Negli open-jaw il prezzo è la somma di due biglietti solo-andata letti su Google Flights: è una stima prudente, il biglietto multi-city unico di solito costa meno sul lungo raggio. Negli A/R il prezzo è cercato con lo stesso limite di scali all'andata e al ritorno; il ritorno «stesso biglietto A/R» è quello che Google abbina a quell'andata allo stesso prezzo, «indicativo» è il volo più economico di quel giorno e sul biglietto potrebbe cambiare, «non ancora letto» vuol dire che orari e scali del ritorno arrivano nei prossimi giri. I link aprono Google Flights con lo stesso filtro scali e, dove si può, con l'andata già scelta.</p></div></div>`;
 }
 function tripHTML(id){
   const t = PT[id];
@@ -945,7 +991,7 @@ function tripHTML(id){
         </div>
         <div class="d-cta"><button class="btn sun" data-act="scroll" data-to="voli">Costi e voli</button>${favCta("t_" + id)}${cmpBtn("t_" + id, t.name, "btn ghost")}</div>
       </div>
-      <div class="d-facts rise" style="--i:3"><span class="b glass">${t.type === "oj" ? "open-jaw" : "A/R"}</span><span class="b glass">clima ${esc(t.g)}</span><span class="b glass">${esc(t.temp)}</span><span class="b glass">ritmo ${esc(t.pace)}</span>${a ? `<span class="b glass">punteggio ${a.bestS}/100</span>` : ""}${a ? oBadge(b.c.o, a.origins, true) : ""}${priceBadge("t_" + id, true)}</div>
+      <div class="d-facts rise" style="--i:3"><span class="b glass">${t.type === "oj" ? "open-jaw" : "A/R"}</span><span class="b glass">clima ${esc(t.g)}</span><span class="b glass">${esc(t.temp)}</span><span class="b glass">ritmo ${esc(t.pace)}</span>${intBadge(t, b && b.o, "glass")}${a ? `<span class="b glass">punteggio ${a.bestS}/100</span>` : ""}${a ? oBadge(b.c.o, a.origins, true) : ""}${priceBadge("t_" + id, true)}</div>
     </div>
   </header>
   <main>
@@ -965,7 +1011,7 @@ function tripHTML(id){
     <section class="sec wrap" id="itinerari"><div class="two">
       <div><p class="eyebrow">Tappe · ${t.nights} notti</p><h2 class="h2" style="margin:6px 0 26px">Il giro, <i>tappa per tappa</i></h2><ol class="stages">${stages}</ol></div>
       <div class="side"><p class="eyebrow" style="margin-bottom:10px">Come ci si muove</p><p>${esc(t.ground)}</p>
-        ${t.internal.length ? `<p class="eyebrow" style="margin:24px 0 10px">Voli interni <span class="est">stima</span></p><p>${t.internal.map(e => `${esc(e[0])} ~${eur(e[1])} pp`).join(" · ")}</p>` : ""}
+        ${t.internal.length ? `<p class="eyebrow" style="margin:24px 0 10px">Voli interni · ${intInfo(t).all ? "" : "~"}${eur(t.itot)} pp</p><ul class="ints side">${t.internal.map(intLi).join("")}</ul><p class="note" style="margin-top:8px">Per persona, fuori dal prezzo dei voli internazionali. «Prezzo reale» = letto su Google Flights nel giorno giusto dell'itinerario (economy, tariffa base); «stima» = ordine di grandezza del catalogo.</p>` : ""}
         <p class="eyebrow" style="margin:24px 0 10px">A terra <span class="est">stima</span></p><p><b class="num">${eur(t.land[0])} – ${eur(t.land[1])}</b> a persona, mid-range in camera doppia.</p>
         ${(t.src || []).length ? `<p class="eyebrow" style="margin:24px 0 10px">Fonti</p><p>${t.src.map(u => `<a href="${esc(safeUrl(u))}" target="_blank" rel="noopener">${esc(host(u))} ↗</a>`).join(" · ")}</p>` : ""}
         ${DEST[t.arr] ? `<p style="margin-top:24px"><a href="#/d/${esc(t.arr)}">Scheda di ${esc(DEST[t.arr].city)} →</a></p>` : ""}</div>
@@ -1236,7 +1282,7 @@ function item(id){
     return {id, kind, name:t.name, sub:t.countries.join(" + "), href:"#/t/" + key, k:coverT(t), tab:"pop", area:t.area, g:t.g, temp:t.temp, rain:"", flag:t.flag || "", code:t.arr,
       pp:v ? v.voli + v.extra : null, unit:"voli", o:b ? b.c.o : null, lin:!!a && a.origins.has("LIN"), dep:b ? b.c.dep : null, n:b ? b.c.n : null, dur:v ? v.out[2] : null,
       stops:v ? Math.max(v.out[3], v.back ? v.back[3] : v.out[3]) : null, via:v ? v.out[7] : "",
-      nights:t.nights, oj:t.type === "oj", voli:v ? v.voli : null, est:!!v && v.a.k === "ow", interni:v ? v.interni : t.itot, land:t.land,
+      nights:t.nights, oj:t.type === "oj", voli:v ? v.voli : null, est:!!v && v.a.k === "ow", interni:v ? v.interni : t.itot, land:t.land, int:intInfo(t, v),
       totLo:v ? v.lo : t.land[0] + t.itot, totHi:v ? v.hi : t.land[1] + t.itot, totNote:v ? `voli + interni + a terra, ${t.nights} notti` : "senza voli internazionali", score:a ? a.bestS : null};
   }
   return null;
@@ -1299,6 +1345,7 @@ function cmpHTML(){
     <div class="cmp-r cmp-h" role="row"><div class="cmp-l" role="columnheader"><span class="sr">Voce</span></div>${its.map((x, i) => `<div class="cmp-c c${i}" role="columnheader"><a class="cmp-ph" href="${x.href}" tabindex="-1" aria-hidden="true">${x.k ? img(x.k, {sz:"thumb", alt:""}) : noPhoto(x.code)}</a><span class="cmp-k">${x.kind === "t" ? "giro" : "meta"} · ${esc(x.sub)}</span><a class="cmp-n" href="${x.href}">${esc(x.name)}</a></div>`).join("")}</div>
     ${row("Prezzo migliore <small>a persona</small>", x => x.pp == null ? nd + `<span class="cmp-s">nessun volo trovato</span>` : `<b class="cmp-pp num">${eur(x.pp)}</b><span class="cmp-s">${x.unit === "voli" ? "voli" : x.unit === "stima" ? "stima, due solo andata" : "A/R"} · da ${esc(oName(x.o))}${x.lin && x.o !== "LIN" ? " · anche da Linate" : ""}</span>${loPP != null && x.pp === loPP ? best("il più basso") : ""}${priceBadge(x.id)}`)}
     ${row("Costo totale stimato <small>a persona</small>", x => x.totLo == null ? nd + `<span class="cmp-s">${esc(x.totNote)}</span>` : `<b class="num">${eur(x.totLo)} – ${eur(x.totHi)}</b> <span class="est">stima</span><span class="cmp-s">${esc(x.totNote)} · coppia ${eur(x.totLo * 2)} – ${eur(x.totHi * 2)}</span>${loTot != null && x.totLo === loTot ? best("il più basso") : ""}`)}
+    ${its.some(x => x.kind === "t") ? row("Voli interni <small>a persona</small>", x => x.kind !== "t" ? `<span class="cmp-s">meta singola: nessun giro</span>` : !x.int.n ? `<b>nessuno</b><span class="cmp-s">ci si muove via terra</span>` : `<b class="num">${x.int.txt}</b> <span class="${x.int.cls}">${x.int.src}</span><span class="cmp-s">${x.int.routes.join(" · ")} · già nel costo totale</span>`) : ""}
     ${row("Date", x => x.dep ? `<b>${fmtD(x.dep)} → ${fmtD(addD(x.dep, x.n))}</b><span class="cmp-s">${x.n} giorni, nella data più economica</span>` : nd)}
     ${row("Ore di volo <small>andata</small>", x => x.dur == null ? nd : `<b class="num">${hm(x.dur)}</b>${loDur != null && x.dur === loDur ? best("il più corto") : ""}`)}
     ${row("Scali", x => x.stops == null ? nd : `<b>${stopsShort(x.stops)}</b>${x.via ? `<span class="cmp-s">via ${esc(x.via)}</span>` : ""}`)}
@@ -1350,6 +1397,7 @@ function votiRow(x, i, rank){
   return `<li class="vrow"><a class="vrow-ph" href="${x.href}" tabindex="-1" aria-hidden="true">${x.k ? img(x.k, {sz:"thumb", alt:""}) : noPhoto(x.code)}</a>
     <div class="vrow-t">${rank ? `<span class="vrow-i num">${i + 1}</span>` : ""}<a class="vrow-n" href="${x.href}">${esc(x.name)}</a>
       <span class="vrow-s">${esc(x.sub)} · <b class="num">${x.nights} notti</b>${x.oj ? " · open-jaw" : ""}${x.dep ? ` · ${fmtD(x.dep)} → ${fmtD(addD(x.dep, x.n))}` : ""}</span>
+      ${x.int && x.int.n ? `<span class="vrow-s intl"><b>${x.int.txt}</b> <span class="${x.int.cls}">${x.int.src}</span> ${x.int.routes.join(" · ")}</span>` : ""}
       ${votiCost(x)}
       <span class="bs">${a != null ? `<span class="b sun">media <b class="num">${avgTxt(a)}</b></span>` : ""}${rateVerdict(x.id).replace(/<span class="rt-avg">.*$/, "")}${priceBadge(x.id)}</span></div>
     <div class="vrow-r">${ps.map(p => rateRow(p, x.id, x.name)).join("")}</div>
@@ -1741,7 +1789,7 @@ function init(){
   go();
 }
 const App = {S, parse, pageHTML, homeParts, aggD, aggT, viewD, viewT, go, favUrl, BOT_USERNAME, API, FAV, favsHTML, toggleFav, loadFavs, flightT, histHTML, histRows, histAgg, HIST,
-  PIN, pinHTML, pinSubmit, readWho, RATE, loadRates, setRate, rateBlockIn, rateChipIn, rateBlock, rateChip, votiHTML, votiList, votiPool, votiSort, eur, GEO, LEAF, TILES, routeOf, tmapHTML, gmapsUrl, stageGeo, tmapOpen, tmapWatch, priceLevel, priceBadge, CMP, cmpToggle, cmpHTML, cmpBarHTML, item, mapHTML, mapBody, mapPoints, mapXY, loadWorld, WORLD, img, srcsetOf};
+  PIN, pinHTML, pinSubmit, readWho, RATE, loadRates, setRate, rateBlockIn, rateChipIn, rateBlock, rateChip, votiHTML, votiList, votiPool, votiSort, eur, GEO, LEAF, TILES, routeOf, tmapHTML, gmapsUrl, stageGeo, tmapOpen, tmapWatch, priceLevel, priceBadge, CMP, cmpToggle, cmpHTML, cmpBarHTML, item, mapHTML, mapBody, mapPoints, mapXY, loadWorld, WORLD, img, srcsetOf, tfs, arLinks, intInfo, PT};
 if(typeof window !== "undefined") window.App = App;
 init();
   return App;

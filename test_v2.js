@@ -742,7 +742,41 @@ const ratesBody = extra => ({ok:true, me:"Anna", people:[{k:KA, name:"Anna", me:
   ok(/Scalo a Madrid <span class="iata">MAD<\/span> · <b class="num">3h 15m<\/b>/.test(a) && /Scalo a Barcellona <span class="iata">BCN<\/span> · <b class="num">1h 35m<\/b>/.test(a), "card di volo: scalo con città e durata (anche a cavallo della mezzanotte)");
   ok(a.indexOf('lg-k">Andata') < a.indexOf('lg-k">Ritorno') && !/indicativo/.test(a), "card di volo: andata prima del ritorno, niente «indicativo» sul ritorno vero");
   ok(/<span class="est">indicativo<\/span>/.test(b) && /Ritorno indicativo: il più economico del giorno\. Sul biglietto A\/R potrebbe cambiare\./.test(b) && /Roma Fiumicino → Madrid → /.test(b), "card di volo: ritorno indicativo dichiarato; senza tratte il percorso viene dagli scali");
-  ok(/class="lg lg-na"/.test(c) && /orari non ancora letti/.test(c) && /Scalo a QQQ <span class="iata">QQQ<\/span> · <b class="num">1h 30m<\/b>/.test(c) && !/class="fn"/.test(c), "card di volo: ritorno non letto dichiarato; righe senza numero di volo");
+  ok(/class="lg lg-na"/.test(c) && /<span class="na">non ancora letto<\/span>/.test(c) && /<b>Orari e scali del ritorno da [^<]+ non li abbiamo ancora letti\.<\/b>/.test(c) && /al massimo 1 scalo anche al ritorno/.test(c)
+     && /Scalo a QQQ <span class="iata">QQQ<\/span> · <b class="num">1h 30m<\/b>/.test(c) && !/class="fn"/.test(c), "card di volo: ritorno non letto dichiarato in evidenza, con il limite di scali; righe senza numero di volo");
+  // link Google Flights: stesso filtro scali del prezzo su andata e ritorno e, dove si conoscono i voli, andata gia' scelta
+  const dec = u => Buffer.from(decodeURIComponent((u.match(/tfs=([^&"]+)/) || ["", ""])[1]).replace(/-/g, "+").replace(/_/g, "/"), "base64");
+  const cnt = (buf, sub) => { let n = 0, i = -1; while((i = buf.indexOf(sub, i + 1)) >= 0) n++; return n; };
+  const hrefs = h => [...h.matchAll(/<a href="(https:\/\/www\.google\.com\/travel\/flights\/search\?tfs=[^"]+)"[^>]*>([^<]+)<\/a>/g)].map(x => [x[1], x[2]]);
+  ok(e.App.tfs([["2027-08-14", "LIN", "EZE", 1, [["LIN", "2027-08-14", "LHR", "BA", "573"], ["LHR", "2027-08-14", "EZE", "BA", "245"]]], ["2027-08-24", "EZE", "LIN", 1]], 1)
+     === "Gl4SCjIwMjctMDgtMTQiHwoDTElOEgoyMDI3LTA4LTE0GgNMSFIqAkJBMgM1NzMiHwoDTEhSEgoyMDI3LTA4LTE0GgNFWkUqAkJBMgMyNDUoAWoFEgNMSU5yBRIDRVpFGhwSCjIwMjctMDgtMjQoAWoFEgNFWkVyBRIDTElOQgEBSAGYAQE=",
+     "link: il tfs con l'andata scelta e il limite di scali è identico a quello di returns.py (e del browser)");
+  ok(!/travel\/flights\?q=/.test(pg), "link: nessun link a testo libero (senza filtro scali) nella pagina della meta");
+  const la = hrefs(a), lc = hrefs(c);
+  const sel = dec(la[0] ? la[0][0] : ""), allA = dec(la[1] ? la[1][0] : "");
+  ok(la.length === 2 && la[0][1] === "Vedi il ritorno su Google Flights ↗" && la[1][1] === "Tutti gli A/R · max 1 scalo ↗", "link A/R: «vedi il ritorno» e ricerca completa → " + la.map(x => x[1]).join(" | "));
+  ok(cnt(sel, Buffer.from([0x28, 1])) === 2 && sel.includes("IB") && sel.includes("804") && sel.includes("107") && cnt(sel, Buffer.from("2027-08-14")) === 3 && sel.includes("2027-08-25"), "link «vedi il ritorno»: max 1 scalo su andata e ritorno, voli dell'andata scelti");
+  ok(cnt(allA, Buffer.from([0x28, 1])) === 2 && !allA.includes("804") && cnt(allA, Buffer.from("MXP")) === 2, "link «tutti gli A/R»: max 1 scalo su andata e ritorno, nessun volo scelto");
+  ok(lc.length === 2 && /Controlla il ritorno su Google Flights/.test(lc[0][1]) && lc[1][1] === "Google Flights A/R · max 1 scalo ↗" && lc.every(x => cnt(dec(x[0]), Buffer.from([0x28, 1])) === 2), "link senza numeri di volo: solo la ricerca con il filtro scali, anche dal blocco del ritorno non letto");
+  const two = e.App.arLinks("MXP", "EZE", "2027-08-14", "2027-08-25", 2, null);
+  ok(/max 2 scali ↗/.test(two) && cnt(dec(two), Buffer.from([0x28, 2])) === 2, "link di un'opzione a 2 scali: filtro a 2 scali su entrambe le tratte");
+  const big = e.App.tfs([["2027-08-14", "LIN", "COR", 2, [["LIN", "2027-08-14", "LHR", "BA", "573"], ["LHR", "2027-08-14", "EZE", "BA", "245"], ["EZE", "2027-08-15", "COR", "AR", "1500"], ["EZE", "2027-08-15", "COR", "AR", "1500"]]], ["2027-08-24", "COR", "LIN", 2]], 1);
+  const bb = Buffer.from(big.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+  ok(bb[0] === 0x1a && (bb[1] & 0x80) && ((bb[1] & 0x7f) | (bb[2] << 7)) > 127 && bb[3] === 0x12, "link: lunghezze oltre 127 byte in varint");
+  // scali di andata e ritorno nella testata e nelle card: il ritorno si dichiara sempre
+  ok(/andata 1 scalo · MAD · ritorno 1 scalo · BCN</.test(pg), "testata della meta: scali dell'andata e del ritorno letto");
+  {
+    const D2 = JSON.parse(JSON.stringify(D));
+    D2.raw.combos = D2.raw.combos.filter(x => x.d !== code || x.o === "LIN" || x.o === "FCO");
+    const p2 = boot("#/d/" + code, {dataObj:D2}).App.pageHTML({page:"dest", id:code});
+    ok(/andata 1 scalo · MAD · ritorno 1 scalo · BCN \(indicativo\)/.test(p2), "testata della meta: ritorno indicativo dichiarato");
+    D2.raw.combos = D2.raw.combos.filter(x => x.d !== code || x.o === "LIN");
+    const e3 = boot("#/d/" + code, {dataObj:D2}), p3 = e3.App.pageHTML({page:"dest", id:code});
+    ok(/andata 1 scalo · QQQ · ritorno: scali non ancora letti/.test(p3), "testata della meta: ritorno non ancora letto dichiarato");
+    e3.nav("#/"); e3.App.S.f = Object.assign(e3.App.S.f, {q:""});
+    const cardHome = (e3.els.grid.innerHTML.split('<article class="card').find(x => x.includes(`href="#/d/${code}"`)) || "");
+    ok(/ritorno: scali non ancora letti/.test(cardHome), "card della home: ritorno non ancora letto dichiarato");
+  }
   ok(/Pisa → /.test(d) && /Ryanair · diretto · 3h 20m/.test(d) && !/class="sgs"/.test(d) && /class="lg lg-na"/.test(d), "card di volo: dati con i soli 10 campi (diretto, nessun elenco di tratte)");
   // popular trip: A/R con ritorno letto + voli interni in un blocco a parte
   const T = D.raw.trips_popular, t = T.trips.find(x => x.best && x.best.kind === "rt" && x.air.some(y => y.k === "rt" && y.add.length));
@@ -756,7 +790,42 @@ const ratesBody = extra => ({ok:true, me:"Anna", people:[{k:KA, name:"Anna", me:
     ok(/<b>Voli internazionali<\/b><span class="real">A\/R · prezzo reale Google/.test(tc) && /lg-k">Andata<\/span><span class="lg-d">sab 14 ago/.test(tc) && /lg-k">Ritorno<\/span><span class="lg-d">mer 25 ago<\/span><span class="est">indicativo/.test(tc), "trip: card A/R con ANDATA e RITORNO → " + t.id);
     ok(/<b>13:00<\/b>/.test(tc) && /<b>09:20<\/b><sup>\+1<\/sup>/.test(tc) && /Scalo a Madrid <span class="iata">MAD<\/span> · <b class="num">2h 10m<\/b>/.test(tc) && /Iberia <span class="fn">IB 805<\/span>/.test(tc), "trip: orari, scalo e numero di volo del ritorno");
     const int = (tc.match(/<div class="lg lg-int"[\s\S]*?<\/div><\/div>/) || [""])[0];
-    ok(/lg-k">(Voli|Tratte) interni?e?<\/span><span class="est">stima<\/span>/.test(int) && int.includes(esc0(air.add[0][0])) && tc.indexOf("lg-int") > tc.indexOf('lg-k">Ritorno') && !/lg-k">(Andata|Ritorno)/.test(int), "trip: voli interni stimati in un blocco a parte, dopo i voli internazionali");
+    ok(/lg-k">(Voli|Tratte) interni?e?<\/span><span class="est">stima<\/span>/.test(int) && int.includes(esc0(String(air.add[0][0]).replace(/-/g, " → "))) && tc.indexOf("lg-int") > tc.indexOf('lg-k">Ritorno') && !/lg-k">(Andata|Ritorno)/.test(int), "trip: voli interni stimati in un blocco a parte, dopo i voli internazionali");
+    const tl = [...tc.matchAll(/<a href="(https:\/\/www\.google\.com\/travel\/flights\/search\?tfs=[^"]+)"[^>]*>([^<]+)<\/a>/g)].map(x => x[2]);
+    ok(tl.join("|") === "Vedi il ritorno su Google Flights ↗|Tutti gli A/R · max 1 scalo ↗" && !/travel\/flights\?q=/.test(tp), "trip: link A/R con il filtro scali e l'andata scelta → " + tl.join("|"));
+    // voli interni: badge con numero, prezzo e tratte; prezzo reale o stima a seconda della fonte; il reale entra nel totale
+    const D3 = JSON.parse(JSON.stringify(D)), t3 = D3.raw.trips_popular.trips.find(y => y.id === t.id), a3 = t3.air[ai];
+    t3.internal = [["Lima-Cusco", 58, 1, 70, "2027-08-15", "JetSMART", 1], ["La Paz-Uyuni A/R", 250, 0, 250, "", "", 2]]; t3.itot = 308;
+    a3.add = [["Cusco-Lima", 52, 1, 70, "2027-08-22", "JetSMART", 1]];
+    t3.cells = [{dep:"2027-08-14", n:11, o:"MXP", a:[[ai, 700, 52, n0, -1, n0 + 1, 2]], b:null, x:null}];
+    const b3 = boot("#/t/" + t.id, {dataObj:D3}), p3 = b3.App.pageHTML({page:"trip", id:t.id});
+    ok(/class="b glass wrapb intb"[^>]*>✈ 4 voli interni · ~360 € pp<\/span>/.test(p3), "voli interni: badge nella testata del giro con numero di voli e prezzo → " + ((p3.match(/intb"[^>]*>([^<]+)/) || [])[1]));
+    ok(/Lima → Cusco <span class="real">prezzo reale<\/span><small>JetSMART · Google Flights, volo del dom 15 ago<\/small><\/span><b class="num">58 €<\/b>/.test(p3) && /La Paz → Uyuni A\/R <span class="est">stima<\/span><\/span><b class="num">~250 €<\/b>/.test(p3),
+       "voli interni: tratte con prezzo reale (compagnia e giorno) o stima, nella pagina del giro");
+    ok(/class="lg lg-int real"[^>]*aria-label="Voli interni, prezzo reale"/.test(p3) && /Cusco → Lima <span class="real">prezzo reale<\/span>/.test(p3), "voli interni: tratta per chiudere il giro con prezzo reale nella card di volo");
+    ok(/<td>Voli interni <span class="est">in parte stima<\/span><small>Lima → Cusco 58 € \(reale\) · La Paz → Uyuni A\/R ~250 € · Cusco → Lima 52 € \(reale\)<\/small><\/td><td>360 €<\/td>/.test(p3), "voli interni: riga dei costi con reale e stima, e somma nel totale");
+    const v3 = b3.App.viewT(b3.App.PT[t.id], "all", 1);
+    ok(v3 && v3.cheap.o.tot === Math.round(700 + 52 + 308 + (t3.land[0] + t3.land[1]) / 2), "voli interni: il prezzo reale entra nel totale stimato del giro");
+    const it3 = b3.App.item("t_" + t.id);
+    ok(it3.int.n === 4 && it3.int.sum === 360 && it3.int.src === "in parte stima" && it3.int.routes.join("|") === "Lima → Cusco|La Paz → Uyuni A/R|Cusco → Lima", "voli interni: dati per voti e confronto");
+    b3.nav("#/trips"); b3.App.S.p = Object.assign(b3.App.S.p, {q:""});
+    const card3 = (b3.els.grid.innerHTML.split('<article class="card').find(y => y.includes(`href="#/t/${t.id}"`)) || "");
+    ok(/class="b info wrapb intb"[^>]*>✈ 4 voli interni · ~360 € pp<\/span>/.test(card3) && /class="meta intl"><b>Voli interni<\/b> <span class="est">in parte stima<\/span> Lima → Cusco · La Paz → Uyuni A\/R · Cusco → Lima<\/p>/.test(card3),
+       "voli interni: badge e tratte sulla card del giro nella lista dei Popular trips");
+    t3.internal = [["Lima-Cusco", 58, 1, 70, "2027-08-15", "JetSMART", 1]]; t3.itot = 58;
+    const b4 = boot("#/t/" + t.id, {dataObj:D3});
+    ok(/intb"[^>]*>✈ 2 voli interni · 110 € pp<\/span>/.test(b4.App.pageHTML({page:"trip", id:t.id})) && b4.App.item("t_" + t.id).int.src === "prezzo reale", "voli interni: tutti reali → prezzo senza «~» e «prezzo reale»");
+    b4.App.CMP.ids = ["t_" + t.id, "d_" + code];
+    const c4 = b4.App.cmpHTML();
+    ok(/role="rowheader">Voli interni <small>a persona<\/small>/.test(c4) && /<b class="num">✈ 2 voli interni · 110 € pp<\/b> <span class="real">prezzo reale<\/span><span class="cmp-s">Lima → Cusco · Cusco → Lima · già nel costo totale/.test(c4) && /meta singola: nessun giro/.test(c4),
+       "voli interni: riga nel confronto");
+    t3.internal = []; t3.itot = 0; a3.add = [["Erevan-Tbilisi via terra", 25, 0, 25, "", "", 0]];
+    const b5 = boot("#/t/" + t.id, {dataObj:D3}), p5 = b5.App.pageHTML({page:"trip", id:t.id});
+    ok(!/intb/.test(p5) && /lg-k">Tratte interne<\/span><span class="est">stima/.test(p5) && b5.App.item("t_" + t.id).int.n === 0, "voli interni: una tratta via terra non è un volo interno (nessun badge)");
+    // dati vecchi (voci con i soli 2 campi): tutto resta stima
+    a3.add = [["Cusco-Lima", 70]]; t3.internal = [["Lima-Cusco", 70]]; t3.itot = 70;
+    const p6 = boot("#/t/" + t.id, {dataObj:D3}).App.pageHTML({page:"trip", id:t.id});
+    ok(/intb"[^>]*>✈ 2 voli interni · ~140 € pp<\/span>/.test(p6) && !/undefined|NaN/.test(p6) && !/prezzo reale<\/span><small>/.test(p6), "voli interni: dati vecchi a 2 campi → stima");
   } else ok(false, "trip: nessun trip A/R con tratte interne nei dati per il test delle card");
 }
 
