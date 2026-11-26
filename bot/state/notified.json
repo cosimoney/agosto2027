@@ -1,9 +1,9 @@
 {
  "cards": {
-  "day": "2026-11-25",
-  "n": 3
+  "day": "2026-11-26",
+  "n": 2
  },
- "digest_last": "2026-11-25",
+ "digest_last": "2026-11-26",
  "fav": {
   "d_CMB": {
    "last": 749,
@@ -28,7 +28,7 @@
   "d_YUL": {
    "last": 685,
    "thr": 1000,
-   "under": true
+   "under": false
   },
   "t_argentina-nord": {
    "last": 851,
@@ -71,7 +71,7 @@
    "min": 639
   },
   "d_BVC@MXP": {
-   "min": 772
+   "min": 701
   },
   "d_CGK@MXP": {
    "min": 873
@@ -122,7 +122,7 @@
    "min": 851
   },
   "d_FAE@FCO-CIA": {
-   "min": 648
+   "min": 598
   },
   "d_FNC@FCO-CIA": {
    "min": 650
@@ -140,10 +140,13 @@
    "min": 340
   },
   "d_GYD@LIN": {
-   "min": 941
+   "min": 810
   },
   "d_GYD@MXP": {
    "min": 420
+  },
+  "d_GYD@PSA": {
+   "min": 731
   },
   "d_ISB@FCO-CIA": {
    "min": 817
@@ -178,6 +181,9 @@
   "d_RAI@FCO-CIA": {
    "min": 747
   },
+  "d_RAI@MXP": {
+   "min": 748
+  },
   "d_SID@FCO-CIA": {
    "min": 869
   },
@@ -209,10 +215,10 @@
    "min": 466
   },
   "d_TOS@MXP": {
-   "min": 367
+   "min": 277
   },
   "d_TOS@PSA": {
-   "min": 711
+   "min": 567
   },
   "d_VXE@FCO-CIA": {
    "min": 881
@@ -227,7 +233,10 @@
    "min": 920
   },
   "t_argentina-bariloche@MXP": {
-   "min": 961
+   "min": 910
+  },
+  "t_azzorre-isole@FCO-CIA": {
+   "min": 455
   },
   "t_azzorre-isole@LIN": {
    "min": 536
@@ -239,7 +248,7 @@
    "min": 267
   },
   "t_baku-tbilisi@LIN": {
-   "min": 489
+   "min": 347
   },
   "t_baku-tbilisi@MXP": {
    "min": 332
@@ -249,6 +258,9 @@
   },
   "t_bali-flores-komodo@MXP": {
    "min": 929
+  },
+  "t_bali-lombok@MXP": {
+   "min": 980
   },
   "t_bali-sumba-komodo@MXP": {
    "min": 929
@@ -296,7 +308,7 @@
    "min": 215
   },
   "t_georgia-armenia@PSA": {
-   "min": 580
+   "min": 527
   },
   "t_georgia-svaneti@FCO-CIA": {
    "min": 354
@@ -352,6 +364,9 @@
   "t_lofoten-tromso@MXP": {
    "min": 274
   },
+  "t_lofoten-tromso@PSA": {
+   "min": 529
+  },
   "t_malesia-borneo@FCO-CIA": {
    "min": 852
   },
@@ -397,8 +412,14 @@
   "t_usa-grand-circle@FCO-CIA": {
    "min": 850
   },
+  "t_usa-grand-circle@LIN": {
+   "min": 956
+  },
   "t_usa-grand-circle@MXP": {
    "min": 840
+  },
+  "t_usa-grand-circle@PSA": {
+   "min": 968
   },
   "t_usa-pacific-northwest@FCO-CIA": {
    "min": 940
@@ -425,7 +446,7 @@
    "min": 684
   },
   "t_usa-sierra-nevada@MXP": {
-   "min": 880
+   "min": 711
   }
  },
  "prefs_cache": {
