@@ -7,6 +7,7 @@ __pycache__/
 /raw_v2.jsonl
 /trips_raw_v2.jsonl
 /returns_v2.jsonl
+/internal_v2.jsonl
 /trips_data.json
 /scan_meta.json
 /bot/snapshot.json

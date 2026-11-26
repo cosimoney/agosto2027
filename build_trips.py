@@ -13,6 +13,11 @@ Formati compatti:
   opzione  = [indice in trip.air, prezzo voli Google pp, extra stimato pp, leg andata, leg ritorno | -1]
   cella    = {dep, n, o, a:[opzioni <=1 scalo, dalla piu' economica], b: opzione con 2 scali che rispetta la regola | null, x: min prezzo 2 scali altrimenti}
 
+Voli interni (internal.py): trip.internal e air[i].add sono liste di
+  [etichetta, euro pp usati nel totale, 1 = prezzo reale letto su Google Flights | 0 = stima del catalogo,
+   stima del catalogo, giorno del volo letto, compagnie, quanti voli (0 = tratta via terra)]
+  trip.itot e l'extra delle opzioni ([2]) sommano i prezzi usati: reali dove ci sono, stime altrove.
+
 Tratte complete e ritorno degli A/R (returns.py):
   legs[i][11] = indice in itin.rows (tratte del volo: vedi returns.Itin); blob["itin"] = {rows, al, ap}
   opzione A/R: [4] resta -1; se il ritorno e' stato letto seguono [5] = leg del ritorno e [6] = tipo
@@ -23,6 +28,7 @@ from datetime import date, timedelta
 import popular_trips as P
 import origins
 import returns
+import internal
 
 MIN_PCT, MIN_EUR = 0.25, 150
 ORIGINS = origins.ORIGINS
@@ -52,6 +58,8 @@ def sig(f):
 LEGS, LEG_IX = [], {}
 ITIN = returns.Itin()
 RET_ROWS = returns.load()
+INT_ROWS = internal.load()
+INT_PICKS = []  # per giro: partenza piu' economica ed etichette dei voli interni, internal.py ci cerca i prezzi reali
 OW_ROWS = {k: r for k, r in raw.items() if k.startswith("OW|")}
 PICKS = []      # opzioni A/R mostrate, con il volo dell'andata: returns.py ci cerca il ritorno
 def leg(f):
@@ -62,11 +70,18 @@ def leg(f):
         LEG_IX[t] = len(LEGS); LEGS.append(list(t))
     return LEG_IX[t]
 
-def rt_opt(tid, ai, f, x, o, hub, dep, ret, ms):
-    """Opzione A/R su un hub: andata + (se letto) il ritorno."""
-    PICKS.append({"o": o, "d": hub, "dep": dep, "ret": ret, "ms": ms, "f": f, "tot": f["price"] + x, "tgt": "t_" + tid})
-    r = returns.lookup(RET_ROWS, OW_ROWS, o, hub, dep, ret, ms, f)
-    return [ai, f["price"], x, leg(f), -1] + ([leg(r[0]), r[1]] if r else [])
+DROPPED = []    # opzioni scartate: il ritorno letto di quel biglietto ha piu' scali del limite
+def rt_opt(tid, ai, fs, x, o, hub, dep, ret, ms):
+    """Opzione A/R su un hub: andata + (se letto) il ritorno. fs = andate dalla piu' economica: vale la prima il cui
+    ritorno letto rispetta il limite di scali (di norma la prima; al massimo 3 tentativi). None se nessuna."""
+    for f in fs[:3]:
+        PICKS.append({"o": o, "d": hub, "dep": dep, "ret": ret, "ms": ms, "f": f, "tot": f["price"] + x, "tgt": "t_" + tid})
+        r = returns.lookup(RET_ROWS, OW_ROWS, o, hub, dep, ret, ms, f)
+        if r and r[1] == 3:
+            DROPPED.append("%s|%s|%s|%s|%d %d EUR: ritorno con %d scali" % (o, hub, dep, ret, ms, f["price"], len(r[0]["segs"]) - 1))
+            continue
+        return [ai, f["price"], x, leg(f), -1] + ([leg(r[0]), r[1]] if r else [])
+    return None
 
 used = {"q": 0, "ok": 0, "reuse": 0}
 seen_keys = set()
@@ -103,8 +118,10 @@ def rt_pool(o, hub, dep, ret):
 
 trips_out = []
 for t in P.TRIPS:
+    # voli interni e tratte extra: [etichetta, euro pp, 1 = prezzo reale | 0 = stima, stima del catalogo, giorno letto, compagnie, n. voli]
+    ient = lambda e: internal.entry(INT_ROWS, t["id"], e)
     air = [{"k": "ow" if a[0] == "oj" else "rt", "a": a[1], "b": a[2] if a[0] == "oj" else a[1],
-            "add": [list(x) for x in (a[2] if a[0] == "rt" else [])], "note": a[3] if a[0] == "rt" else ""} for a in t["air"]]
+            "add": [ient(x) for x in (a[2] if a[0] == "rt" else [])], "note": a[3] if a[0] == "rt" else ""} for a in t["air"]]
     cov = [[0, 0, 0] for _ in air]   # per modo di volare: query, query con voli, celle con opzione <=1 scalo
     covk = [{} for _ in air]
     cells = []
@@ -135,10 +152,12 @@ for t in P.TRIPS:
                     else:
                         f1, f2, ks = rt_pool(o, a["a"], dep, ret)
                         covk[ai].update(ks)
-                        if f1:
-                            one.append(rt_opt(t["id"], ai, f1[0], x, o, a["a"], dep, ret, 1)); cov[ai][2] += 1
-                        if f2:
-                            two.append(rt_opt(t["id"], ai, f2[0], x, o, a["a"], dep, ret, 2))
+                        op1 = rt_opt(t["id"], ai, f1, x, o, a["a"], dep, ret, 1) if f1 else None
+                        if op1:
+                            one.append(op1); cov[ai][2] += 1
+                        op2 = rt_opt(t["id"], ai, f2, x, o, a["a"], dep, ret, 2) if f2 else None
+                        if op2:
+                            two.append(op2)
                 tot = lambda op: op[1] + op[2]
                 one.sort(key=tot); two.sort(key=tot)
                 if not one and not two:
@@ -152,8 +171,8 @@ for t in P.TRIPS:
                 cells.append({"dep": dep, "n": n, "o": o, "a": one, "b": b, "x": x2})
     for ai in range(len(air)):
         cov[ai][0], cov[ai][1] = len(covk[ai]), sum(covk[ai].values())
-    internal = [list(x) for x in t["internal"]]
-    itot = sum(x[1] for x in internal)
+    internal_ = [ient(x) for x in t["internal"]]
+    itot = sum(x[1] for x in internal_)
     valid = [c for c in cells if c["a"]]
     why = None
     if not valid:
@@ -181,7 +200,14 @@ for t in P.TRIPS:
     if valid:
         best = best_of(valid)
     d = dict(t)
-    d.update({"air": air, "internal": internal, "itot": itot, "nights": sum(s[1] for s in t["stages"]), "stages": [list(s) for s in t["stages"]],
+    labels = [e[0] for e in internal_ if e[6]] + [e[0] for a in air for e in a["add"] if e[6]]
+    if labels:
+        must = {e[0]: True for e in internal_}
+        if best:
+            must.update({e[0]: True for e in next(a for a in air if a["k"] == best["kind"] and a["a"] == best["hub"])["add"]})
+        INT_PICKS.append({"tid": t["id"], "dep": best["dep"] if best else DEPS[4], "tot": best["tot"] if best else 99999,
+                          "labels": list(dict.fromkeys(labels)), "must": must})
+    d.update({"air": air, "internal": internal_, "itot": itot, "nights": sum(s[1] for s in t["stages"]), "stages": [list(s) for s in t["stages"]],
               "land": list(t["land"]), "cells": cells, "cov": cov, "why": why, "best": best, "bestBy": best_by})
     trips_out.append(d)
 
