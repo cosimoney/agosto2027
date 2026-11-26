@@ -36,7 +36,9 @@ KEEP = int(os.environ.get("INT_KEEP") or 7)
 KEEP_EMPTY = 2              # una pagina tornata senza voli si richiede prima: spesso e' solo vuota quel giorno
 WORKERS = int(os.environ.get("INT_WORKERS") or 2)
 MS = 1                      # al massimo 1 scalo anche sui voli interni
-MAX_BLOCKED = 3
+MAX_BLOCKED = 6
+PAUSE = 90                  # secondi di pausa per tutti dopo un blocco di Google (429 / captcha)
+pause_until = [0.0]
 ONLY = set(filter(None, (os.environ.get("INT_ONLY") or "").split(",")))   # prove: solo questi giri (id)
 lock = threading.Lock()
 stats = {"req": 0, "ok": 0, "empty": 0, "fail": 0, "blocked": 0}
@@ -258,12 +260,16 @@ def work(k, rows, state):
         if time.time() > state["deadline"] or stats["blocked"] >= MAX_BLOCKED or stats["req"] >= state["max"]:
             return
         stats["req"] += 1
+    w = pause_until[0] - time.time()
+    if w > 0:
+        time.sleep(min(w, max(0.0, state["deadline"] - time.time())))
     time.sleep(0.6 + random.random() * 0.9)
     try:
         st, fl = gf.fetch(_query(k), tries=2)
     except gf.Blocked:
         with lock:
             stats["blocked"] += 1
+            pause_until[0] = time.time() + PAUSE
         return
     except Exception:
         st, fl = "error", []

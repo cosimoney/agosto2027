@@ -26,8 +26,8 @@ EST_BUDGET_MIN (default 75 minuti, o un terzo di SCAN_BUDGET_MIN nelle prove cor
 chiavi non rifatte in tempo restano quelle del giro prima e vanno per prime al giro dopo. EST_BUDGET_MIN=0 le spegne.
 Lo stesso ripiego e' acceso nel ricontrollo dei vuoti dei popular trips (fase C e verify_trips.py).
 
-Ritorni (returns.py): la pagina di un A/R elenca solo le andate. Dopo la scansione (e dopo fill / retry), prima del build,
-si legge il ritorno delle opzioni mostrate dal sito: la pagina dello stesso A/R con l'andata gia' scelta, e come ripiego il
+Ritorni (returns.py): la pagina di un A/R elenca solo le andate. Dopo la scansione e prima delle stime (in fill allo stesso
+modo, in retry alla fine) si legge il ritorno delle opzioni mostrate dal sito: la pagina dello stesso A/R con l'andata gia' scelta, e come ripiego il
 solo andata di quel giorno. Solo pagine html, mai GetShoppingResults. Prima l'opzione migliore di ogni meta e trip per
 citta' di partenza, poi le altre celle; tetto RET_MAX richieste (default 2500) e RET_BUDGET_MIN minuti (default 45, 0 = spento).
 Le righe stanno in returns_v2.jsonl (branch "data") e restano valide finche' andata e prezzo non cambiano. Un blocco o un
@@ -307,6 +307,11 @@ def scan():
         if os.path.exists("raw.jsonl"):
             os.remove("raw.jsonl")
 
+    # ritorni degli A/R e voli interni PRIMA delle stime: sono pagine html come quelle della scansione, mentre le stime
+    # usano GetShoppingResults, che blocca in fretta; subito dopo anche le pagine tornano bloccate e i ritorni si fermerebbero
+    # dopo poche righe. Fuori dai conteggi del giro e mai un motivo per farlo fallire.
+    ret_meta, int_meta = returns_step(True), internal_step(True)
+
     # stime per le coppie rimaste senza A/R (fuori dal controllo anti-blocco: sono un'altra fonte)
     est, est_stale = estimates(t0, prev_raw, prev_trips, first)
     tstale += est_stale
@@ -335,8 +340,7 @@ def scan():
              "Google sta probabilmente bloccando il runner. Niente pubblicazione, niente avvisi." % (ok_now, ok_prev, n_fresh, blocked))
     elif ok_prev < 50 and ok_now < min(MIN_OK_ABS, max(1, n_fresh // 20)):
         fail("solo %d risultati con voli su %d query e nessun giro precedente con cui confrontare (%d bloccate)." % (ok_now, n_fresh, blocked))
-    meta["ret"] = returns_step(True)     # dopo il controllo anti-blocco: sono poche pagine in piu', fuori dai conteggi del giro
-    meta["int"] = internal_step(True)
+    meta["ret"], meta["int"] = ret_meta, int_meta
     meta["minutes"] = round((time.time() - t0) / 60, 1)
     with open(META, "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=1)
@@ -409,12 +413,14 @@ def fill():
             T.run(tb, "trip nuovi B(ms1)")
             T.run(tb, "trip nuovi B ricontrollo", workers=2, v=1, slow=True)
 
+    for path in (RAW, TRIPS_RAW):
+        rewrite(path, set())                 # una riga per chiave
+    ret = returns_step(False)            # ritorni delle opzioni nuove (e di quelle rimaste senza): prima delle stime, vedi scan()
+    inte = internal_step(False)          # voli interni dei giri nuovi (e di quelli rimasti senza prezzo reale)
     est, _ = estimates(t0, prev_raw, prev_trips)   # stime per le mete nuove rimaste senza A/R (e per le chiavi mancanti delle altre)
     r, t = load(RAW), load(TRIPS_RAW)
     for path, rows in ((RAW, r), (TRIPS_RAW, t)):
         rewrite(path, set())                 # una riga per chiave
-    ret = returns_step(False)            # ritorni delle opzioni nuove (e di quelle rimaste senza)
-    inte = internal_step(False)          # voli interni dei giri nuovi (e di quelli rimasti senza prezzo reale)
     blocked = S.stats.get("blocked", 0) + T.stats.get("blocked", 0)
     new_keys = [key(x) for x in a] + ta
     ok_new = sum(1 for k in new_keys if (r.get(k) or t.get(k) or {}).get("st") == "ok")

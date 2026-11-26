@@ -17,6 +17,9 @@ che la pagina apre da sola), poi le altre celle dalla piu' economica, fino a RET
 RET_BUDGET_MIN minuti (default 45) per giro: sono pagine come quelle della scansione (che ne legge circa 21.000 a giro
 senza blocchi), quindi un decimo in piu'; al terzo blocco ci si ferma comunque. Le righe gia' lette restano valide finche' andata e prezzo non cambiano
 (al massimo RET_KEEP giri, default 6), quindi la copertura cresce di giro in giro senza rifare le stesse richieste.
+Un blocco di Google (429 / captcha) mette in pausa tutti per RET_PAUSE secondi; dopo RET_MAX_BLOCKED blocchi ci si ferma.
+Nella pipeline questo passo gira PRIMA delle stime: quelle usano GetShoppingResults, che blocca in fretta, e subito dopo
+anche le pagine tornano bloccate (giro del 26/11: 4 blocchi su 38 richieste, fermo dopo 33 righe).
 
 Dati: returns_v2.jsonl, una riga per chiave (sta sul branch "data" con gli altri file del giro):
   R|orig|meta|andata|ritorno|ms|BA573-BA245   {"st", "p": prezzo A/R letto, "fl": [ritorni, dal piu' economico], "age"}
@@ -34,7 +37,9 @@ MAX_REQ = int(os.environ.get("RET_MAX") or 2500)
 BUDGET_MIN = float(os.environ.get("RET_BUDGET_MIN") or 45)
 KEEP = int(os.environ.get("RET_KEEP") or 6)          # giri per cui una riga letta resta valida senza rifarla
 WORKERS = int(os.environ.get("RET_WORKERS") or 3)
-MAX_BLOCKED = 3
+MAX_BLOCKED = int(os.environ.get("RET_MAX_BLOCKED") or 8)   # dopo tanti blocchi (429 / captcha) ci si ferma: restano le righe lette
+PAUSE = float(os.environ.get("RET_PAUSE") or 90)             # secondi di pausa per tutti dopo un blocco, come nella scansione
+pause_until = [0.0]
 ONLY = set(filter(None, (os.environ.get("RET_ONLY") or "").split(",")))   # prove: solo queste mete / hub (codici IATA)
 lock = threading.Lock()
 stats = {"req": 0, "ok": 0, "empty": 0, "fail": 0, "blocked": 0, "same": 0, "ow": 0}
@@ -247,13 +252,17 @@ def work(p, rows, state):
             if stats["req"] >= state["max"]:
                 return
             stats["req"] += 1; state["done"].add(key)
+        w = pause_until[0] - time.time()
+        if w > 0:
+            time.sleep(min(w, max(0.0, state["deadline"] - time.time())))
         time.sleep(0.6 + random.random() * 0.9)
         try:
             q = gf.ReturnQuery(o, d, dep, ret, ms, f["segs"]) if kind == "sel" else _ow_query(o, d, ret, ms)
             st, fl = gf.fetch(q, tries=2)
         except gf.Blocked:
             with lock:
-                stats["blocked"] += 1
+                stats["blocked"] += 1; state["done"].discard(key)
+                pause_until[0] = time.time() + PAUSE
             return
         except Exception:
             st, fl = "error", []
