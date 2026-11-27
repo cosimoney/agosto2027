@@ -1,9 +1,9 @@
 {
  "cards": {
-  "day": "2026-11-26",
-  "n": 2
+  "day": "2026-11-27",
+  "n": 3
  },
- "digest_last": "2026-11-26",
+ "digest_last": "2026-11-27",
  "fav": {
   "d_CMB": {
    "last": 749,
@@ -28,15 +28,15 @@
   "d_YUL": {
    "last": 685,
    "thr": 1000,
-   "under": false
+   "under": true
   },
   "t_argentina-nord": {
    "last": 851,
    "thr": 1000,
-   "under": true
+   "under": false
   },
   "t_atacama-uyuni-salta": {
-   "last": 1171,
+   "last": 1059,
    "thr": 1000,
    "under": false
   },
@@ -101,7 +101,7 @@
    "min": 411
   },
   "d_EVE@LIN": {
-   "min": 942
+   "min": 676
   },
   "d_EVE@MXP": {
    "min": 274
@@ -170,7 +170,7 @@
    "min": 887
   },
   "d_PDL@FCO-CIA": {
-   "min": 897
+   "min": 460
   },
   "d_PDL@LIN": {
    "min": 732
@@ -184,6 +184,9 @@
   "d_RAI@MXP": {
    "min": 748
   },
+  "d_SCL@LIN": {
+   "min": 754
+  },
   "d_SID@FCO-CIA": {
    "min": 869
   },
@@ -191,7 +194,7 @@
    "min": 399
   },
   "d_TBS@FCO-CIA": {
-   "min": 367
+   "min": 292
   },
   "d_TBS@LIN": {
    "min": 317
@@ -271,6 +274,9 @@
   "t_canada-great-bear@FCO-CIA": {
    "min": 930
   },
+  "t_canada-great-bear@LIN": {
+   "min": 891
+  },
   "t_canada-great-bear@MXP": {
    "min": 910
   },
@@ -281,7 +287,7 @@
    "min": 983
   },
   "t_canada-quebec@MXP": {
-   "min": 926
+   "min": 852
   },
   "t_canada-rockies@FCO-CIA": {
    "min": 890
@@ -311,7 +317,7 @@
    "min": 527
   },
   "t_georgia-svaneti@FCO-CIA": {
-   "min": 354
+   "min": 292
   },
   "t_georgia-svaneti@LIN": {
    "min": 317
@@ -365,7 +371,7 @@
    "min": 274
   },
   "t_lofoten-tromso@PSA": {
-   "min": 529
+   "min": 445
   },
   "t_malesia-borneo@FCO-CIA": {
    "min": 852
